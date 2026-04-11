@@ -41,6 +41,19 @@
 /api-design Поиск товаров с фильтрами по категории, цене и наличию
 ```
 
+## Структура
+
+```
+.claude/skills/
+├── api-review/
+│   └── SKILL.md        # ревью контракта
+└── api-design/
+    └── SKILL.md        # проектирование эндпоинтов
+
+docs/
+└── rest-api-style-guide.md   # свод правил (источник истины для скиллов)
+```
+
 ## Документация
 
 - [REST API Style Guide](docs/rest-api-style-guide.md) — свод правил проектирования REST API
