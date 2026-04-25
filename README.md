@@ -69,6 +69,47 @@
 /ddd-tactical-review src/.../order/domain    # ревью конкретного пакета
 ```
 
+### `/usecase-pattern-review`
+
+Ревью Java/Spring-кода на соответствие [методологии Use Case Pattern](https://vikulin-va.ru/use-case-pattern/) и корректное использование библиотеки [`usecase-pattern`](https://github.com/remodov/usecase-pattern).
+
+**Что проверяет:**
+- UseCase — immutable record/final, без логики
+- UseCaseHandler — `@Component`, `useCaseType()`, `@Transactional` (или `readOnly`)
+- Controller ходит только через `UseCaseDispatcher`
+- CQRS-маркеры (Уровень 2+): `UseCaseCommand` / `UseCaseQuery`
+- Слои моделей: JsonBean ≠ Pojo ≠ Domain
+- Hexagonal (Уровень 4): `core/` не импортирует Spring/jOOQ/REST/Kafka
+- UseCaseStep — только при реальном переиспользовании
+- Транзакции на Handler, события после `repository.save(...)`
+
+Скилл сам определяет уровень внедрения (1–4) и применяет соответствующие правила.
+
+**Использование:**
+
+```
+/usecase-pattern-review                       # ревью изменений из git diff
+/usecase-pattern-review src/.../OrderHandler.java
+```
+
+### `/usecase-pattern-design`
+
+Проектирование нового UseCase + UseCaseHandler (плюс контроллер и маппер) под `usecase-pattern`.
+
+**Что генерирует:**
+- `<Operation>UseCase` — record, реализующий `UseCase` / `UseCaseCommand` / `UseCaseQuery`
+- `<Operation>UseCaseHandler` — `@Component` с транзакционной политикой
+- Метод контроллера, диспатчащий UseCase
+- MapStruct-мапперы при необходимости
+- Доменные объекты (на Уровне 3+) и раскладку под `core/` + `adapter/` (на Уровне 4)
+
+**Использование:**
+
+```
+/usecase-pattern-design Команда «отменить заказ» с проверкой статуса
+/usecase-pattern-design Запрос списка заказов клиента с пагинацией
+```
+
 ### `/ddd-tactical-design`
 
 Проектирование нового агрегата (entity, value object, события, repository) с использованием `ddd-building-blocks`.
@@ -114,13 +155,16 @@ ln -s ~/projects/usecase-pattern-skills/.claude/skills/* ~/.claude/skills/
 
 ```
 .claude/skills/
-├── api-review/             # ревью контракта REST API
-├── api-design/             # проектирование REST-эндпоинтов
-├── ddd-tactical-review/    # ревью доменного кода (DDD tactical)
-└── ddd-tactical-design/    # проектирование агрегата (DDD tactical)
+├── api-review/                 # ревью контракта REST API
+├── api-design/                 # проектирование REST-эндпоинтов
+├── usecase-pattern-review/     # ревью кода на соответствие Use Case Pattern
+├── usecase-pattern-design/     # проектирование UseCase + Handler
+├── ddd-tactical-review/        # ревью доменного кода (DDD tactical)
+└── ddd-tactical-design/        # проектирование агрегата (DDD tactical)
 
 docs/
 ├── rest-api-style-guide.md          # снапшот vikulin-va.ru/rest-api-style-guide/
+├── usecase-pattern-style-guide.md   # снапшот vikulin-va.ru/use-case-pattern/
 └── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
 ```
 
