@@ -49,6 +49,44 @@
 /api-design Поиск товаров с фильтрами по категории, цене и наличию
 ```
 
+### `/ddd-tactical-review`
+
+Ревью доменного кода на соответствие [тактическим паттернам DDD](https://vikulin-va.ru/domain-driven-design/tactical-patterns/) и корректное использование библиотеки [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks).
+
+**Что проверяет:**
+- Entity → `Entity<ID>`, equals/hashCode не переопределены, ID `final`
+- Value Object → `ValueObject` + immutable + equals по значениям
+- Aggregate Root → `AggregateRoot<ID>`, события только в корне
+- Domain Event → `DomainEvent`, имя в прошедшем времени, immutable
+- Repository → `AggregateRepository<T, ID>`, публикация событий в `save`
+- Domain Service / Factory / Specification — обоснованность применения
+- Структура пакетов (по домену, не по типу)
+
+**Использование:**
+
+```
+/ddd-tactical-review                         # ревью изменений из git diff
+/ddd-tactical-review src/.../order/domain    # ревью конкретного пакета
+```
+
+### `/ddd-tactical-design`
+
+Проектирование нового агрегата (entity, value object, события, repository) с использованием `ddd-building-blocks`.
+
+**Что генерирует:**
+- Корень агрегата, внутренние Entity, Value Objects (records)
+- Доменные события (extends `DomainEvent`)
+- Интерфейс репозитория (extends `AggregateRepository`)
+- Раскладку пакетов по бизнес-домену
+- Чек-лист тестов на инварианты и события
+
+**Использование:**
+
+```
+/ddd-tactical-design Агрегат Order: позиции, статусы, событие OrderConfirmed
+/ddd-tactical-design VO Money с поддержкой валют и арифметики
+```
+
 ## Подключение к проекту
 
 ### Симлинк всех скиллов (рекомендуется)
@@ -76,21 +114,24 @@ ln -s ~/projects/usecase-pattern-skills/.claude/skills/* ~/.claude/skills/
 
 ```
 .claude/skills/
-├── api-review/
-│   └── SKILL.md        # ревью контракта
-└── api-design/
-    └── SKILL.md        # проектирование эндпоинтов
+├── api-review/             # ревью контракта REST API
+├── api-design/             # проектирование REST-эндпоинтов
+├── ddd-tactical-review/    # ревью доменного кода (DDD tactical)
+└── ddd-tactical-design/    # проектирование агрегата (DDD tactical)
 
 docs/
-└── rest-api-style-guide.md   # снапшот статьи vikulin-va.ru/rest-api-style-guide/
+├── rest-api-style-guide.md          # снапшот vikulin-va.ru/rest-api-style-guide/
+└── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
 ```
 
-## Связанные статьи
+## Связанные статьи и библиотеки
 
-- [REST API Style Guide](https://vikulin-va.ru/rest-api-style-guide/) — полный свод правил с диаграммами.
-- [Use Case Pattern](https://vikulin-va.ru/use-case-pattern/) — методология, частью которой является REST API контракт.
+- [REST API Style Guide](https://vikulin-va.ru/rest-api-style-guide/) — свод правил с диаграммами.
+- [Тактические паттерны DDD](https://vikulin-va.ru/domain-driven-design/tactical-patterns/) — Entity, Value Object, Aggregate, Domain Event, Repository.
+- [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks) — Java-библиотека базовых DDD-абстракций, на которой опираются скиллы DDD.
+- [Use Case Pattern](https://vikulin-va.ru/use-case-pattern/) — методология, объединяющая всё вместе.
 
-В планах — скиллы для остальных статей сайта (DDD, CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka, Auth Patterns).
+В планах — скиллы для остальных статей сайта (CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka, Auth Patterns).
 
 ## Лицензия
 
