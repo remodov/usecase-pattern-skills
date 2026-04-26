@@ -6,7 +6,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 # DDD Tactical Patterns Design
 
-You are designing or scaffolding a new domain model: a bounded context, an aggregate, a value object, or a domain event. The implementation must follow the team's DDD Tactical Patterns Style Guide and use the abstractions from the `ddd-building-blocks` library (package `ru.badgermock.ddd`).
+You are designing or scaffolding a new domain model: a bounded context, an aggregate, a value object, or a domain event. The implementation must follow the team's DDD Tactical Patterns Style Guide and use the abstractions from the `ddd-building-blocks` library (package `ru.vikulinva.ddd`).
 
 ## Instructions
 

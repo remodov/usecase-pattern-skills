@@ -6,7 +6,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 
 # DDD Tactical Patterns Review
 
-You are reviewing domain-layer code (aggregates, entities, value objects, domain events, repositories, domain services, specifications, factories) for compliance with the team's DDD Tactical Patterns Style Guide and correct usage of the `ddd-building-blocks` library (package `ru.badgermock.ddd`).
+You are reviewing domain-layer code (aggregates, entities, value objects, domain events, repositories, domain services, specifications, factories) for compliance with the team's DDD Tactical Patterns Style Guide and correct usage of the `ddd-building-blocks` library (package `ru.vikulinva.ddd`).
 
 ## Instructions
 

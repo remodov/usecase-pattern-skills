@@ -2,7 +2,7 @@
 
 Тактические паттерны DDD как они применяются в проектах с библиотекой
 [`ru.vikulinva:ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks)
-(пакет `ru.badgermock.ddd`).
+(пакет `ru.vikulinva.ddd`).
 
 Этот документ — единственный источник правды для скиллов
 `ddd-tactical-review` и `ddd-tactical-design`. Любые расхождения с этим
