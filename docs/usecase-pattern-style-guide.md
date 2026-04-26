@@ -275,7 +275,98 @@ adapter/
 
 ---
 
-## 12. Чек-лист обзора
+## 12. Проектные конвенции (default-ы для генерации)
+
+Когда скиллы (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`, `ucp-test-design`) собирают новый сервис на Tier C / UCP Level 4 — берут эти решения по умолчанию. Команда может явно отступить, но обязана зафиксировать причину.
+
+### 12.0 Сборка и persistence-стек (default)
+
+| Слой | Инструмент |
+|---|---|
+| Сборка | **Gradle (Kotlin DSL)** + версионный каталог `gradle/libs.versions.toml` |
+| Java | **21** (toolchain) — для самого сервиса и для всех публикуемых библиотек методологии |
+| Spring | Spring Boot 3.x |
+| Миграции БД | **Liquibase** (YAML changelog) — **не Flyway** |
+| Структура миграций | `migrations/db/changelog-master.yaml` на уровне репо + `migrations/db/changelog/v-X.Y/<feature>.yaml` |
+| jOOQ codegen | **`nu.studer.jooq`** Gradle-плагин, генерация после Liquibase update |
+| Локальная БД для разработки | `docker-compose.yml` с `postgres:16-alpine` |
+| Liquibase Gradle plugin | `org.liquibase.gradle` версия 2.2.2 + `liquibase-core 4.29.x` (стабильная связка) |
+
+**Почему Liquibase, а не Flyway:**
+
+- YAML-changeset читается людьми и diff-ится в PR.
+- `databasechangelog` хранит метаданные применённых изменений → откат через `rollback` встроен.
+- Плагин `org.liquibase.gradle` совместим с CLI-командой `update` и продакшен-Liquibase в Spring Boot.
+- В команде уже есть инструменты и шаблоны под Liquibase (см. эталон bus-tickets).
+
+### 12.1 Gradle multi-module с самого старта
+
+Для Tier C / UCP Level 4 проект **сразу** разделяется на модули (один модуль на каждый порт/адаптер), чтобы ArchUnit-правила работали с первого коммита:
+
+```
+<service>/
+  core/                          # @InboundPort, @OutboundPort, домен, UseCase, Handler
+  adapter-in-rest/               # @InboundAdapter REST
+  adapter-in-kafka/              # @InboundAdapter Kafka consumers
+  adapter-out-postgres/          # @OutboundAdapter jOOQ + Outbox writer
+  adapter-out-<external>/        # @OutboundAdapter HTTP-клиенты внешних систем
+  bootstrap/                     # Spring Boot main + application.yml + Dockerfile
+  test-utils/                    # BaseIntegrationTest, DatabasePreparer, TestObjectGenerator
+```
+
+Зависимости направлены внутрь: `bootstrap → adapter-* → core`. Adapter-модули **не зависят друг от друга** (горизонтально). `core` не зависит ни от чего, кроме `usecase-pattern-core`, `ddd-building-blocks`, `hexagonal-architecture-core` и стандартной Java.
+
+Tier B (UCP Levels 1–2) может оставаться single-module — multi-module не оправдан без Hexagonal.
+
+### 12.2 OpenAPI-first
+
+Для REST-контрактов **всегда** идём от OpenAPI:
+
+1. Скилл `ucp-api-design` пишет/обновляет YAML в `<module>/src/main/resources/openapi/<service>.openapi.yaml`.
+2. Plugin `org.openapi.generator` генерирует JsonBean DTO + интерфейсы контроллеров (`OrdersApi`) в `core/build/generated`.
+3. `OrderController implements OrdersApi` в `adapter-in-rest`.
+
+Никаких runtime аннотаций `@Operation`/`@ApiResponse` (springdoc) — спека первична. Изменение API → правка YAML → regenerate → код подхватывает.
+
+### 12.3 Outbox-relay через `@Scheduled`-job (V1)
+
+Outbox реализуется **внутри сервиса**:
+
+- `adapter-out-postgres` пишет в таблицу `outbox` в той же транзакции, что и агрегат (через `DomainEventPublisher`).
+- `OutboxRelayJob` в `adapter-out-kafka` (`@Scheduled(fixedDelay = ...)`), читает `outbox WHERE published_at IS NULL FOR UPDATE SKIP LOCKED`, публикует в Kafka, проставляет `published_at`.
+- Не используем Debezium / Kafka Connect в V1 — лишняя инфраструктура. Переходим на CDC только при реальной необходимости (RPS > 1000 событий/сек или требование zero-lag).
+
+Гарантия: at-least-once. Подписчики обязаны быть idempotent (`processed_events` таблица).
+
+### 12.4 Внешние HTTP-клиенты — Resilience4j
+
+В `adapter-out-<external>`:
+- `RestTemplate` или `WebClient` (по согласию команды).
+- Resilience4j: `Retry` + `CircuitBreaker` + `Timeout` + `Bulkhead` (если пул RPS заметный).
+- Бросаем доменные исключения наружу (`PaymentGatewayException`, `CatalogUnavailableException`), не `RestClientException`.
+
+### 12.5 jOOQ codegen после Liquibase
+
+Связка:
+
+1. `./gradlew :adapter-out-postgres:update` — Liquibase накатывает changelog на локальный Postgres из `docker-compose.yml`.
+2. `./gradlew :adapter-out-postgres:generateJooq` — `nu.studer.jooq` читает живую схему и генерирует Pojo + Records в `build/generated/jooq`.
+3. Композитная задача `regenerate` объединяет оба шага.
+
+**Конвенции codegen:**
+
+- Pojo называются `<Table>_Pojo` (PASCAL strategy с `MatcherRule.expression = "$0_Pojo"`).
+- `TIMESTAMP` (без TZ) → `OffsetDateTime` через `forcedTypes`.
+- Из генерации исключаются `databasechangelog` и `databasechangeloglock`.
+- Сгенерированный код — в classpath модуля `adapter-out-postgres`, **не коммитится** (в `.gitignore`).
+
+### 12.6 Тесты — см. `test-strategy.md`
+
+Synchronous, только Postgres + WireMock, `@MockitoBean DateTimeService/UuidGenerator`, `DatabasePreparer` + `TestObjectGenerator`. Полные правила — в [`test-strategy.md`](test-strategy.md).
+
+---
+
+## 13. Чек-лист обзора
 
 1. Каждый UseCase — record/final, без логики, имя = бизнес-операция.
 2. Каждый Handler — `@Component`, реализует useCaseType, помечен
