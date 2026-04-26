@@ -1,12 +1,21 @@
 ---
 name: usecase-spec-design
 description: Write a Use Case specification for a new or existing service from a business description, following the team's universal spec template (Tier A / B / C). Use when starting a new service, onboarding a legacy module, or formalising what a team has been building informally.
-allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
+allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(superpowers:*) Bash(mcp__plugin_context7_context7__*)
 ---
 
 # Use Case Specification — design
 
 You are writing a Use Case specification for a service. The output is a single markdown file in the project repository, structured according to the universal 16-section template, with depth chosen by **Tier** (A / B / C).
+
+## Зависимости
+
+Этот скилл предполагает наличие в окружении:
+
+- **Плагин `superpowers`** — для общих рабочих практик планирования и работы с TodoWrite. Если плагина нет, скилл всё равно отработает, но без вспомогательных хелперов.
+- **MCP-сервер `context7`** (`mcp__plugin_context7_context7__*`) — для подтягивания актуальной документации по библиотекам, упоминаемым в спеке (Spring Boot, jOOQ и т.п.). Если сервер не подключён, документационные ссылки в спеке оставляются без проверки актуальности.
+
+Если зависимости отсутствуют — скилл сообщает об этом в начале ответа, не падает молча.
 
 ## Instructions
 
