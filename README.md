@@ -128,6 +128,23 @@
 /ddd-tactical-design VO Money с поддержкой валют и арифметики
 ```
 
+### `/usecase-spec-design`
+
+Написание [Use Case спецификации](https://vikulin-va.ru/use-case-pattern/spec-template/) сервиса по бизнес-описанию. Сама определяет нужный Tier (A — legacy, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
+
+**Что генерирует:**
+- Markdown-файл спеки в `docs/spec.md`
+- 16 разделов: Bounded Context, глоссарий, доменная модель, состояния, роли, бизнес-правила, команды, события, queries, use cases, UI, саги, ошибки, интеграции, критерии приёмки, НФТ
+- Frontmatter с `tier`, `service`, `last_updated`
+- Кросс-ссылки между разделами (BR ↔ commands ↔ errors)
+
+**Использование:**
+
+```
+/usecase-spec-design Сервис заказов: бизнес-описание в docs/case.md
+/usecase-spec-design Tier C, Order Service, см. case.md и текущие агрегаты в src/
+```
+
 ## Подключение к проекту
 
 ### Симлинк всех скиллов (рекомендуется)
@@ -160,12 +177,14 @@ ln -s ~/projects/usecase-pattern-skills/.claude/skills/* ~/.claude/skills/
 ├── usecase-pattern-review/     # ревью кода на соответствие Use Case Pattern
 ├── usecase-pattern-design/     # проектирование UseCase + Handler
 ├── ddd-tactical-review/        # ревью доменного кода (DDD tactical)
-└── ddd-tactical-design/        # проектирование агрегата (DDD tactical)
+├── ddd-tactical-design/        # проектирование агрегата (DDD tactical)
+└── usecase-spec-design/        # написание Use Case спецификации сервиса
 
 docs/
 ├── rest-api-style-guide.md          # снапшот vikulin-va.ru/rest-api-style-guide/
 ├── usecase-pattern-style-guide.md   # снапшот vikulin-va.ru/use-case-pattern/
-└── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
+├── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
+└── usecase-spec-template.md         # снапшот vikulin-va.ru/use-case-pattern/spec-template/
 ```
 
 ## Связанные статьи и библиотеки
