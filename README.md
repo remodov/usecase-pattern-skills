@@ -164,6 +164,44 @@
 /ucp-java-style-review src/main/java/.../OrderHandler.java
 ```
 
+### `/ucp-auth-review`
+
+Ревью кода на соответствие [паттернам авторизации](https://vikulin-va.ru/auth-patterns/) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
+
+**Что проверяет:**
+- JWT validation через `oauth2ResourceServer().jwt()`, без кастомных фильтров.
+- На каждом REST-endpoint — `@PreAuthorize`.
+- Если endpoint работает с агрегатом по id — есть ABAC-проверка владения.
+- Outbound клиенты используют mTLS / Bearer (не анонимный HTTP).
+- `admin`-команды пишутся в audit log.
+- PII (email/phone/address/токены) не попадают в логи и `ProblemDetails.detail`.
+- Денежные команды требуют `Idempotency-Key`.
+
+**Использование:**
+
+```
+/ucp-auth-review                                # ревью изменений из git diff
+/ucp-auth-review src/main/java/.../SecurityConfig.java
+```
+
+### `/ucp-auth-design`
+
+Генерирует Spring Security + OAuth2 Resource Server конфигурацию под методологию: JWT, RBAC, ABAC-хелперы, audit-аспект, layout секретов, идемпотентность.
+
+**Что генерирует:**
+- `SecurityConfig` с `oauth2ResourceServer().jwt()` + `JwtAuthenticationConverter` (роли из `realm_access.roles`).
+- `AuthenticatedX` хелперы по ролям.
+- `@Component("access")` с ABAC-методами.
+- `@Around`-аспект для audit log админских команд.
+- Шаблоны `application-*.yml` с плейсхолдерами секретов.
+
+**Использование:**
+
+```
+/ucp-auth-design Domain Service: customer + admin, ABAC по customerId
+/ucp-auth-design BFF: OAuth2 Authorization Code + PKCE + Redis-сессия
+```
+
 ### `/ucp-test-design`
 
 Проектирование интеграционных и unit-тестов под [стратегию тестов](https://vikulin-va.ru/test-strategy/): синхронные, только PostgreSQL + WireMock, без Kafka/Redis в базовом классе, события через in-memory publisher.
@@ -216,7 +254,9 @@ ln -s ~/projects/usecase-pattern-skills/.claude/skills/* ~/.claude/skills/
 ├── ucp-ddd-tactical-design/        # проектирование агрегата (DDD tactical)
 ├── ucp-spec-design/        # написание Use Case спецификации сервиса
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
-└── ucp-test-design/        # проектирование интеграционных и unit-тестов
+├── ucp-test-design/        # проектирование интеграционных и unit-тестов
+├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
+└── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
 docs/
 ├── rest-api-style-guide.md          # снапшот vikulin-va.ru/rest-api-style-guide/
@@ -224,7 +264,8 @@ docs/
 ├── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
 ├── usecase-spec-template.md         # снапшот vikulin-va.ru/use-case-pattern/spec-template/
 ├── java-style-guide.md              # снапшот vikulin-va.ru/java-style-guide/
-└── test-strategy.md                 # снапшот vikulin-va.ru/test-strategy/
+├── test-strategy.md                 # снапшот vikulin-va.ru/test-strategy/
+└── auth-patterns-style-guide.md     # снапшот vikulin-va.ru/auth-patterns/
 ```
 
 ## Связанные статьи и библиотеки
