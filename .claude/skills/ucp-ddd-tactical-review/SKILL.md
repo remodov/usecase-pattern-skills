@@ -1,5 +1,5 @@
 ---
-name: ddd-tactical-review
+name: ucp-ddd-tactical-review
 description: Review domain code for compliance with the team's DDD Tactical Patterns Style Guide and correct usage of the ddd-building-blocks library. Use when reviewing aggregates, entities, value objects, domain events, repositories, or domain services.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---

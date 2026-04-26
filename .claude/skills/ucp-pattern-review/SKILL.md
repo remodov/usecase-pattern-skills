@@ -1,5 +1,5 @@
 ---
-name: usecase-pattern-review
+name: ucp-pattern-review
 description: Review Java/Spring code for compliance with the team's Use Case Pattern Style Guide and correct usage of the usecase-pattern library. Use when reviewing controllers, UseCase classes, UseCaseHandlers, dispatchers, or layer mapping (JsonBean / Pojo / Domain).
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---

@@ -1,5 +1,5 @@
 ---
-name: usecase-pattern-design
+name: ucp-pattern-design
 description: Design or scaffold a new business operation as a UseCase + UseCaseHandler using the usecase-pattern library, following the team's Use Case Pattern Style Guide. Use when adding a new endpoint, command, or query to a Spring Boot service.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---

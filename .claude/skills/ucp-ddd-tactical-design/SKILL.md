@@ -1,5 +1,5 @@
 ---
-name: ddd-tactical-design
+name: ucp-ddd-tactical-design
 description: Design or scaffold a new domain model (aggregate, entities, value objects, events, repository) following the team's DDD Tactical Patterns Style Guide and using the ddd-building-blocks library. Use when modelling a new bounded context, adding an aggregate, or introducing a new domain event.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---

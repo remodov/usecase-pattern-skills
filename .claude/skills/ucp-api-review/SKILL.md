@@ -1,5 +1,5 @@
 ---
-name: api-review
+name: ucp-api-review
 description: Review REST API contract or code for compliance with the team's REST API Style Guide. Use when reviewing OpenAPI specs, controllers, DTOs, or error handling code.
 allowed-tools: Read Glob Grep Bash(git diff*) Agent
 ---

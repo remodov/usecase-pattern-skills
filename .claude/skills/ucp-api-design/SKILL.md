@@ -1,5 +1,5 @@
 ---
-name: api-design
+name: ucp-api-design
 description: Design a new REST API endpoint or resource following the team's REST API Style Guide. Use when creating new endpoints, planning API structure, or writing OpenAPI specs from scratch.
 allowed-tools: Read Glob Grep Write Edit
 ---
