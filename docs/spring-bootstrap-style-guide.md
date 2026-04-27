@@ -111,7 +111,81 @@ public Jackson2ObjectMapperBuilderCustomizer objectMapperCustomizer() {
 
 ---
 
-## 7. Quickstart-чеклист
+## 7. Persistence — jOOQ и только generated классы
+
+`BS-17` **Persistence-слой во всех сервисах — только jOOQ.** Никаких альтернатив (JdbcTemplate, JPA/Hibernate, MyBatis, Spring Data JDBC), независимо от Tier'а сервиса. Это командное правило, оно перебивает любые tier-обоснования вида «для CRUD JdbcTemplate проще» или «JPA даёт быстрый старт». Подключаем `spring-boot-starter-jooq` + `nu.studer.jooq` plugin для кодогенерации.
+
+`BS-18` **Используем максимум сгенерённого кода: generated POJO, generated enum'ы, generated table-references.** Handcrafted POJO/entity, дублирующие строку БД, удаляются. Цель — меньше кода и один источник правды (Liquibase-схема → jOOQ codegen → Java).
+
+VARCHAR-колонки с фиксированным набором значений конвертируем в **Postgres ENUM types** через Liquibase (отдельный ChangeSet, обычно в `v-1.x/enum-types.yaml`):
+
+```yaml
+- changeSet:
+    id: v-1.1-create-notification-channel-enum
+    author: ...
+    changes:
+      - sql:
+          sql: "CREATE TYPE notification_channel AS ENUM ('EMAIL','PUSH')"
+          rollback: "DROP TYPE notification_channel"
+      - sql:
+          sql: |
+            ALTER TABLE notifications
+              ALTER COLUMN channel TYPE notification_channel
+              USING channel::notification_channel
+```
+
+Тогда jOOQ codegen автоматически создаст Java enum (`NotificationChannel`) — handcrafted enum в `domain/` не нужен.
+
+`BS-19` **Generated-классы не модифицируем.** Если на enum нужны методы (например, `isTerminal()`, `canRetry()`) — inline'им проверку на use-sites (`status == NotificationStatus.FAILED`), либо кладём методы в отдельный utility-класс. Добавление методов в generated-enum нарушает «один источник правды»: при следующей перегенерации они пропадут.
+
+`BS-20` **DTO внешних API остаются handcrafted.** Это касается только классов, дублирующих строку БД. JSON-DTO от REST-клиентов (`UserContact` от Customer BFF), Kafka-payload'ы, request/response DTO в OpenAPI-генерации — это не зона действия `BS-17/18`, они остаются ручными.
+
+### Codegen из applied-схемы
+
+Codegen в Gradle настроен так, что генерирует POJO/Records/Tables/Enums из **уже накатанной** Liquibase-схемы локального Postgres. Шаги local dev:
+
+```bash
+docker compose up -d postgres
+./gradlew update              # liquibase update — накатывает миграции
+./gradlew generateJooq        # jOOQ codegen из applied-схемы
+./gradlew test                # generated-классы видны компилятору
+```
+
+Удобный shortcut — task `regenerate`, объединяющий `update + generateJooq`.
+
+`build.gradle.kts` пример конфигурации (упрощённо):
+
+```kotlin
+jooq {
+    configurations {
+        create("main") {
+            jooqConfiguration.apply {
+                jdbc.apply { url = dbUrl; user = dbUser; password = dbPassword }
+                generator.apply {
+                    database.apply {
+                        name = "org.jooq.meta.postgres.PostgresDatabase"
+                        inputSchema = "public"
+                        excludes = "databasechangelog|databasechangeloglock"
+                    }
+                    target.apply {
+                        packageName = "<service>.generated"
+                    }
+                    generate.apply {
+                        isPojos = true
+                        isRecords = true
+                    }
+                }
+            }
+        }
+    }
+}
+```
+
+Сгенерированные файлы кладутся в `build/generated/jooq/` (в `.gitignore` через `**/generated/`) — на VCS не уходят, всегда регенерируются.
+
+---
+
+## 8. Quickstart-чеклист
 
 Когда сервис **не стартует**, проходим по этому списку перед глубоким копанием:
 
@@ -119,6 +193,9 @@ public Jackson2ObjectMapperBuilderCustomizer objectMapperCustomizer() {
 2. Активен ли профиль (`local` для `bootRun`)? Без профиля security требует JWK от живого Keycloak.
 3. Поднят ли Postgres из docker-compose? (`docker compose up -d postgres`)
 4. Liquibase накатил миграции? Смотри лог `liquibase.util: UPDATE SUMMARY`.
-5. На production-старте — есть ли `spring.security.oauth2.resourceserver.jwt.jwk-set-uri` в ENV?
+5. Generated jOOQ-классы на месте? (`./gradlew generateJooq` после `update`)
+6. На production-старте — есть ли `spring.security.oauth2.resourceserver.jwt.jwk-set-uri` в ENV?
 
-Когда сервис стартует, но события не уходят в Kafka — проверь, что `adapter-out-kafka` подключён в `bootstrap/build.gradle.kts` и `KafkaExternalEventPublisher` подменил logging-stub (см. `BS-15`).
+Когда сервис стартует, но:
+- События не уходят в Kafka — проверь, что `adapter-out-kafka` подключён в `bootstrap/build.gradle.kts` и `KafkaExternalEventPublisher` подменил logging-stub (см. `BS-15`).
+- В коде есть handcrafted POJO/enum, дублирующие БД, — это нарушение `BS-18`. Замени на generated-классы и удали handcrafted, см. `BS-17/18/19`.

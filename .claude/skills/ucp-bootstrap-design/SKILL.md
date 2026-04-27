@@ -1,6 +1,6 @@
 ---
 name: ucp-bootstrap-design
-description: Design or fix Spring Boot bootstrap configuration for a Use Case Pattern service — profiles (local / integration-test / production), production beans for clock/UUID interfaces, SecurityConfig per profile, Liquibase, Kafka listener gating, Jackson event-payload visibility. Use when scaffolding a new service or when bootRun fails with UnsatisfiedDependencyException, JWK-set fetch errors, empty outbox payloads, or the service refuses to start without a live Keycloak/Kafka.
+description: Design or fix Spring Boot bootstrap configuration for a Use Case Pattern service — profiles (local / integration-test / production), production beans for clock/UUID interfaces, SecurityConfig per profile, Liquibase, jOOQ codegen + generated-only persistence, Kafka listener gating, Jackson event-payload visibility. Use when scaffolding a new service or when bootRun fails with UnsatisfiedDependencyException, JWK-set fetch errors, empty outbox payloads, the service refuses to start without a live Keycloak/Kafka, or persistence layer uses JdbcTemplate/JPA instead of jOOQ.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) Bash(curl*)
 ---
 
@@ -16,6 +16,7 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
 - Outbox events publish but payload is empty / contains only base fields (`id`, `aggregateId`, `aggregateType`, `createdAt`).
 - `@KafkaListener`-consumers throw boot errors when there is no broker.
 - User asks for a `local` profile, dev quickstart, or "why doesn't the service start without docker-compose up everything".
+- Persistence layer uses JdbcTemplate / JPA / MyBatis or has handcrafted POJO/enum classes that duplicate database rows — violation of `BS-17/18` (jOOQ-only, generated-only).
 
 ## Instructions
 
@@ -63,7 +64,17 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
 
 8. **Wire migrations once, version forever.** Per `BS-10/BS-12`: `migrations/db/` at repo root, the `adapter-out-postgres` (or `bootstrap`) module pulls them via `srcDir(rootProject.file("migrations"))`. Subsequent schema changes go into new ChangeSet files (`v-1.1`, `v-1.2`); never edit applied ChangeSets — Liquibase will reject them on startup with checksum mismatch.
 
-9. **Document the local quickstart in README**:
+9. **Persistence — only jOOQ, only generated.** Per `BS-17/18/19/20`:
+   - **No JdbcTemplate, no JPA, no MyBatis.** This applies on **every** Tier (A/B/C). If you see a `JdbcTemplate`-based repo or a JPA `@Entity`, it's a violation; rewrite to jOOQ DSL on generated tables.
+   - **Codegen plugin**: `nu.studer.jooq` 10.x with PASCAL `_Pojo` strategy. Codegen runs against the **applied** Liquibase schema in local Postgres — workflow is `./gradlew update && ./gradlew generateJooq && ./gradlew test`. Add a `regenerate` task that combines both.
+   - **Use generated POJO and enums** (`<service>.generated.tables.pojos.*Pojo`, `<service>.generated.enums.*`) directly in repos, services, controllers' DTO mappers. Handcrafted `Notification` / `Channel` / `NotificationStatus` classes that duplicate the row layout — delete them.
+   - **VARCHAR-with-fixed-values columns → Postgres ENUM types.** Add a separate `v-1.x/enum-types.yaml` ChangeSet that creates the enum and ALTERs the column to use it. Then jOOQ codegen produces a Java enum automatically — no `forcedType`, no handcrafted enum.
+   - **Generated classes are not modified.** If you need methods on an enum (`isTerminal()`, `canRetry()`), inline the check at use-sites or put helpers in a utility class. Don't edit generated code, it'll be overwritten.
+   - **Exception** (`BS-20`): DTOs of external APIs (`UserContact` from a REST client, OpenAPI-generated DTOs, Kafka payloads) stay handcrafted — they're not from your DB.
+
+   When fixing a service that has handcrafted POJO/enum, the migration is mechanical: add the plugin, add a `v-1.x/enum-types.yaml` for any VARCHAR-enum columns, run `regenerate`, delete the handcrafted classes, search-and-replace imports, tests should still pass after the type renames.
+
+10. **Document the local quickstart in README**:
    ```bash
    docker compose up -d postgres
    ./gradlew :bootstrap:bootRun --args='--spring.profiles.active=local'
