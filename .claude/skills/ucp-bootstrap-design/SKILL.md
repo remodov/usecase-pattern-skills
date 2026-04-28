@@ -83,19 +83,48 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
 
 11. **Не цитировать коды правил в комментариях исходников** (`JS-7.3` в `java-style-guide.md`). В сгенерённых Java/YAML файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.д. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
 
-12. **Lombok + MapStruct — обязательны в build с самого старта** (см. `JS-6.6` и `R-LAY-3`). Прописать в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
-   ```kotlin
-   compileOnly("org.projectlombok:lombok:1.18.34")
-   annotationProcessor("org.projectlombok:lombok:1.18.34")
-   testCompileOnly("org.projectlombok:lombok:1.18.34")
-   testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
+12. **Lombok + MapStruct + OpenAPI-generator — обязательны в build с самого старта** (`JS-6.6`, `R-LAY-3`, style-guide §12.2). Прописать в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
 
-   implementation("org.mapstruct:mapstruct:1.6.3")
-   annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
-   // Lombok+MapStruct interop — без этого MapStruct не видит Lombok-сгенерированные ctor'ы.
-   annotationProcessor("org.projectlombok:lombok-mapstruct-binding:0.2.0")
+   ```kotlin
+   plugins {
+       id("org.openapi.generator") version "7.10.0"
+   }
+
+   dependencies {
+       compileOnly("org.projectlombok:lombok:1.18.34")
+       annotationProcessor("org.projectlombok:lombok:1.18.34")
+       testCompileOnly("org.projectlombok:lombok:1.18.34")
+       testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
+
+       implementation("org.mapstruct:mapstruct:1.6.3")
+       annotationProcessor("org.mapstruct:mapstruct-processor:1.6.3")
+       // Lombok+MapStruct interop — без этого MapStruct не видит Lombok-сгенерированные ctor'ы.
+       annotationProcessor("org.projectlombok:lombok-mapstruct-binding:0.2.0")
+   }
+
+   openApiGenerate {
+       generatorName.set("spring")
+       inputSpec.set("$projectDir/src/main/resources/openapi/<service>.openapi.yaml")
+       outputDir.set("$buildDir/generated/openapi")
+       apiPackage.set("<base>.generated.api")
+       modelPackage.set("<base>.generated.api.model")
+       configOptions.set(mapOf(
+           "useSpringBoot3" to "true",
+           "useJakartaEe" to "true",
+           "interfaceOnly" to "true",
+           "skipDefaultInterface" to "true",
+           "useTags" to "true",
+           "openApiNullable" to "false",
+           "documentationProvider" to "none",
+           "annotationLibrary" to "none",
+           "dateLibrary" to "java8"
+       ))
+   }
+   sourceSets["main"].java.srcDir("$buildDir/generated/openapi/src/main/java")
+   tasks.named("compileJava") { dependsOn("openApiGenerate") }
    ```
-   Без этого `ucp-pattern-design` упадёт на компиляции — он генерит `@RequiredArgsConstructor`-handler'ы (`JS-6.1`) и `@Mapper`-интерфейсы (`R-LAY-3`). Порядок annotation processor'ов: Lombok сначала, потом MapStruct (Gradle сам разрулит, если оба объявлены).
+
+   Без этого скиллы downstream'а упадут: `ucp-pattern-design` генерит `@RequiredArgsConstructor`-handler'ы (`JS-6.1`), `@Mapper`-интерфейсы (`R-LAY-3`) и `Controller implements <Tag>Api` (§12.2) — все три annotation/codegen-цепочки должны работать с первой компиляции.
 
 ## Output
 

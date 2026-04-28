@@ -24,13 +24,15 @@ You are designing a new REST API endpoint (or set of endpoints) following the te
    - Response: status code, response body structure, headers
    - Error responses: applicable HTTP codes with `code` enum values and `detail` examples
 
-4. **Output as OpenAPI spec** (YAML). Include:
-   - Paths with `operationId`, `tags`, `summary`, `description`
-   - Request/response schemas under `components/schemas`
-   - `ProblemDetails` and `Violation` schemas (copy from style guide section 13.7)
-   - `ErrorCode` enum with all applicable business error codes
-   - Error response examples for each endpoint (section 13.8)
-   - Pagination structure if listing endpoints exist
+4. **Output as OpenAPI spec** (YAML). **Файл — `<module>/src/main/resources/openapi/<service>.openapi.yaml`** (style-guide §12.2 — OpenAPI-first). НЕ `docs/api/`, НЕ рядом с маркдаун-спекой.
+
+   Include:
+   - Paths with `operationId`, `tags`, `summary`, `description` — `operationId` станет именем метода в `*Api`, `tags` определят имя интерфейса (`<Tag>Api`).
+   - Request/response schemas под `components/schemas`. Имена схем — это имена сгенерированных Java-классов (`ProductDto`, `CreateProductRequest`, `ProductPageDto`).
+   - `ProblemDetails` и `Violation` schemas (copy from style guide section 13.7).
+   - `ErrorCode` enum со всеми применимыми business error codes.
+   - Error response examples for each endpoint (section 13.8).
+   - Pagination structure if listing endpoints exist.
 
 5. **Validate your own output** against the style guide before presenting it. Check:
    - URLs: lowercase, kebab-case, plural nouns, `/api/v1/` prefix, max 2 nesting levels
@@ -41,8 +43,9 @@ You are designing a new REST API endpoint (or set of endpoints) following the te
    - Errors: RFC 9457, `application/problem+json`, `violations` for 400 validation
 
 6. After the OpenAPI spec, provide a brief **implementation notes** section:
-   - Spring controller method signatures
-   - Key DTOs needed
-   - Error codes to add to the project's ErrorCode enum
+   - **Generator wiring**: `org.openapi.generator` plugin должен быть в `build.gradle.kts` (если нет — флагнуть для `ucp-bootstrap-design`). Output: `build/generated/openapi/src/main/java`. Generated artifacts — `<package>.generated.api.<Tag>Api` (controller interface) + `<package>.generated.api.model.<Schema>` (DTO).
+   - **Controller контракт**: `<X>Controller implements <Tag>Api` — НЕ ручной `@RequestMapping`-класс с handcrafted DTO. См. `ucp-pattern-design`.
+   - Какие error codes добавить в Java `ErrorCode` enum (если он отдельный) или в `@ExceptionHandler` mapping.
+   - Что **не пишем руками**: request DTO, response DTO, page DTO, `<Tag>Api` интерфейс — всё генерируется. Hand-written DTO в `jsonbean/` пакете — нарушение `BS-20` (это касается DB-Pojo) **и** §12.2 (это касается API-DTO).
 
 $ARGUMENTS
