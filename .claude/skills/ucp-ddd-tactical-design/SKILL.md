@@ -10,7 +10,7 @@ You are designing or scaffolding a new domain model: a bounded context, an aggre
 
 ## Instructions
 
-1. **Read the style guide** from `docs/ddd-tactical-style-guide.md`. Treat every `R-*` rule as binding. Cite the rules you rely on in your design notes.
+1. **Read the style guide** from `docs/ddd-tactical-style-guide.md`. Treat every `R-*` rule as binding. Cite the rules you rely on **в design-обосновании ответа пользователю** — но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
 
 2. **Confirm the library is available.** Check `build.gradle` / `pom.xml` for `ru.vikulinva:ddd-building-blocks`. If absent, instruct the user to add it (and offer the dependency snippet) — do not invent local copies of `Entity`/`AggregateRoot`/`ValueObject`.
 
@@ -23,7 +23,7 @@ You are designing or scaffolding a new domain model: a bounded context, an aggre
    - Cross-aggregate references — must be by ID only.
    - Whether a Factory, Domain Service or Specification is justified (default: no).
 
-4. **Produce the code.** For each class, write a complete Java file (Java 21+, no Lombok unless project already uses it):
+4. **Produce the code.** For each class, write a complete Java file (Java 21+). На VO/Entity/Aggregate Lombok **не** применяем (`JS-6.4` — records уже дают ctor / accessors / equals; на агрегатах `@Builder` обходит инварианты, см. `JS-6.7`). Lombok оправдан только на **handler'ах / сервисах** в слое UseCase, не в `domain/`.
 
    - **Value Objects** as Java `record`s implementing `ValueObject`, with compact constructor validating invariants. If a record is not a fit (mutable algorithms, custom equals semantics), use `final class` with `final` fields.
    - **Entities** extending `Entity<ID>`, `id` `final`, only business methods (no setters), validation in constructor. Do not override `equals`/`hashCode`.

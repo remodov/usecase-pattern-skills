@@ -78,6 +78,7 @@ You are writing tests for a Java/Spring service following the team's Test Strate
 
 9. **Что запрещено:**
 
+   - **Цитирование кодов правил в комментариях тестов** (`JS-7.3` в `java-style-guide.md`). Никаких `// TS-9..TS-11`, `// TS-7`, `// AC-C5` в исходниках. Названия классов / методов / `@DisplayName` уже выражают соответствие сценарию — в `@DisplayName` цитата BR/AC ОК (это бизнес-описание, не code-style правило), а в коде — нет.
    - `Thread.sleep`, `Awaitility.await` — flaky (`TS-2`).
    - `Instant.now()`, `UUID.randomUUID()` напрямую в продакшен-коде — должны быть `DateTimeService`/`UuidGenerator` (`TS-7`).
    - `@MockBean` на бизнес-логику внутри своего сервиса (UseCaseHandler, агрегаты, репозитории). Mock-ируются только **внешние границы**: HTTP-клиенты (через WireMock или `@MockitoBean`), `DateTimeService`, `UuidGenerator`.

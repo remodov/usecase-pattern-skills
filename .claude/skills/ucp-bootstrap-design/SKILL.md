@@ -81,7 +81,9 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
    ```
    Plus the matrix of profiles (BS-2). If the README doesn't say which profile to use for local dev, the next dev to clone this repo will spend an hour debugging a JWK-fetch failure.
 
-11. **Lombok + MapStruct — обязательны в build с самого старта** (см. `JS-6.6` и `R-LAY-3`). Прописать в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
+11. **Не цитировать коды правил в комментариях исходников** (`JS-7.3` в `java-style-guide.md`). В сгенерённых Java/YAML файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.д. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
+
+12. **Lombok + MapStruct — обязательны в build с самого старта** (см. `JS-6.6` и `R-LAY-3`). Прописать в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
    ```kotlin
    compileOnly("org.projectlombok:lombok:1.18.34")
    annotationProcessor("org.projectlombok:lombok:1.18.34")

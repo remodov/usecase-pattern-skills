@@ -31,6 +31,8 @@ You are designing or scaffolding a new business operation: one or more `UseCase`
 
 5. **Produce the code.** Write complete Java files (Java 21+). **Lombok-defaults обязательны** (`JS-6.1`–`JS-6.7` в `java-style-guide.md`): `@RequiredArgsConstructor` на каждом Spring-бине с DI, `@Slf4j` вместо ручного `Logger`, `@Getter` на доменных исключениях с payload-полями. Lombok **не** навешиваем на records.
 
+   **Не цитировать коды правил в комментариях кода** (`JS-7.3`). Никаких `// R-UC-3`, `// R-LAY-2`, `// R-DSP-X2`, `// R-CQRS-1` в исходниках. Соответствие правилу выражается именами (`CreateProductUseCase`, `*Query*Handler`) и структурой (record + marker interface + `@Component` + `@Transactional`). Комментарий уместен только если WHY неочевиден из кода — и тогда без кода правила.
+
    - **`<Operation>UseCase`** — `record` implementing `UseCase<R>` (Level 1) or `UseCaseCommand<R>` / `UseCaseQuery<R>` (Level 2+). Immutable, no logic.
    - **`<Operation>UseCaseHandler`** — `@Component` + `@RequiredArgsConstructor`, implements `UseCaseHandler<MyUseCase, R>`, returns `MyUseCase.class` from `useCaseType()`, has `@Transactional` (or `readOnly = true`). Поля — `private final`, без явного constructor'а. Logic stays here.
    - **Controller method** — `@RestController` method that maps the request into the `UseCase`, calls `useCaseDispatcher.dispatch(...)`, returns the result. No business logic.
