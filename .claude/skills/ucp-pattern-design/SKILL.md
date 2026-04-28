@@ -34,7 +34,7 @@ You are designing or scaffolding a new business operation: one or more `UseCase`
    - **`<Operation>UseCase`** — `record` implementing `UseCase<R>` (Level 1) or `UseCaseCommand<R>` / `UseCaseQuery<R>` (Level 2+). Immutable, no logic.
    - **`<Operation>UseCaseHandler`** — `@Component` + `@RequiredArgsConstructor`, implements `UseCaseHandler<MyUseCase, R>`, returns `MyUseCase.class` from `useCaseType()`, has `@Transactional` (or `readOnly = true`). Поля — `private final`, без явного constructor'а. Logic stays here.
    - **Controller method** — `@RestController` method that maps the request into the `UseCase`, calls `useCaseDispatcher.dispatch(...)`, returns the result. No business logic.
-   - **Mapper** (if a new mapping is needed) — MapStruct interface annotated `@Mapper(componentModel = SPRING)`.
+   - **Mapper** (if a new mapping is needed) — **MapStruct interface обязательно** (`R-LAY-3`): `@Mapper(componentModel = "spring")` + `default`-методы внутри интерфейса для нетривиальных конверсий. Hand-written `@Component`-маппер — только при stateful / DI-зависимом маппинге, что не покрывается MapStruct'ом.
    - **(Level 3+)** **Domain pieces** — only if the operation actually requires new aggregate state, value object, or event. Follow `ddd-tactical-style-guide.md`. If the operation is pure read, prefer a Read Model and skip the aggregate.
    - **(Level 4)** Place files: `core/<bc>/usecase/...`, `core/<bc>/port/...`, `adapter/in/rest/...`, `adapter/out/<storage>/...`. Domain stays in `core/<bc>/domain/...`.
 
