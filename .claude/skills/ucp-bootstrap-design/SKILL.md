@@ -81,6 +81,15 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
    ```
    Plus the matrix of profiles (BS-2). If the README doesn't say which profile to use for local dev, the next dev to clone this repo will spend an hour debugging a JWK-fetch failure.
 
+11. **Lombok — обязателен в build с самого старта** (см. `JS-6.6` в `java-style-guide.md`). Прописать в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
+   ```kotlin
+   compileOnly("org.projectlombok:lombok:1.18.34")
+   annotationProcessor("org.projectlombok:lombok:1.18.34")
+   testCompileOnly("org.projectlombok:lombok:1.18.34")
+   testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
+   ```
+   Без этого `ucp-pattern-design` упадёт на компиляции, потому что генерит `@RequiredArgsConstructor`-handler'ы (`JS-6.1`).
+
 ## Output
 
 Produce concrete files (Java + YAML) and a short PR description that lists:

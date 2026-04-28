@@ -260,6 +260,81 @@ public class Entity {
 
 ---
 
+## 6. Lombok
+
+Lombok применяется во всех модулях по умолчанию — он убирает шум boilerplate-конструкторов и логгеров, не меняя видимой семантики. Правила ниже — обязательные.
+
+### `JS-6.1` `@RequiredArgsConstructor` на всех Spring-бинах с DI
+
+Любой `@Component` / `@Service` / `@Repository` / `@RestController` / `@Configuration` с DI-полями — `@RequiredArgsConstructor` + `private final` поля. Явный `public Foo(Bar bar) { this.bar = bar; }` не пишем.
+
+```java
+@Component
+@RequiredArgsConstructor
+public class CreateOrderUseCaseHandler implements UseCaseHandler<CreateOrderUseCase, OrderDto> {
+    private final OrderRepository orders;
+    private final DateTimeService dateTimeService;
+    private final UuidGenerator uuidGenerator;
+    // ... handle(...)
+}
+```
+
+Это перекрывает R-HND-5 из `usecase-pattern-style-guide.md`: Lombok — default, явный constructor — только для нестандартных кейсов (например, если нужно валидировать DI-аргументы или вызвать `super(...)`).
+
+### `JS-6.2` `@Slf4j` вместо ручного логгера
+
+```java
+@Slf4j
+@Component
+public class FooService { /* log.info(...) */ }
+```
+
+Не пишем `private static final Logger log = LoggerFactory.getLogger(FooService.class);` — это шум.
+
+### `JS-6.3` `@Getter` на custom exceptions и value-objects, которые не records
+
+Когда исключение несёт payload-поля (`productId`, `from`, `to`), accessor-методы — через `@Getter`, не руками. Если accessor нужен в record-стиле (без `get`-префикса) — оставляем явный, но не дублируем `@Getter`.
+
+```java
+@Getter
+public class InvalidStateTransitionException extends RuntimeException {
+    private final ProductStatus from;
+    private final ProductStatus to;
+    public InvalidStateTransitionException(ProductStatus from, ProductStatus to) {
+        super("Invalid transition: " + from + " -> " + to);
+        this.from = from;
+        this.to = to;
+    }
+}
+```
+
+### `JS-6.4` Lombok **не** на records
+
+Records уже дают immutable ctor / accessors / `equals` / `hashCode` / `toString`. `@Value`, `@Data`, `@AllArgsConstructor` поверх record — мусор и компилятор ругается.
+
+### `JS-6.5` `@Data` запрещён в производственном коде
+
+`@Data` генерирует mutable setters + equals/hashCode по всем полям — это две диверсии в одном: оно ломает неизменяемость и делает entity сравнимыми по `id` равных в коллекциях, что приводит к багам в `Set`-ах и JPA-кешах. Нужен POJO с геттерами/сеттерами для legacy-биндинга — пишем `@Getter @Setter` явно. Для иммутабельных DTO — record (см. `JS-6.4`).
+
+### `JS-6.6` Build-настройка одинакова во всех модулях
+
+```kotlin
+compileOnly("org.projectlombok:lombok:1.18.34")
+annotationProcessor("org.projectlombok:lombok:1.18.34")
+testCompileOnly("org.projectlombok:lombok:1.18.34")
+testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
+```
+
+Версия фиксируется в `gradle/libs.versions.toml` (если используется). `lombok` НЕ в `implementation` — это compile-time-only зависимость, не должна попасть в runtime classpath.
+
+### `JS-6.7` `@Builder` — точечно, не везде
+
+`@Builder` уместен на сложных DTO с 5+ полями и опциональными значениями (например, исходящие запросы во внешний API, настройки). Не вешаем его на каждый POJO «на всякий случай» — это раздувает API класса.
+
+`@Builder` запрещён на entity / aggregate root: построение агрегата идёт через named-конструкторы (`Order.draft(...)`, `Order.fromPersistence(...)`), Lombok-builder делает это бесконтрольно и обходит инварианты.
+
+---
+
 ## Настройка IDE (IntelliJ IDEA)
 
 1. Берём `checkstyle.xml` из проекта.
@@ -280,3 +355,4 @@ public class Entity {
 | Импорты | `JS-3.1`, `JS-3.2` |
 | Выражения | `JS-4.1`–`JS-4.7` |
 | Отступы | `JS-5.1`–`JS-5.3` |
+| Lombok | `JS-6.1`–`JS-6.7` |
