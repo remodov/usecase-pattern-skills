@@ -35,13 +35,14 @@ You are writing tests for a Java/Spring service following the team's Test Strate
 
 4. **Создай `<Domain>DatabasePreparer`** (`TS-9`–`TS-11`):
 
-   - `@Component`, обёртка над `DSLContext`, поле `List<Runnable> preparers = new ArrayList<>()`.
+   - `@Component` + `@RequiredArgsConstructor` (`JS-6.1`), обёртка над `DSLContext`, поле `private final DSLContext dsl;` + `private final List<Runnable> preparers = new ArrayList<>();`.
    - Методы трёх групп:
      - `clear<Table>()` — `dsl.deleteFrom(<TABLE>).execute()`.
      - `create<Entity>(<Pojo>)` — insert через `dsl.insertInto(...).set(dsl.newRecord(<TABLE>, pojo)).execute()`.
      - `prepare()` — `preparers.forEach(Runnable::run); preparers.clear();`.
    - Не пересоздавай схему, только `DELETE`.
    - Учти порядок FK: при чистке — зависимые сначала; при создании — родительские сначала.
+   - Lombok в test-scope тоже: `testCompileOnly` + `testAnnotationProcessor` (`JS-6.6`). Скилл `ucp-bootstrap-design` это уже прописал в build.
 
 5. **Создай `<Entity>TestObjectGenerator`** для каждой POJO, на которую опирается тест (`TS-12`–`TS-14`):
 

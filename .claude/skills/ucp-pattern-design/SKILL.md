@@ -29,10 +29,10 @@ You are designing or scaffolding a new business operation: one or more `UseCase`
    - Cross-cutting needs: idempotency, auth context, async vs sync, batch.
    - If Level 3+: which aggregate is touched, which invariants must hold, what events are emitted.
 
-5. **Produce the code.** Write complete Java files (Java 21+):
+5. **Produce the code.** Write complete Java files (Java 21+). **Lombok-defaults обязательны** (`JS-6.1`–`JS-6.7` в `java-style-guide.md`): `@RequiredArgsConstructor` на каждом Spring-бине с DI, `@Slf4j` вместо ручного `Logger`, `@Getter` на доменных исключениях с payload-полями. Lombok **не** навешиваем на records.
 
    - **`<Operation>UseCase`** — `record` implementing `UseCase<R>` (Level 1) or `UseCaseCommand<R>` / `UseCaseQuery<R>` (Level 2+). Immutable, no logic.
-   - **`<Operation>UseCaseHandler`** — `@Component`, implements `UseCaseHandler<MyUseCase, R>`, returns `MyUseCase.class` from `useCaseType()`, has `@Transactional` (or `readOnly = true`), constructor injection. Logic stays here.
+   - **`<Operation>UseCaseHandler`** — `@Component` + `@RequiredArgsConstructor`, implements `UseCaseHandler<MyUseCase, R>`, returns `MyUseCase.class` from `useCaseType()`, has `@Transactional` (or `readOnly = true`). Поля — `private final`, без явного constructor'а. Logic stays here.
    - **Controller method** — `@RestController` method that maps the request into the `UseCase`, calls `useCaseDispatcher.dispatch(...)`, returns the result. No business logic.
    - **Mapper** (if a new mapping is needed) — MapStruct interface annotated `@Mapper(componentModel = SPRING)`.
    - **(Level 3+)** **Domain pieces** — only if the operation actually requires new aggregate state, value object, or event. Follow `ddd-tactical-style-guide.md`. If the operation is pure read, prefer a Read Model and skip the aggregate.
@@ -40,11 +40,12 @@ You are designing or scaffolding a new business operation: one or more `UseCase`
 
 6. **Self-review before presenting.** Walk through these checks (style-guide §12):
    - UseCase is record/final, no logic, name = business operation.
-   - Handler is `@Component`, returns useCaseType, transactional.
+   - Handler is `@Component` + `@RequiredArgsConstructor`, returns useCaseType, transactional.
    - Controller calls only `UseCaseDispatcher`.
    - On Level 2+, the right CQRS marker is used, query handler has `readOnly = true`.
    - Layer models are not mixed (JsonBean ≠ Pojo ≠ Domain).
    - On Level 4, `core/` does not import Spring / jOOQ / REST / Kafka.
+   - Lombok: `@RequiredArgsConstructor` на каждом бине; `@Slf4j` если нужны логи; явных multi-arg constructor'ов нет (`JS-6.1`).
 
 7. **Output structure:**
    1. Detected level + one-paragraph design summary (operation, command/query, side effects, events).

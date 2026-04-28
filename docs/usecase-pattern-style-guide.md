@@ -84,8 +84,11 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 - **R-HND-4.** Один Handler — один UseCase. Не делать «универсальных»
   handler-ов на несколько UseCase.
 - **R-HND-5.** Все внешние зависимости (репозитории, мапперы,
-  внешние API) приходят через конструктор (`@RequiredArgsConstructor` или
-  явный `final` constructor).
+  внешние API) приходят через конструктор. **Default — `@RequiredArgsConstructor`**
+  + `private final` поля (см. `JS-6.1` в `java-style-guide.md`). Явный
+  `public Foo(Bar bar)`-constructor допустим только в нестандартных
+  кейсах: валидация DI-аргументов в теле конструктора, вызов
+  `super(...)`, нетривиальная инициализация поля.
 
 ### 4.2 Запрещено
 
