@@ -221,26 +221,47 @@
 
 ## Подключение к проекту
 
-### Симлинк всех скиллов (рекомендуется)
+### Через `install.sh` (рекомендуется)
 
 ```bash
 git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/usecase-pattern-skills
+cd ~/projects/usecase-pattern-skills
 
-# из своего Java-проекта
-mkdir -p .claude/skills
-ln -s ~/projects/usecase-pattern-skills/.claude/skills/* .claude/skills/
-
-# и скопировать или симлинк style guide:
-mkdir -p docs
-ln -s ~/projects/usecase-pattern-skills/docs/rest-api-style-guide.md docs/
+# подключить все скиллы и style-guide-снапшоты в свой Java-проект:
+./install.sh ~/my-java-project
 ```
+
+Скрипт создаёт симлинки на `.claude/skills/*` и `docs/*.md` — обновления в этом
+репо автоматически прилетят в проект, без ручного re-копирования.
+
+После установки в проекте появятся:
+
+- `.claude/skills/ucp-*/` — все скиллы (`ucp-pattern-review`, `ucp-api-design` и т.д.)
+- `docs/*.md` — снапшоты style-guide-ов, которые скиллы читают как input
 
 ### Глобально для всех проектов
 
 ```bash
-mkdir -p ~/.claude/skills
-ln -s ~/projects/usecase-pattern-skills/.claude/skills/* ~/.claude/skills/
+./install.sh ~/.claude
+# скиллы будут доступны во всех Claude Code-сессиях независимо от проекта
 ```
+
+### Опциональные плагины Claude Code
+
+Большинство скиллов (11 из 12) работают **без внешних плагинов** — только на
+стандартных tools (Read, Glob, Grep, Write, Edit, Bash, Agent).
+
+Скилл `ucp-spec-design` опционально использует:
+
+- **`superpowers`** — для общих практик планирования и работы с TodoWrite.
+  Установка: `claude plugins install superpowers`
+- **`context7`** (MCP) — для подтягивания актуальной документации библиотек
+  (Spring Boot, jOOQ и т.п.) в выходную спеку.
+  Установка: `claude mcp add context7`
+
+Без них `ucp-spec-design` всё равно работает — просто без TodoWrite-планирования
+и без проверки актуальности версий библиотек. Остальные 11 скиллов их не
+требуют вообще.
 
 ## Структура
 
