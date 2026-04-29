@@ -133,7 +133,7 @@
 Написание [Use Case спецификации](https://vikulin-va.ru/use-case-pattern/spec-template/) сервиса по бизнес-описанию. Сама определяет нужный Tier (A — legacy, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
 
 **Что генерирует:**
-- Markdown-файл спеки в `docs/spec.md`
+- Папка `docs/spec/` с **split-файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — single-file спеки скилл больше не делает.
 - 16 разделов: Bounded Context, глоссарий, доменная модель, состояния, роли, бизнес-правила, команды, события, queries, use cases, UI, саги, ошибки, интеграции, критерии приёмки, НФТ
 - Frontmatter с `tier`, `service`, `last_updated`
 - Кросс-ссылки между разделами (BR ↔ commands ↔ errors)

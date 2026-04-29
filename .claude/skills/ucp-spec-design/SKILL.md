@@ -6,7 +6,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
 
 # Use Case Specification — design
 
-You are writing a Use Case specification for a service. The output is a single markdown file in the project repository, structured according to the universal 16-section template, with depth chosen by **Tier** (A / B / C).
+You are writing a Use Case specification for a service. The output is **a directory of split markdown files** under `docs/spec/`, one file per section, plus a consolidated `<service>.md` that concatenates all sections for sharing and ingestion. Files are structured according to the universal 16-section template, with depth chosen by **Tier** (A / B / C).
 
 ## Зависимости
 
@@ -35,9 +35,37 @@ You are writing a Use Case specification for a service. The output is a single m
 
    If the input is too thin to fill even Tier A (no glossary, no actors, no operations), **stop and ask** for what's missing. Do not invent business facts.
 
-4. **Generate the specification** as a single markdown file. Filename and location:
-   - Default: `docs/spec.md` in the project root, or `docs/spec/<service-name>.md` if the project has multiple services.
-   - Frontmatter: `title`, `tier` (`A`, `B`, or `C`), `service`, `last_updated`.
+4. **Generate the specification as split markdown files** under `docs/spec/`. This is an invariant — never produce a single-file spec. Layout:
+
+   ```
+   docs/spec/
+     01-<service>-context.md          — Bounded Context
+     02-<service>-language.md         — Ubiquitous Language
+     03-<service>-model.md            — Domain Model
+     04-<service>-lifecycle.md        — Жизненный цикл и состояния
+     05-<service>-roles.md            — Роли и права
+     06-<service>-rules.md            — Бизнес-правила
+     07-<service>-commands.md         — Commands
+     08-<service>-events.md           — Domain Events (Tier B+ если есть события)
+     09-<service>-queries.md          — Queries / Read Model
+     10-<service>-use-cases.md        — Use Cases
+     11-<service>-ui.md               — UI (если есть)
+     12-<service>-sagas.md            — Saga / Process Manager (Tier C+)
+     13-<service>-errors.md           — Каталог ошибок
+     14-<service>-integrations.md     — Интеграции
+     15-<service>-acceptance.md       — Критерии приёмки
+     16-<service>-nfr.md              — НФТ
+     17-<service>-stack.md            — Стек технологий
+     <service>.md                     — Консолидированная версия (все разделы вместе)
+   ```
+
+   - Каждый файл начинается с `# N. <Section title>` (markdown H1) и содержит только свой раздел.
+   - Frontmatter с `title`, `tier`, `service`, `last_updated` — **только в консолидированном `<service>.md`**, в split-файлах frontmatter не нужен.
+   - Консолидированный `<service>.md` собирается из split-файлов (порядок 01 → 17), плюс короткий вводный абзац перед §1. Это файл для шаринга с бизнесом и для ingestion в другие AI-сессии — всегда обновляется синхронно с split-файлами.
+
+   Имя сервиса (`<service>`) определяется автоматически из аргументов промпта или из существующих маркеров проекта (build.gradle artifactId, pom.xml, README); если не понятно — спросить у пользователя.
+
+   Разделы, неприменимые на текущем Tier-е, **создаются как короткие файлы с одной строкой пояснения** (`Не применимо на Tier A` / `Сервис не публикует доменных событий`), не пропускаются молча. Это сохраняет нумерацию и позволяет PR-обзору видеть «решение опустить раздел» как явный артефакт.
 
 5. **Fill all 16 sections** in the order from the template:
    1. Bounded Context (Tier A: «модуль / компонент»; Tier B+: full BC).
@@ -76,8 +104,9 @@ You are writing a Use Case specification for a service. The output is a single m
    - Sections that are not applicable have explicit one-line notes, not silent omissions.
 
 10. **Output structure:**
-    1. One-paragraph **summary**: detected Tier, service name, what was filled and what was intentionally minimal.
-    2. The full markdown spec as a single file (path stated above the code block).
-    3. **Implementation notes**: which downstream skills can pick this up next (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`), and what they will produce.
+    1. One-paragraph **summary**: detected Tier, service name, какие разделы заполнены и какие намеренно минимальные / помечены «Не применимо».
+    2. **Список созданных файлов** в `docs/spec/` — точные пути и назначение каждого. Это первая проверочная точка для пользователя: правильно ли разделено.
+    3. Консолидированный `<service>.md` показывается полностью в ответе (под заголовком с путём). Split-файлы — только пути, без полного содержимого, чтобы не дублировать.
+    4. **Implementation notes**: какие downstream-скиллы возьмут эту спеку дальше (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`), и что они произведут.
 
 $ARGUMENTS
