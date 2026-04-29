@@ -27,7 +27,7 @@ if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   exit 1
 fi
 
-mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/docs"
+mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs"
 
 # Skills — симлинк всех 12 (или сколько есть на момент установки) ucp-* скиллов.
 echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/"
@@ -39,13 +39,34 @@ for skill in "$SKILLS_DIR"/.claude/skills/*/; do
   echo "    ✓ $name"
 done
 
-# Docs — снапшоты style-guide-ов, которые скиллы читают по docs/*.md.
+# Cleanup: старые версии install.sh симлинковали style-guide-ы в <project>/docs/.
+# Это засоряло пользовательскую docs/ — теперь они переехали в .claude/docs/.
+# Удаляем старые симлинки если они есть и указывают именно на наши snapshot-ы.
 echo
-echo "==> Подключаю style-guide-снапшоты из $SKILLS_DIR/docs/"
+echo "==> Чищу старые симлинки в $PROJECT_DIR/docs/ (если есть)"
+CLEANED=0
+for doc in "$SKILLS_DIR"/docs/*.md; do
+  name="$(basename "$doc")"
+  old_link="$PROJECT_DIR/docs/$name"
+  if [ -L "$old_link" ] && [ "$(readlink "$old_link")" = "$doc" ]; then
+    rm "$old_link"
+    CLEANED=$((CLEANED + 1))
+    echo "    × removed $old_link"
+  fi
+done
+if [ "$CLEANED" -eq 0 ]; then
+  echo "    (старых симлинков нет — чистая установка)"
+fi
+
+# Docs — снапшоты style-guide-ов, которые скиллы читают по .claude/docs/*.md.
+# Они инструментальные (не часть проектной документации), поэтому идут под
+# .claude/docs/, рядом со скиллами, а не в пользовательскую docs/.
+echo
+echo "==> Подключаю style-guide-снапшоты в $PROJECT_DIR/.claude/docs/"
 DOC_COUNT=0
 for doc in "$SKILLS_DIR"/docs/*.md; do
   name="$(basename "$doc")"
-  ln -sfn "$doc" "$PROJECT_DIR/docs/$name"
+  ln -sfn "$doc" "$PROJECT_DIR/.claude/docs/$name"
   DOC_COUNT=$((DOC_COUNT + 1))
   echo "    ✓ $name"
 done
@@ -55,7 +76,7 @@ echo "✓ Готово. $SKILL_COUNT скиллов и $DOC_COUNT style-guide-о
 echo
 echo "Проверка:"
 echo "    ls -la $PROJECT_DIR/.claude/skills"
-echo "    ls -la $PROJECT_DIR/docs"
+echo "    ls -la $PROJECT_DIR/.claude/docs"
 echo
 echo "─────────────────────────────────────────────────────────────────────"
 echo "ОПЦИОНАЛЬНО: плагины Claude Code, которые улучшают ucp-spec-design"

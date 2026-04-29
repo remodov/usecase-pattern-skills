@@ -10,7 +10,7 @@ You are designing or scaffolding a new business operation: one or more `UseCase`
 
 ## Instructions
 
-1. **Read the style guide** from `docs/usecase-pattern-style-guide.md` and treat every `R-*` rule as binding. On Level 3+ also read `docs/ddd-tactical-style-guide.md`.
+1. **Read the style guide** from `.claude/docs/usecase-pattern-style-guide.md` and treat every `R-*` rule as binding. On Level 3+ also read `.claude/docs/ddd-tactical-style-guide.md`.
 
 2. **Confirm the library is available.** Check `build.gradle` / `pom.xml` for `ru.vikulinva:usecase-pattern-starter`. If absent, instruct the user to add it (and offer the dependency snippet) — do not invent local copies of `UseCase` / `UseCaseHandler` / `UseCaseDispatcher`.
 

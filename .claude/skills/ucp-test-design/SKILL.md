@@ -10,12 +10,12 @@ You are writing tests for a Java/Spring service following the team's Test Strate
 
 ## Зависимости
 
-- **`docs/test-strategy.md`** в проекте (или из `usecase-pattern-skills`) — единственный источник правил. Каждое правило имеет код `TS-N`.
-- **`docs/usecase-spec-template.md`** — если есть спека сервиса, тестовые сценарии берутся оттуда (UC-1, UC-2, …, BR-001, BR-002, …).
+- **`.claude/docs/test-strategy.md`** в проекте (или из `usecase-pattern-skills`) — единственный источник правил. Каждое правило имеет код `TS-N`.
+- **`.claude/docs/usecase-spec-template.md`** — если есть спека сервиса, тестовые сценарии берутся оттуда (UC-1, UC-2, …, BR-001, BR-002, …).
 
 ## Instructions
 
-1. **Прочти стратегию** из `docs/test-strategy.md`. Цитируй коды `TS-N` в обоснованиях.
+1. **Прочти стратегию** из `.claude/docs/test-strategy.md`. Цитируй коды `TS-N` в обоснованиях.
 
 2. **Определи слой теста** перед тем как писать:
 

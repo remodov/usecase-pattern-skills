@@ -10,7 +10,7 @@ You are reviewing a REST API contract (OpenAPI spec, controller code, DTOs, or e
 
 ## Instructions
 
-1. **Read the style guide** from `docs/rest-api-style-guide.md` in the project root. This is the single source of truth for all rules.
+1. **Read the style guide** from `.claude/docs/rest-api-style-guide.md` in the project root. This is the single source of truth for all rules.
 
 2. **Identify what to review.** If the user specified files — use those. Otherwise:
    - Check `git diff` for recently changed files

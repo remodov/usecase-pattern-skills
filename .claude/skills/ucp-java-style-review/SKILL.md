@@ -10,7 +10,7 @@ You are reviewing Java source files for compliance with the team's Java Style Gu
 
 ## Instructions
 
-1. **Read the style guide** from `docs/java-style-guide.md` in the project root. Every rule has a code (`JS-2.1`, `JS-4.7`, …) — cite codes in findings. Treat the guide as binding except where `JS-1.1` («любое нарушение допустимо, если оно улучшает читаемость») is explicitly applicable; in that case the contributor must justify the deviation in the PR description.
+1. **Read the style guide** from `.claude/docs/java-style-guide.md` in the project root. Every rule has a code (`JS-2.1`, `JS-4.7`, …) — cite codes in findings. Treat the guide as binding except where `JS-1.1` («любое нарушение допустимо, если оно улучшает читаемость») is explicitly applicable; in that case the contributor must justify the deviation in the PR description.
 
 2. **Identify what to review.** If the user named files — review those. Otherwise:
    - Use `git diff` (working tree, staged, last commit) to find changed `.java` files.

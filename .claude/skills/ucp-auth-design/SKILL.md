@@ -10,7 +10,7 @@ You are scaffolding the security/auth layer for a Java/Spring service following 
 
 ## Instructions
 
-1. **Read the style guide** from `docs/auth-patterns-style-guide.md`. Cite `AUTH-N` rules **в design-обосновании ответа пользователю**, но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
+1. **Read the style guide** from `.claude/docs/auth-patterns-style-guide.md`. Cite `AUTH-N` rules **в design-обосновании ответа пользователю**, но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
 
 2. **Confirm the layer.** Determine:
    - **Gateway** — здесь только JWT validation + rate limiting. Сервис обычно не Gateway; если перед тобой именно Gateway — генерируешь правила маршрутизации, но не RBAC handler-ов.

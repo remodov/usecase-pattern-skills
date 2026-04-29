@@ -10,7 +10,7 @@ You are reviewing Spring Boot code for compliance with the team's auth-patterns 
 
 ## Instructions
 
-1. **Read the style guide** from `docs/auth-patterns-style-guide.md`. Cite codes (`AUTH-7`, `AUTH-15`) in findings.
+1. **Read the style guide** from `.claude/docs/auth-patterns-style-guide.md`. Cite codes (`AUTH-7`, `AUTH-15`) in findings.
 
 2. **Identify what to review.** Default scope:
    - `**/SecurityConfig*.java` and any `@Configuration` that talks to Spring Security or `OAuth2ResourceServer`.

@@ -10,7 +10,7 @@ You are reviewing Java/Spring code for compliance with the Use Case Pattern Styl
 
 ## Instructions
 
-1. **Read the style guide** from `docs/usecase-pattern-style-guide.md` in the project root. Every rule has a code (`R-UC-1`, `R-HND-X2`, etc.) — cite codes in findings.
+1. **Read the style guide** from `.claude/docs/usecase-pattern-style-guide.md` in the project root. Every rule has a code (`R-UC-1`, `R-HND-X2`, etc.) — cite codes in findings.
 
 2. **Detect the adoption level** by inspecting the project (style guide §2):
    - Look for `core/<bc>/` + `adapter/in/`, `adapter/out/` → **Level 4 (Hexagonal)**.
@@ -18,7 +18,7 @@ You are reviewing Java/Spring code for compliance with the Use Case Pattern Styl
    - Look for `UseCaseCommand` / `UseCaseQuery` markers → **Level 2 (CQRS)**.
    - Otherwise → **Level 1 (basic)**.
 
-   State the detected level at the start of your report. Apply the rules listed for that level in §2 of the style guide. On Level 3+, also load `docs/ddd-tactical-style-guide.md` and apply its rules to domain code.
+   State the detected level at the start of your report. Apply the rules listed for that level in §2 of the style guide. On Level 3+, also load `.claude/docs/ddd-tactical-style-guide.md` and apply its rules to domain code.
 
 3. **Identify what to review.** If the user named files — review those. Otherwise:
    - Use `git diff` (working tree, staged, last commit) to find changed Java files.

@@ -19,7 +19,7 @@ You are writing a Use Case specification for a service. The output is **a direct
 
 ## Instructions
 
-1. **Read the template** from `docs/usecase-spec-template.md` in the project root. It contains the 16-section structure, Tier rules and examples of what each section should contain. Treat it as binding — do not invent your own section names or order.
+1. **Read the template** from `.claude/docs/usecase-spec-template.md` in the project root. It contains the 16-section structure, Tier rules and examples of what each section should contain. Treat it as binding — do not invent your own section names or order.
 
 2. **Determine the Tier** for the service (template §«Уровни спеки»):
    - **Tier A** — legacy / layered service, Controller → Service → Repository, no `usecase-pattern` library.

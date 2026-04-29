@@ -10,7 +10,7 @@ You are designing a new REST API endpoint (or set of endpoints) following the te
 
 ## Instructions
 
-1. **Read the style guide** from `docs/rest-api-style-guide.md` in the project root. Follow every rule strictly.
+1. **Read the style guide** from `.claude/docs/rest-api-style-guide.md` in the project root. Follow every rule strictly.
 
 2. **Clarify the requirements.** From the user's description, determine:
    - What resource(s) are involved

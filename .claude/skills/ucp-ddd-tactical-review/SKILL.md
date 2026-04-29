@@ -10,7 +10,7 @@ You are reviewing domain-layer code (aggregates, entities, value objects, domain
 
 ## Instructions
 
-1. **Read the style guide** from `docs/ddd-tactical-style-guide.md` in the project root. It is the single source of truth — every rule is identified by code (`R-ENT-1`, `R-AGG-X3`, etc.). Cite these codes in findings.
+1. **Read the style guide** from `.claude/docs/ddd-tactical-style-guide.md` in the project root. It is the single source of truth — every rule is identified by code (`R-ENT-1`, `R-AGG-X3`, etc.). Cite these codes in findings.
 
 2. **Identify what to review.** If the user named files — review those. Otherwise:
    - Use `git diff` (working tree, staged, last commit) to find changed Java files in domain packages.

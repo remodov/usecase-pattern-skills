@@ -10,7 +10,7 @@ You are designing or scaffolding a new domain model: a bounded context, an aggre
 
 ## Instructions
 
-1. **Read the style guide** from `docs/ddd-tactical-style-guide.md`. Treat every `R-*` rule as binding. Cite the rules you rely on **в design-обосновании ответа пользователю** — но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
+1. **Read the style guide** from `.claude/docs/ddd-tactical-style-guide.md`. Treat every `R-*` rule as binding. Cite the rules you rely on **в design-обосновании ответа пользователю** — но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
 
 2. **Confirm the library is available.** Check `build.gradle` / `pom.xml` for `ru.vikulinva:ddd-building-blocks`. If absent, instruct the user to add it (and offer the dependency snippet) — do not invent local copies of `Entity`/`AggregateRoot`/`ValueObject`.
 

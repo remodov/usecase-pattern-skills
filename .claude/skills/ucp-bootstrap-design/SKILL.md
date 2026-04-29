@@ -20,7 +20,7 @@ You are setting up — or rescuing — the Spring Boot bootstrap layer of a Use 
 
 ## Instructions
 
-1. **Read the style guide** from `docs/spring-bootstrap-style-guide.md`. Every rule has a `BS-N` code; cite them in your design and review notes. On Level 4 projects also read `usecase-pattern-style-guide.md` for module layout.
+1. **Read the style guide** from `.claude/docs/spring-bootstrap-style-guide.md`. Every rule has a `BS-N` code; cite them in your design and review notes. On Level 4 projects also read `usecase-pattern-style-guide.md` for module layout.
 
 2. **Diagnose if this is a fix or a from-scratch task.** For a fix, run the boot first and read the actual error:
    ```bash
