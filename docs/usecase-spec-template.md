@@ -450,6 +450,179 @@ focus_keyword: "Use Case спецификация"
 
 ---
 
+## Per-item cards (frontmatter-схемы для Obsidian-vault)
+
+Спека выкладывается деревом папок и файлов. Часть секций — **папка с landing-файлом + per-item карточками**: §03 (агрегаты), §07 (команды), §08 (события), §09 (запросы), §13 (ошибки), §14 (интеграции). Остальные — плоский файл (нарратив или короткая таблица).
+
+Каждая карточка обязана нести frontmatter — это то, что делает спеку запросной через Dataview и пригодной для генерации диаграмм и AI-ingestion.
+
+### Service landing — `00-<svc>/<svc>.md`
+
+```yaml
+---
+type: service              # или module — для модулей модульного монолита
+owner: ocpi-team
+status: active             # active | planned | deprecated | sunsetting
+criticality: critical      # critical | standard | experimental
+since: "2024-Q1"
+repo: "https://github.com/.../<svc>"
+runbook: "[[runbooks/<svc>]]"
+tags:
+  - service
+  - tech/java
+  - tech/spring-boot
+  - tech/postgres
+---
+```
+
+### Section landing — `NN-<svc>-<section>.md` или `NN-<svc>-<section>/NN-<svc>-<section>.md`
+
+```yaml
+---
+type: context-section
+context: <svc>
+parent: "[[<svc>]]"
+section: errors            # context | language | model | roles | rules | commands | events | queries | use-cases | ui | sagas | errors | integrations | acceptance | nfr | stack
+---
+```
+
+### Error — `13-<svc>-errors/<ERROR_CODE>.md`
+
+```yaml
+---
+type: error
+code: ENERGY_NOT_AVAILABLE
+http: 503
+severity: error            # error | warn
+retryable: true
+raised-by:
+  - "[[start-charge]]"
+since: "2024-Q3"
+status: active
+---
+```
+
+### Command — `07-<svc>-commands/<Command>.md`
+
+```yaml
+---
+type: command
+command: StartCharge
+actor: driver
+intent: "Запустить зарядную сессию"
+idempotent: true
+side-effects:
+  - "[[ChargeStarted]]"
+br:
+  - "[[06-<svc>-rules#BR-007]]"
+errors:
+  - "[[ENERGY_NOT_AVAILABLE]]"
+returns: SessionId
+---
+```
+
+### Event — `08-<svc>-events/<Event>.md`
+
+```yaml
+---
+type: event
+event: ChargeStarted
+aggregate: "[[Session]]"
+payload-version: 2
+partition-key: stationId
+retention: 7d              # либо infinite
+consumers:
+  - "[[csms-session]]"
+  - "[[parking]]"
+status: active
+since: "2024-Q3"
+---
+```
+
+### Aggregate — `03-<svc>-model/<Aggregate>.md` (Tier B/C)
+
+```yaml
+---
+type: aggregate
+aggregate: Session
+root: true
+states: [Pending, Active, Stopped, Failed]
+emits:
+  - "[[ChargeStarted]]"
+  - "[[ChargeStopped]]"
+invariants:
+  - "BR-001: одна активная сессия на станцию"
+---
+```
+
+### Query — `09-<svc>-queries/<Query>.md` (Tier B+ Level 2)
+
+```yaml
+---
+type: query
+query: ListActiveSessions
+actor: driver
+returns: SessionView[]
+read-model: "[[SessionsRead]]"
+---
+```
+
+### Integration edge — `14-<svc>-integrations/<svc>-{from|to}-<other>.md`
+
+```yaml
+---
+type: integration
+integration-type: outer    # inner | outer
+source: "[[<owner>]]"
+target: "[[<reciprocal-edge>]]"
+direction: outbound        # inbound | outbound
+protocol: rest             # rest | kafka | websocket | grpc | ...
+sync: sync                 # sync | async
+ddd-pattern:
+  - conformist             # customer-supplier | published-language | conformist | ohs | acl | shared-kernel
+description: "Locations / Sessions / CDRs"
+auth: api-key              # api-key | mtls | oauth2 | jwt | none
+payload:
+  - locations
+  - sessions
+status: active             # active | planned | deprecated
+since: "2024-Q3"
+idempotency: true
+sla: "<200ms p95"          # либо "async-eventual"
+tags:
+  - integration
+  - integration/outer
+---
+```
+
+### Связи через wikilinks
+
+Любая ссылка между сущностями (команда → событие, команда → ошибка, событие → потребитель, агрегат → событие) делается через `"[[<Имя>]]"` во frontmatter — Obsidian Graph View и Backlinks-панель подхватят. В теле документа можно дублировать прозой через ту же `[[<Имя>]]`-нотацию.
+
+Уникальность имён карточек на уровне vault'а:
+- ошибки — `<ERROR_CODE>` (UPPER_SNAKE_CASE);
+- команды — `<Command>` (PascalCase);
+- события — `<Event>` (PascalCase);
+- агрегаты — `<Aggregate>` (PascalCase);
+- интеграции — `<svc>-from-<other>` или `<svc>-to-<other>` (kebab-case).
+
+### Landing-файл секции с Dataview
+
+Landing-файлы секций §03/§07/§08/§09/§13/§14 содержат короткое описание + Dataview-запрос, который автоматически собирает таблицу карточек:
+
+````markdown
+# 13. Каталог ошибок
+
+```dataview
+TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
+FROM "docs/spec/13-<svc>-errors"
+WHERE type = "error"
+SORT code ASC
+```
+````
+
+Никаких ручных списков карточек в landing — только Dataview.
+
 ## Дальше
 
 - **Гайды по ролям** — как заполнять каждый раздел в зависимости от твоей роли (см. таблицу выше).

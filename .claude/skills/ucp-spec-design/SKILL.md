@@ -6,7 +6,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
 
 # Use Case Specification — design
 
-You are writing a Use Case specification for a service. The output is **a directory of split markdown files** under `docs/spec/`, one file per section, plus a consolidated `<service>.md` that concatenates all sections for sharing and ingestion. Files are structured according to the universal 16-section template, with depth chosen by **Tier** (A / B / C).
+You are writing a Use Case specification for a service. The output is **a directory of split markdown files** under `docs/spec/`, one file per section. Files are structured according to the universal 16-section template, with depth chosen by **Tier** (A / B / C).
 
 ## Зависимости
 
@@ -35,37 +35,83 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    If the input is too thin to fill even Tier A (no glossary, no actors, no operations), **stop and ask** for what's missing. Do not invent business facts.
 
-4. **Generate the specification as split markdown files** under `docs/spec/`. This is an invariant — never produce a single-file spec. Layout:
+4. **Generate the specification as an Obsidian-vault-compatible directory tree** under `docs/spec/`. Это инвариант — на выходе всегда дерево папок и файлов с frontmatter, готовое к копированию в `architecture/20-systems/<system>/services/<service>/` обсидиановского vault'а.
+
+   Раскладка:
 
    ```
    docs/spec/
-     01-<service>-context.md          — Bounded Context
-     02-<service>-language.md         — Ubiquitous Language
-     03-<service>-model.md            — Domain Model
-     04-<service>-lifecycle.md        — Жизненный цикл и состояния
-     05-<service>-roles.md            — Роли и права
-     06-<service>-rules.md            — Бизнес-правила
-     07-<service>-commands.md         — Commands
-     08-<service>-events.md           — Domain Events (Tier B+ если есть события)
-     09-<service>-queries.md          — Queries / Read Model
-     10-<service>-use-cases.md        — Use Cases
-     11-<service>-ui.md               — UI (если есть)
-     12-<service>-sagas.md            — Saga / Process Manager (Tier C+)
-     13-<service>-errors.md           — Каталог ошибок
-     14-<service>-integrations.md     — Интеграции
-     15-<service>-acceptance.md       — Критерии приёмки
-     16-<service>-nfr.md              — НФТ
-     17-<service>-stack.md            — Стек технологий
-     <service>.md                     — Консолидированная версия (все разделы вместе)
+     00-<service>/
+       <service>.md                       — service landing (frontmatter + краткий обзор)
+     01-<service>-context.md              — Bounded Context (нарратив)
+     02-<service>-language.md             — Ubiquitous Language (таблица)
+     03-<service>-model/
+       03-<service>-model.md              — landing раздела (ER + Dataview-индекс агрегатов)
+       <Aggregate>.md                     — карточка на агрегат (Tier B/C)
+     04-<service>-lifecycle.md            — Жизненный цикл (нарратив)
+     05-<service>-roles.md                — Роли и права (матрица)
+     06-<service>-rules.md                — Бизнес-правила (BR-XXX, нумерованный список)
+     07-<service>-commands/
+       07-<service>-commands.md           — landing раздела (Dataview-индекс команд)
+       <Command>.md                       — карточка на команду
+     08-<service>-events/                 — Tier B+, если события публикуются
+       08-<service>-events.md
+       <Event>.md
+     09-<service>-queries/                — Tier B+ Level 2, если есть Read Model
+       09-<service>-queries.md
+       <Query>.md
+     10-<service>-use-cases.md            — Use Cases (нарратив, Given/When/Then)
+     11-<service>-ui.md                   — UI (если есть)
+     12-<service>-sagas.md                — Saga (Tier C+)
+     13-<service>-errors/
+       13-<service>-errors.md             — landing раздела (Dataview-индекс ошибок)
+       <ERROR_CODE>.md                    — карточка на ошибку
+     14-<service>-integrations/
+       14-<service>-integrations.md       — landing раздела (Dataview-индекс рёбер)
+       <service>-{from|to}-<other>.md     — карточка на ребро
+     15-<service>-acceptance.md           — Критерии приёмки (нарратив)
+     16-<service>-nfr.md                  — НФТ
+     17-<service>-stack.md                — Стек технологий
    ```
 
-   - Каждый файл начинается с `# N. <Section title>` (markdown H1) и содержит только свой раздел.
-   - Frontmatter с `title`, `tier`, `service`, `last_updated` — **только в консолидированном `<service>.md`**, в split-файлах frontmatter не нужен.
-   - Консолидированный `<service>.md` собирается из split-файлов (порядок 01 → 17), плюс короткий вводный абзац перед §1. Это файл для шаринга с бизнесом и для ingestion в другие AI-сессии — всегда обновляется синхронно с split-файлами.
+   **Что папка, что плоский файл:**
+   - Папки с per-item карточками: §03 (агрегаты, Tier B+), §07 (команды), §08 (события, Tier B+), §09 (запросы, Tier B+ Level 2), §13 (ошибки), §14 (интеграции). В каждой — landing-файл + N карточек.
+   - Плоские файлы (нарратив или короткая таблица): §01, §02, §04, §05, §06, §10, §11, §12, §15, §16, §17.
+   - `00-<service>/<service>.md` — landing сервиса с frontmatter `type: service` (или `type: module`), `owner`, `status`, `criticality`, `since`, `repo`, теги `tech/*`.
+
+   **Frontmatter — обязателен** на следующих файлах (схемы — в `.claude/docs/usecase-spec-template.md`, раздел «Per-item cards»):
+   - Service landing (`00-<svc>/<svc>.md`): `type: service|module` + owner/status/criticality/tech-tags.
+   - Section landings (`NN-<svc>-<section>.md`): `type: context-section`, `context: <svc>`, `parent: "[[<svc>]]"`, `section: <section>`.
+   - Per-item карточки — по своим схемам:
+     - `<ERROR_CODE>.md` → `type: error` + `code`, `http`, `severity`, `retryable`, `raised-by[]`.
+     - `<Command>.md` → `type: command` + `command`, `actor`, `intent`, `idempotent`, `side-effects[]`, `br[]`, `errors[]`, `returns`.
+     - `<Event>.md` → `type: event` + `event`, `aggregate`, `payload-version`, `partition-key`, `retention`, `consumers[]`.
+     - `<Aggregate>.md` → `type: aggregate` + `aggregate`, `root`, `states[]`, `emits[]`, `invariants[]`.
+     - `<Query>.md` → `type: query` + `query`, `actor`, `returns`, `read-model`.
+     - `<edge>.md` → `type: integration` + `integration-type`, `source`, `target`, `direction`, `protocol`, `sync`, `description`, `auth`, `payload[]`, `status`, `idempotency`, `sla`, `ddd-pattern[]`.
+
+   **Консолидированный `<service>.md` не создаётся.** Если потребителю (бизнес-ревью, ingestion в другую AI-сессию) нужен один файл — собирается ad-hoc через `cat`-конкатенацию и не коммитится.
+
+   **Landing раздела с per-item папкой** содержит короткое описание + Dataview-таблицу, которая автоматически собирает карточки. Пример для §13:
+
+   ````markdown
+   # 13. Каталог ошибок
+
+   Все ошибки сервиса собираются Dataview-запросом ниже.
+
+   ```dataview
+   TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
+   FROM "docs/spec/13-<service>-errors"
+   WHERE type = "error"
+   SORT code ASC
+   ```
+   ````
+
+   Никаких ручных списков карточек в landing-файле — Dataview соберёт.
 
    Имя сервиса (`<service>`) определяется автоматически из аргументов промпта или из существующих маркеров проекта (build.gradle artifactId, pom.xml, README); если не понятно — спросить у пользователя.
 
-   Разделы, неприменимые на текущем Tier-е, **создаются как короткие файлы с одной строкой пояснения** (`Не применимо на Tier A` / `Сервис не публикует доменных событий`), не пропускаются молча. Это сохраняет нумерацию и позволяет PR-обзору видеть «решение опустить раздел» как явный артефакт.
+   Разделы, неприменимые на текущем Tier-е, **создаются как короткие landing-файлы с одной строкой пояснения** (`Не применимо на Tier A` / `Сервис не публикует доменных событий`) — landing-файл присутствует всегда, даже если внутри секции нет per-item карточек.
 
 5. **Fill all 16 sections** in the order from the template:
    1. Bounded Context (Tier A: «модуль / компонент»; Tier B+: full BC).
@@ -92,21 +138,27 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    When a section is intentionally skipped — **do not omit it silently**, write the heading and a one-line note: «Не применимо на Tier A» / «Сервис не публикует доменных событий».
 
-7. **Cross-reference between sections.** Commands (§7) refer to BR codes from §6 and error codes from §13. Use Cases (§10) refer to commands and queries. Sagas (§12) refer to commands. Make these refs explicit (`см. §6 / BR-007`).
+7. **Cross-reference between sections via Obsidian wikilinks.** Commands (§7) refer to BR codes from §6 and error codes from §13. Use Cases (§10) refer to commands and queries. Sagas (§12) refer to commands. Делайте ссылки и в frontmatter (массивы), и в теле:
+   - В frontmatter: `errors: ["[[ENERGY_NOT_AVAILABLE]]"]`, `br: ["[[06-<svc>-rules#BR-007]]"]`, `side-effects: ["[[ChargeStarted]]"]`, `consumers: ["[[csms-session]]"]`.
+   - В теле: `см. [[06-<svc>-rules#BR-007]]`, `публикует [[ChargeStarted]]`.
+
+   Wikilinks дают рабочие связи в Obsidian Graph View и Backlinks-панели. Уникальность имён карточек на уровне vault'а: ошибки — `<ERROR_CODE>` (UPPER_SNAKE), команды — `<Command>` (PascalCase), события — `<Event>` (PascalCase), агрегаты — `<Aggregate>`.
 
 8. **Do not write code.** This skill produces only the markdown spec. Code (UseCase classes, aggregates, controllers) is generated by other skills (`ucp-pattern-design`, `ucp-ddd-tactical-design`) from this spec.
 
 9. **Self-review before presenting.** Walk through these checks:
-   - Tier is declared in the frontmatter and matches what the project actually is.
-   - Every BR has a code; every command and event references the BRs it touches.
+   - Tier in `01-<service>-context.md` matches what the project actually is.
+   - Every BR has a code; every command and event references the BRs it touches via wikilinks.
    - Glossary covers every term used elsewhere in the spec.
-   - Каталог ошибок (§13) matches all error mentions in commands and use cases.
+   - Каталог ошибок (§13) matches all error mentions in commands and use cases (через `errors:` во frontmatter команд).
    - Sections that are not applicable have explicit one-line notes, not silent omissions.
+   - Frontmatter валиден: на каждой per-item карточке есть свой `type:` (`error` / `command` / `event` / `aggregate` / `query` / `integration`); на каждом landing-файле секции есть `type: context-section`.
+   - Wikilinks ссылаются на существующие имена файлов (никаких опечаток в `[[ChargeStarted]]`).
+   - В `docs/spec/` нет консолидированного `<service>.md` — если он есть, удалить.
 
 10. **Output structure:**
     1. One-paragraph **summary**: detected Tier, service name, какие разделы заполнены и какие намеренно минимальные / помечены «Не применимо».
-    2. **Список созданных файлов** в `docs/spec/` — точные пути и назначение каждого. Это первая проверочная точка для пользователя: правильно ли разделено.
-    3. Консолидированный `<service>.md` показывается полностью в ответе (под заголовком с путём). Split-файлы — только пути, без полного содержимого, чтобы не дублировать.
-    4. **Implementation notes**: какие downstream-скиллы возьмут эту спеку дальше (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`), и что они произведут.
+    2. **Дерево созданных файлов и папок** в `docs/spec/` — точные пути. Это первая проверочная точка для пользователя: правильно ли разделено и заполнен ли frontmatter на per-item карточках. Полное содержимое в ответе не дублируется — пользователь читает файлы через свой редактор / Obsidian.
+    3. **Implementation notes**: какие downstream-скиллы возьмут эту спеку дальше (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`), и что они произведут. Если пользователь ведёт architecture vault — упомянуть, что папку `docs/spec/` можно скопировать под `architecture/20-systems/<system>/services/<service>/` и связи через wikilinks подхватятся автоматически.
 
 $ARGUMENTS
