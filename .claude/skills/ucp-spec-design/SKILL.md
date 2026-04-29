@@ -127,6 +127,20 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    Разделы, неприменимые на текущем Tier-е, **создаются как короткие landing-файлы с одной строкой пояснения** (`Не применимо на Tier A` / `Сервис не публикует доменных событий`) — landing-файл присутствует всегда, даже если внутри секции нет per-item карточек.
 
+   **Bootstrap Obsidian vault.** Если в `docs/spec/` ещё нет `.obsidian/`, скопируйте туда содержимое бутстрапа:
+
+   ```bash
+   cp -R .claude/docs/obsidian-vault-bootstrap/.obsidian docs/spec/.obsidian
+   ```
+
+   Бутстрап лежит в `.claude/docs/obsidian-vault-bootstrap/.obsidian/` (симлинк создаёт `install.sh`). Внутри:
+   - `types.json` — schema всех frontmatter-полей карточек, чтобы Properties-панель показывала правильные виджеты (checkbox для `retryable`, multitext для `payload`, и т.д.).
+   - `community-plugins.json` — указание установить Dataview (нужен для landing-запросов).
+   - `core-plugins.json` — Properties / Graph / Backlinks / Tag pane включены.
+   - `graph.json` — цветовые группы Graph View по типам узлов (errors красные, commands зелёные, events фиолетовые, и т.д.).
+
+   Если `.obsidian/` уже есть — **не перезаписывайте**, пользователь мог поправить под себя. Только сообщите в Output, что бутстрап доступен по пути выше.
+
 5. **Fill all 16 sections** in the order from the template:
    1. Bounded Context (Tier A: «модуль / компонент»; Tier B+: full BC).
    2. Ubiquitous Language — glossary table.

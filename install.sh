@@ -71,6 +71,15 @@ for doc in "$SKILLS_DIR"/docs/*.md; do
   echo "    ✓ $name"
 done
 
+# Obsidian vault bootstrap — конфигурация .obsidian/ для папки docs/spec/.
+# Делаем симлинк на бутстрап-директорию; ucp-spec-design при генерации
+# спеки скопирует её содержимое в docs/spec/.obsidian/.
+echo
+echo "==> Подключаю Obsidian-bootstrap в $PROJECT_DIR/.claude/docs/obsidian-vault-bootstrap"
+ln -sfn "$SKILLS_DIR/docs/obsidian-vault-bootstrap" \
+        "$PROJECT_DIR/.claude/docs/obsidian-vault-bootstrap"
+echo "    ✓ obsidian-vault-bootstrap (.obsidian/types.json + Dataview + Graph)"
+
 echo
 echo "✓ Готово. $SKILL_COUNT скиллов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
 echo
