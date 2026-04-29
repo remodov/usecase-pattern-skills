@@ -80,6 +80,56 @@ ln -sfn "$SKILLS_DIR/docs/obsidian-vault-bootstrap" \
         "$PROJECT_DIR/.claude/docs/obsidian-vault-bootstrap"
 echo "    ✓ obsidian-vault-bootstrap (.obsidian/types.json + Dataview + Graph)"
 
+# CLAUDE.md — точка входа для Claude в проекте-потребителе. install.sh
+# управляет блоком между маркерами BEGIN ucp-skills / END ucp-skills:
+# создаёт файл, дописывает блок, либо in-place заменяет существующий блок.
+# Контент вне маркеров сохраняется — это место пользователя.
+echo
+echo "==> Управляю блоком ucp-skills в $PROJECT_DIR/CLAUDE.md"
+
+CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
+CLAUDE_TEMPLATE="$SKILLS_DIR/templates/claude-block.md"
+BEGIN_MARKER="<!-- BEGIN ucp-skills (managed by usecase-pattern-skills/install.sh) -->"
+END_MARKER="<!-- END ucp-skills -->"
+
+if [ ! -f "$CLAUDE_TEMPLATE" ]; then
+  echo "ERROR: шаблон $CLAUDE_TEMPLATE не найден" >&2
+  exit 1
+fi
+
+if [ ! -f "$CLAUDE_MD" ]; then
+  cp "$CLAUDE_TEMPLATE" "$CLAUDE_MD"
+  echo "    ✓ создан $CLAUDE_MD с блоком ucp-skills"
+elif grep -qF "$BEGIN_MARKER" "$CLAUDE_MD"; then
+  TMP="$(mktemp)"
+  awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" -v block_file="$CLAUDE_TEMPLATE" '
+    BEGIN {
+      while ((getline line < block_file) > 0) {
+        block = block (block_loaded ? "\n" : "") line
+        block_loaded = 1
+      }
+      close(block_file)
+    }
+    index($0, begin) && !replaced {
+      print block
+      replaced = 1
+      in_block = 1
+      next
+    }
+    in_block {
+      if (index($0, end)) in_block = 0
+      next
+    }
+    { print }
+  ' "$CLAUDE_MD" > "$TMP"
+  mv "$TMP" "$CLAUDE_MD"
+  echo "    ✓ обновлён блок ucp-skills в $CLAUDE_MD (контент вне маркеров сохранён)"
+else
+  printf '\n' >> "$CLAUDE_MD"
+  cat "$CLAUDE_TEMPLATE" >> "$CLAUDE_MD"
+  echo "    ✓ блок ucp-skills дописан в $CLAUDE_MD (существующий контент сохранён)"
+fi
+
 echo
 echo "✓ Готово. $SKILL_COUNT скиллов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
 echo
