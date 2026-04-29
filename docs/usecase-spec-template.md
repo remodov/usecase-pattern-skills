@@ -615,11 +615,13 @@ Landing-файлы секций §03/§07/§08/§09/§13/§14 содержат �
 
 ```dataview
 TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
-FROM "docs/spec/13-<svc>-errors"
-WHERE type = "error"
+FROM ""
+WHERE type = "error" AND file.folder = this.file.folder
 SORT code ASC
 ```
 ````
+
+Используется path-independent шаблон `WHERE ... AND file.folder = this.file.folder` — landing соберёт карточки своей же папки независимо от того, где она лежит (`docs/spec/` в проекте или `architecture/20-systems/.../services/<svc>/` в vault'е).
 
 Никаких ручных списков карточек в landing — только Dataview.
 

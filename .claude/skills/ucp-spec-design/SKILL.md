@@ -37,47 +37,59 @@ You are writing a Use Case specification for a service. The output is **a direct
 
 4. **Generate the specification as an Obsidian-vault-compatible directory tree** under `docs/spec/`. Это инвариант — на выходе всегда дерево папок и файлов с frontmatter, готовое к копированию в `architecture/20-systems/<system>/services/<service>/` обсидиановского vault'а.
 
-   Раскладка:
+   Раскладка — **каждая секция всегда папка** с одноимённым landing-файлом внутри. Это инвариант: даже если секция содержит только нарратив, она всё равно лежит в папке. Так структура единообразна и в Obsidian wikilink `[[NN-<svc>-<section>]]` стабильно резолвится.
 
    ```
    docs/spec/
      00-<service>/
-       <service>.md                       — service landing (frontmatter + краткий обзор)
-     01-<service>-context.md              — Bounded Context (нарратив)
-     02-<service>-language.md             — Ubiquitous Language (таблица)
+       <service>.md                                 — service landing (без префикса в имени файла, чтобы [[<service>]] резолвился)
+     01-<service>-context/
+       01-<service>-context.md                      — Bounded Context (нарратив)
+     02-<service>-language/
+       02-<service>-language.md                     — Ubiquitous Language (таблица)
      03-<service>-model/
-       03-<service>-model.md              — landing раздела (ER + Dataview-индекс агрегатов)
-       <Aggregate>.md                     — карточка на агрегат (Tier B/C)
-     04-<service>-lifecycle.md            — Жизненный цикл (нарратив)
-     05-<service>-roles.md                — Роли и права (матрица)
-     06-<service>-rules.md                — Бизнес-правила (BR-XXX, нумерованный список)
+       03-<service>-model.md                        — landing (ER + Dataview-индекс агрегатов)
+       <Aggregate>.md                               — карточка на агрегат (Tier B/C)
+     04-<service>-lifecycle/
+       04-<service>-lifecycle.md                    — Жизненный цикл (нарратив)
+     05-<service>-roles/
+       05-<service>-roles.md                        — Роли и права (матрица)
+     06-<service>-rules/
+       06-<service>-rules.md                        — Бизнес-правила (BR-XXX, нумерованный список)
      07-<service>-commands/
-       07-<service>-commands.md           — landing раздела (Dataview-индекс команд)
-       <Command>.md                       — карточка на команду
-     08-<service>-events/                 — Tier B+, если события публикуются
+       07-<service>-commands.md                     — landing (Dataview-индекс команд)
+       <Command>.md                                 — карточка на команду
+     08-<service>-events/                           — Tier B+, если события публикуются
        08-<service>-events.md
        <Event>.md
-     09-<service>-queries/                — Tier B+ Level 2, если есть Read Model
+     09-<service>-queries/                          — Tier B+ Level 2, если есть Read Model
        09-<service>-queries.md
        <Query>.md
-     10-<service>-use-cases.md            — Use Cases (нарратив, Given/When/Then)
-     11-<service>-ui.md                   — UI (если есть)
-     12-<service>-sagas.md                — Saga (Tier C+)
+     10-<service>-use-cases/
+       10-<service>-use-cases.md                    — Use Cases (нарратив, Given/When/Then)
+     11-<service>-ui/
+       11-<service>-ui.md                           — UI (если есть)
+     12-<service>-sagas/
+       12-<service>-sagas.md                        — Saga (Tier C+)
      13-<service>-errors/
-       13-<service>-errors.md             — landing раздела (Dataview-индекс ошибок)
-       <ERROR_CODE>.md                    — карточка на ошибку
+       13-<service>-errors.md                       — landing (Dataview-индекс ошибок)
+       <ERROR_CODE>.md                              — карточка на ошибку
      14-<service>-integrations/
-       14-<service>-integrations.md       — landing раздела (Dataview-индекс рёбер)
-       <service>-{from|to}-<other>.md     — карточка на ребро
-     15-<service>-acceptance.md           — Критерии приёмки (нарратив)
-     16-<service>-nfr.md                  — НФТ
-     17-<service>-stack.md                — Стек технологий
+       14-<service>-integrations.md                 — landing (Dataview-индекс рёбер)
+       <service>-{from|to}-<other>.md               — карточка на ребро
+     15-<service>-acceptance/
+       15-<service>-acceptance.md                   — Критерии приёмки (нарратив)
+     16-<service>-nfr/
+       16-<service>-nfr.md                          — НФТ
+     17-<service>-stack/
+       17-<service>-stack.md                        — Стек технологий
    ```
 
-   **Что папка, что плоский файл:**
-   - Папки с per-item карточками: §03 (агрегаты, Tier B+), §07 (команды), §08 (события, Tier B+), §09 (запросы, Tier B+ Level 2), §13 (ошибки), §14 (интеграции). В каждой — landing-файл + N карточек.
-   - Плоские файлы (нарратив или короткая таблица): §01, §02, §04, §05, §06, §10, §11, §12, §15, §16, §17.
-   - `00-<service>/<service>.md` — landing сервиса с frontmatter `type: service` (или `type: module`), `owner`, `status`, `criticality`, `since`, `repo`, теги `tech/*`.
+   **Папки с per-item карточками** (landing + N файлов внутри): §03 (агрегаты, Tier B+), §07 (команды), §08 (события, Tier B+), §09 (запросы, Tier B+ Level 2), §13 (ошибки), §14 (интеграции).
+
+   **Папки только с landing-файлом** (нарратив или короткая таблица): §01, §02, §04, §05, §06, §10, §11, §12, §15, §16, §17.
+
+   **Service landing** (`00-<service>/<service>.md`) — особый случай: имя файла без префикса `00-`, чтобы wikilink `[[<service>]]` резолвился прямо на landing. Frontmatter: `type: service` (или `type: module`), `owner`, `status`, `criticality`, `since`, `repo`, теги `tech/*`.
 
    **Frontmatter — обязателен** на следующих файлах (схемы — в `.claude/docs/usecase-spec-template.md`, раздел «Per-item cards»):
    - Service landing (`00-<svc>/<svc>.md`): `type: service|module` + owner/status/criticality/tech-tags.
@@ -101,11 +113,13 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    ```dataview
    TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
-   FROM "docs/spec/13-<service>-errors"
-   WHERE type = "error"
+   FROM ""
+   WHERE type = "error" AND file.folder = this.file.folder
    SORT code ASC
    ```
    ````
+
+   Используйте path-independent шаблон `WHERE ... AND file.folder = this.file.folder` (а не `FROM "docs/spec/..."`) — тогда landing-файл соберёт карточки своей же папки независимо от того, где он лежит: `docs/spec/` в проекте или `architecture/20-systems/<sys>/services/<svc>/` в обсидиановском vault'е.
 
    Никаких ручных списков карточек в landing-файле — Dataview соберёт.
 
