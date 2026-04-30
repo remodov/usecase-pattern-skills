@@ -606,24 +606,17 @@ tags:
 - агрегаты — `<Aggregate>` (PascalCase);
 - интеграции — `<svc>-from-<other>` или `<svc>-to-<other>` (kebab-case).
 
-### Landing-файл секции с Dataview
+### Landing-файл секции
 
-Landing-файлы секций §03/§07/§08/§09/§13/§14 содержат короткое описание + Dataview-запрос, который автоматически собирает таблицу карточек:
+Landing-файлы секций §03/§07/§08/§09/§13/§14 содержат H1 заголовок + 1–2 строки общего описания. Список карточек берётся из листинга папки — любой файловый менеджер, IDE или `ls` справляются, ручных индексов в landing'е не нужно.
 
-````markdown
+```markdown
 # 13. Каталог ошибок
 
-```dataview
-TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
-FROM ""
-WHERE type = "error" AND file.folder = this.file.folder
-SORT code ASC
+Каждый код ошибки — отдельный файл-карточка в этой же папке.
 ```
-````
 
-Используется path-independent шаблон `WHERE ... AND file.folder = this.file.folder` — landing соберёт карточки своей же папки независимо от того, где она лежит (`docs/spec/` в проекте или `architecture/20-systems/.../services/<svc>/` в vault'е).
-
-Никаких ручных списков карточек в landing — только Dataview.
+При желании landing можно дополнить Dataview-запросом, если в проекте установлен плагин Dataview. По умолчанию бутстрап его не включает.
 
 ## Дальше
 

@@ -104,24 +104,15 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    **Консолидированный `<service>.md` не создаётся.** Если потребителю (бизнес-ревью, ingestion в другую AI-сессию) нужен один файл — собирается ad-hoc через `cat`-конкатенацию и не коммитится.
 
-   **Landing раздела с per-item папкой** содержит короткое описание + Dataview-таблицу, которая автоматически собирает карточки. Пример для §13:
+   **Landing раздела с per-item папкой** содержит H1 заголовок + 1–2 строки общего описания. Список карточек получается из листинга папки (любой файловый менеджер / IDE / `ls` справляются), специальных индексов в landing'е не нужно. Пример:
 
-   ````markdown
+   ```markdown
    # 13. Каталог ошибок
 
-   Все ошибки сервиса собираются Dataview-запросом ниже.
-
-   ```dataview
-   TABLE WITHOUT ID file.link AS "Code", http AS "HTTP", severity AS "Severity", retryable AS "Retryable"
-   FROM ""
-   WHERE type = "error" AND file.folder = this.file.folder
-   SORT code ASC
+   Каждый код ошибки — отдельный файл-карточка в этой же папке.
    ```
-   ````
 
-   Используйте path-independent шаблон `WHERE ... AND file.folder = this.file.folder` (а не `FROM "docs/spec/..."`) — тогда landing-файл соберёт карточки своей же папки независимо от того, где он лежит: `docs/spec/` в проекте или `architecture/20-systems/<sys>/services/<svc>/` в обсидиановском vault'е.
-
-   Никаких ручных списков карточек в landing-файле — Dataview соберёт.
+   Если пользователь установит Dataview-плагин в Obsidian вручную — landing можно дополнить запросом, но базовый шаблон без него.
 
    Имя сервиса (`<service>`) определяется автоматически из аргументов промпта или из существующих маркеров проекта (build.gradle artifactId, pom.xml, README); если не понятно — спросить у пользователя.
 
@@ -135,10 +126,9 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    Бутстрап лежит в `.claude/docs/obsidian-vault-bootstrap/.obsidian/` (симлинк создаёт `install.sh`). Внутри:
    - `types.json` — schema всех frontmatter-полей карточек, чтобы Properties-панель показывала правильные виджеты (checkbox для `retryable`, multitext для `payload`, и т.д.).
-   - `plugins/dataview/` — бинарник плагина Dataview (нужен для landing-запросов; Obsidian не качает плагины автоматически из `community-plugins.json`).
-   - `community-plugins.json` — `["dataview"]`, включает плагин.
    - `core-plugins.json` — Properties / Graph / Backlinks / Tag pane включены.
-   - `graph.json` — цветовые группы Graph View по типам узлов (errors красные, commands зелёные, events фиолетовые, и т.д.).
+   - `graph.json` — цветовые группы Graph View по типам узлов через нативный обсидиановский `["type":"error"]`-синтаксис (errors красные, commands зелёные, events фиолетовые, и т.д.) — без community-плагинов.
+   - `community-plugins.json` — пустой массив. Community-плагины (Dataview, Templater) не ставим по умолчанию: пользователь добавит сам, если понадобится.
 
    Если `.obsidian/` уже есть — **не перезаписывайте**, пользователь мог поправить под себя. Только сообщите в Output, что бутстрап доступен по пути выше.
 

@@ -8,33 +8,31 @@
   (`severity`, `retryable`, `criticality`, `payload`, и т.д. — см. `types.json`).
 - **Graph View** с предзаданными цветовыми группами:
   `#service` (синий), `#module` (фиолетовый), `#integration` (оранжевый),
-  карточки errors / commands / events / aggregates — каждый со своим цветом.
+  карточки errors / commands / events / aggregates — каждый со своим цветом
+  (фильтрация по нативному обсидиановскому `["type":"error"]`-синтаксису,
+  без community-плагинов).
 - **Backlinks**, **Tag pane**, **Outline**, **Bookmarks** — все нужные core plugins.
 
 ## Что включено
 
-- `plugins/dataview/` — бинарник Dataview (MIT, 1.3 МБ). Лежит прямо в
-  бутстрапе, потому что Obsidian **не качает** плагины из `community-plugins.json`
-  автоматически — там только список «что включить из уже установленного».
-  Без бинарника Dataview-блоки в landing-файлах остаются мёртвым текстом.
-- `community-plugins.json` — `["dataview"]`, включает плагин.
-- `core-plugins.json` — включённые штатные плагины Obsidian.
 - `types.json` — schema всех frontmatter-полей UCP-спеки. Без этого
   Obsidian показывал бы `payload` как простой текст вместо списка.
 - `graph.json` — цветовые группы и параметры Graph View.
+- `core-plugins.json` — включённые штатные плагины Obsidian
+  (Properties / Graph / Backlinks / Tag pane / Outline).
+- `community-plugins.json` — пустой список (community-плагины не ставим
+  по умолчанию).
 - `app.json` — общие настройки (без табов, attachments в `./attachments`).
 
 ## Что НЕ включено
 
+- **Community-плагины** (Dataview, Templater и т.п.). Раньше пытались
+  поставлять Dataview прямо в бутстрапе — отказались: пинит версию,
+  раздувает репо, вшитый бинарник вызывал больше проблем чем решал.
+  Хотите Dataview-таблицы в landing-файлах — установите плагин руками
+  через Obsidian → Settings → Community plugins → Browse.
 - **Темы и кастомизации** — это вкусовщина пользователя.
 - **Workspace.json** — состояние открытых вкладок, не должно лежать в репо.
-
-## Обновление Dataview
-
-Версия плагина пинится через коммит. Когда выйдет новая Dataview и вы
-хотите обновить — скачайте `main.js`/`manifest.json`/`styles.css` с
-[github.com/blacksmithgu/obsidian-dataview/releases](https://github.com/blacksmithgu/obsidian-dataview/releases)
-в `docs/obsidian-vault-bootstrap/.obsidian/plugins/dataview/` и закоммитьте.
 
 ## Использование вручную
 
