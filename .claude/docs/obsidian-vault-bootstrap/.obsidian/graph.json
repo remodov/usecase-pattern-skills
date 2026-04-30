@@ -1,0 +1,51 @@
+{
+  "collapse-filter": false,
+  "search": "",
+  "showTags": true,
+  "showAttachments": false,
+  "hideUnresolved": false,
+  "showOrphans": true,
+  "collapse-color-groups": false,
+  "colorGroups": [
+    {
+      "query": "tag:#service",
+      "color": { "a": 1, "rgb": 4543476 }
+    },
+    {
+      "query": "tag:#module",
+      "color": { "a": 1, "rgb": 6735311 }
+    },
+    {
+      "query": "tag:#integration",
+      "color": { "a": 1, "rgb": 14773536 }
+    },
+    {
+      "query": "[\"type\":\"error\"]",
+      "color": { "a": 1, "rgb": 14431327 }
+    },
+    {
+      "query": "[\"type\":\"command\"]",
+      "color": { "a": 1, "rgb": 5025616 }
+    },
+    {
+      "query": "[\"type\":\"event\"]",
+      "color": { "a": 1, "rgb": 9783996 }
+    },
+    {
+      "query": "[\"type\":\"aggregate\"]",
+      "color": { "a": 1, "rgb": 14724700 }
+    }
+  ],
+  "collapse-display": false,
+  "showArrow": true,
+  "textFadeMultiplier": 0,
+  "nodeSizeMultiplier": 1,
+  "lineSizeMultiplier": 1,
+  "collapse-forces": false,
+  "centerStrength": 0.518713248970312,
+  "repelStrength": 10,
+  "linkStrength": 1,
+  "linkDistance": 250,
+  "scale": 1,
+  "close": true
+}
