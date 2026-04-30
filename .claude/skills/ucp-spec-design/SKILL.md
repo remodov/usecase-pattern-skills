@@ -135,7 +135,8 @@ You are writing a Use Case specification for a service. The output is **a direct
 
    Бутстрап лежит в `.claude/docs/obsidian-vault-bootstrap/.obsidian/` (симлинк создаёт `install.sh`). Внутри:
    - `types.json` — schema всех frontmatter-полей карточек, чтобы Properties-панель показывала правильные виджеты (checkbox для `retryable`, multitext для `payload`, и т.д.).
-   - `community-plugins.json` — указание установить Dataview (нужен для landing-запросов).
+   - `plugins/dataview/` — бинарник плагина Dataview (нужен для landing-запросов; Obsidian не качает плагины автоматически из `community-plugins.json`).
+   - `community-plugins.json` — `["dataview"]`, включает плагин.
    - `core-plugins.json` — Properties / Graph / Backlinks / Tag pane включены.
    - `graph.json` — цветовые группы Graph View по типам узлов (errors красные, commands зелёные, events фиолетовые, и т.д.).
 
