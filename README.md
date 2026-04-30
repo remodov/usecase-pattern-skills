@@ -315,17 +315,46 @@ Style-guide-ы — это **инструментальные** документ�
 Большинство скиллов (11 из 12) работают **без внешних плагинов** — только на
 стандартных tools (Read, Glob, Grep, Write, Edit, Bash, Agent).
 
-Скилл `ucp-spec-design` опционально использует:
+Скилл `ucp-spec-design` опционально использует два расширения.
 
-- **`superpowers`** — для общих практик планирования и работы с TodoWrite.
-  Установка: `claude plugins install superpowers`
-- **`context7`** (MCP) — для подтягивания актуальной документации библиотек
-  (Spring Boot, jOOQ и т.п.) в выходную спеку.
-  Установка: `claude mcp add context7`
+#### `superpowers` — планирование, TodoWrite, TDD-дисциплина
 
-Без них `ucp-spec-design` всё равно работает — просто без TodoWrite-планирования
-и без проверки актуальности версий библиотек. Остальные 11 скиллов их не
-требуют вообще.
+Marketplace плагинов от obra ([obra/superpowers-marketplace](https://github.com/obra/superpowers-marketplace)):
+
+```bash
+claude plugin marketplace add obra/superpowers-marketplace
+claude plugin install superpowers@superpowers-marketplace
+```
+
+После установки доступны скиллы `superpowers:writing-plans`,
+`superpowers:executing-plans`, `superpowers:brainstorming`,
+`superpowers:test-driven-development` и т.д. — `ucp-spec-design`
+интегрируется с ними автоматически.
+
+#### `context7` — MCP-сервер с актуальной документацией библиотек
+
+Сервер от Upstash ([upstash/context7](https://github.com/upstash/context7)).
+Stdio-вариант (рекомендуется, не требует серверной части):
+
+```bash
+claude mcp add context7 -- npx -y @upstash/context7-mcp
+```
+
+HTTP-вариант (если предпочитаете remote endpoint):
+
+```bash
+claude mcp add --transport http context7 https://mcp.context7.com/mcp
+```
+
+После установки `ucp-spec-design` и другие скиллы могут запросить актуальные
+версии Spring Boot, jOOQ и других зависимостей через
+`mcp__plugin_context7_context7__resolve-library-id` и `query-docs`.
+
+#### Без плагинов
+
+`ucp-spec-design` всё равно работает — просто без TodoWrite-планирования
+и без проверки актуальности версий библиотек. Остальные 11 скиллов их
+не требуют вообще.
 
 ## Структура
 

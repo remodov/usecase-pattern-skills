@@ -141,12 +141,13 @@ echo "────────────────────────�
 echo "ОПЦИОНАЛЬНО: плагины Claude Code, которые улучшают ucp-spec-design"
 echo "─────────────────────────────────────────────────────────────────────"
 echo
-echo "  • superpowers — добавляет TodoWrite и общие практики планирования."
-echo "    Установка: claude plugins install superpowers"
+echo "  • superpowers — TodoWrite, планирование, TDD."
+echo "    claude plugin marketplace add obra/superpowers-marketplace"
+echo "    claude plugin install superpowers@superpowers-marketplace"
 echo
-echo "  • context7 (MCP) — подтягивает актуальные версии библиотек"
-echo "    (Spring Boot, jOOQ и т.п.) в спеку, чтобы не протухали."
-echo "    Установка: claude mcp add context7"
+echo "  • context7 (MCP) — актуальная документация библиотек"
+echo "    (Spring Boot, jOOQ и т.п.), чтобы не протухала в спеке."
+echo "    claude mcp add context7 -- npx -y @upstash/context7-mcp"
 echo
 echo "Без них работают 11 скиллов из 12 без потерь."
 echo "ucp-spec-design без superpowers/context7 тоже работает — просто без"
