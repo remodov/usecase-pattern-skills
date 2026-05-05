@@ -389,6 +389,167 @@ if (!owner.equals(requester)) { ... }    // имя владельца уже в�
 
 ---
 
+## 8. Современные фичи Java
+
+Раздел применяется, **если проект собирается на Java 21+** (проверить
+`sourceCompatibility = JavaVersion.VERSION_21` в `build.gradle` или
+`<source>21</source>` в `pom.xml`). На Java 17 применимы только правила
+про records и sealed без record patterns. На Java 11 и ниже раздел
+не применим.
+
+### `JS-8.1` Switch expression на sealed-иерархии вместо if-else цепочек
+
+Если значение принадлежит sealed-иерархии и нужно вернуть результат
+на основе варианта — `switch` expression, не цепочка `instanceof`-проверок.
+Компилятор гарантирует exhaustiveness и поймает забытый вариант
+при добавлении нового подтипа.
+
+```java
+// PREFER
+return switch (parking) {
+    case ParkingResolution.None ignored -> null;
+    case ParkingResolution.Reused(UUID id) -> id;
+    case ParkingResolution.Created(UUID id) -> id;
+};
+
+// AVOID — exhaustiveness не гарантируется компилятором
+if (parking instanceof ParkingResolution.None) return null;
+if (parking instanceof ParkingResolution.Reused r) return r.id();
+if (parking instanceof ParkingResolution.Created c) return c.id();
+throw new IllegalStateException("Unhandled: " + parking);
+```
+
+### `JS-8.2` Record patterns в `case` — для деконструкции
+
+Если вариант sealed-иерархии — record, его поля разбираем прямо
+в `case`, без `.field()` геттера в правой части.
+
+```java
+// PREFER
+case ParkingResolution.Created(UUID id) -> id;
+
+// AVOID — двойная работа: распознали тип и тут же тянем геттер
+case ParkingResolution.Created c -> c.id();
+```
+
+Когда поле в варианте есть, но не нужно — `ignored` как имя binding-а:
+
+```java
+case ParkingResolution.None ignored -> null;
+```
+
+### `JS-8.3` Record patterns в `instanceof` — для деконструкции
+
+В `if (x instanceof Type)` — также через record pattern, не через
+binding + геттер.
+
+```java
+// PREFER
+if (parking instanceof ParkingResolution.Created(UUID parkingSessionId)) {
+    parkingSessionService.cancelParking(parkingSessionId);
+}
+
+// AVOID
+if (parking instanceof ParkingResolution.Created created) {
+    parkingSessionService.cancelParking(created.id());
+}
+```
+
+### `JS-8.4` Exhaustive switch без `default` для sealed-иерархий
+
+Если switch покрывает все варианты sealed-иерархии — **не** добавляем
+`default`. Компилятор обязан проверить exhaustiveness, и `default` молча
+проглотит новый вариант, который ты забудешь обработать после расширения
+иерархии.
+
+```java
+// PREFER — компилятор сломает сборку, если добавить новый ParkingResolution
+return switch (parking) {
+    case ParkingResolution.None ignored -> null;
+    case ParkingResolution.Reused(UUID id) -> id;
+    case ParkingResolution.Created(UUID id) -> id;
+};
+
+// AVOID — default превращает compile-time error в runtime
+return switch (parking) {
+    case ParkingResolution.None ignored -> null;
+    case ParkingResolution.Reused(UUID id) -> id;
+    case ParkingResolution.Created(UUID id) -> id;
+    default -> throw new IllegalStateException("Unhandled: " + parking);
+};
+```
+
+`default` оправдан только для open-иерархий (switch по `String`, `int`,
+enum, который может быть расширен в будущем).
+
+### `JS-8.5` Sealed interfaces — для closed-набора альтернатив
+
+Если у концепта **закрытый** набор вариантов, известный во время
+компиляции (`None / Reused / Created`, `Success / Failure`,
+`Free / Premium / Trial`) — `sealed interface` + record-варианты.
+Это включает exhaustiveness check в switch (`JS-8.1`, `JS-8.4`)
+и делает добавление варианта compile-time-событием.
+
+```java
+// PREFER
+public sealed interface ParkingResolution {
+    record None() implements ParkingResolution {}
+    record Reused(UUID id) implements ParkingResolution {}
+    record Created(UUID id) implements ParkingResolution {}
+
+    static ParkingResolution none() { return new None(); }
+}
+```
+
+Sealed **не** для open-расширяемых иерархий (доменные базовые классы,
+которые расширяет чужой код в других модулях / сервисах) — там обычный
+`interface`.
+
+### `JS-8.6` `String.formatted()` вместо `String.format()`
+
+```java
+// PREFER
+"User(id=%s) default card not found".formatted(userId);
+
+// AVOID
+String.format("User(id=%s) default card not found", userId);
+```
+
+Читается линейно слева-направо: «строка → подставить аргументы».
+`String.format(...)` ставит шаблон в начало, аргументы в конец, что
+заставляет глаз бегать. Особенно заметно в длинных сообщениях
+exception-ов.
+
+### `JS-8.7` Records для in-class data carriers
+
+Маленькие data-структуры внутри handler-а / сервиса (3–5 полей,
+используются только в этом классе) — `private record`, без Lombok-обёрток,
+без отдельного Value Object.
+
+```java
+// PREFER — внутри handler-а собрать связанные сущности из репозиториев
+private record ChargingContext(
+        ConnectorsPojo connector,
+        ChargeStationsPojo chargeStation,
+        LocationsPojo location
+) {}
+
+// AVOID — Lombok-класс ради тех же геттеров
+@Getter
+@RequiredArgsConstructor
+private static class ChargingContext {
+    private final ConnectorsPojo connector;
+    private final ChargeStationsPojo chargeStation;
+    private final LocationsPojo location;
+}
+```
+
+Lombok поверх records запрещён (`JS-6.4`). Если структура нужна снаружи
+класса как доменный VO — это уже отдельный concern: см.
+`ddd-tactical-style-guide.md`.
+
+---
+
 ## Настройка IDE (IntelliJ IDEA)
 
 1. Берём `checkstyle.xml` из проекта.
@@ -411,3 +572,4 @@ if (!owner.equals(requester)) { ... }    // имя владельца уже в�
 | Отступы | `JS-5.1`–`JS-5.3` |
 | Lombok | `JS-6.1`–`JS-6.7` |
 | Комментарии | `JS-7.1`–`JS-7.5` |
+| Java 21+ фичи | `JS-8.1`–`JS-8.7` (применимо если проект на Java 21+) |
