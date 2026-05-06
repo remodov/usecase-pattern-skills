@@ -129,10 +129,10 @@
 
 ### `/ucp-spec-design`
 
-Написание Use Case спецификации (`.claude/docs/usecase-spec-template.md`) сервиса по бизнес-описанию. Сама определяет нужный Tier (A — legacy, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
+Написание Use Case спецификации (`.claude/docs/usecase-spec-template.md`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
 
 **Что генерирует:**
-- Папка `docs/spec/` с **split-файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — single-file спеки скилл больше не делает.
+- Папка `docs/spec/` с **разбитыми по разделам файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — спеки одним файлом скилл больше не делает.
 - 16 разделов: Bounded Context, глоссарий, доменная модель, состояния, роли, бизнес-правила, команды, события, queries, use cases, UI, саги, ошибки, интеграции, критерии приёмки, НФТ
 - Frontmatter с `tier`, `service`, `last_updated`
 - Кросс-ссылки между разделами (BR ↔ commands ↔ errors)
@@ -142,6 +142,48 @@
 ```
 /ucp-spec-design Сервис заказов: бизнес-описание в docs/case.md
 /ucp-spec-design Tier C, Order Service, см. case.md и текущие агрегаты в src/
+```
+
+### `/ucp-spec-review`
+
+**Парный к `/ucp-spec-design`** — AI как design-критик: проверка качества спецификации (или черновика Event Storming) **до кодогенерации**. Закрывает симметрию design ↔ review на спека-слое — то, что архитектор ловит на review, но что часто проскакивает мимо.
+
+**Что проверяет (9 категорий правил):**
+- **SR-T** Tier consistency — заявленный Tier vs реальная глубина содержания
+- **SR-UL** Ubiquitous Language — синонимы вне глоссария, осиротевшие термины, термины без определения
+- **SR-BC** Bounded Context — явный scope/not-scope, чужие команды, невидимое пересечение с соседями
+- **SR-AG** Aggregates — > 7 инвариантов (кандидат на разделение), циклические ссылки, identity-типы вместо примитивов
+- **SR-AR** Actors / Roles — orphan-актор, отсутствие permissions matrix, команды без роли-владельца
+- **SR-CM** Commands — pre/post-conditions, идемпотентность для money-операций, CQRS-leak (read-DTO в команде)
+- **SR-EV** Domain Events — события без потребителей, payload без типов, retryable без идемпотентного консьюмера, события вне Outbox
+- **SR-FD** Failure Domains — стратегия при отказе для каждого внешнего соседа, таймаут / Circuit Breaker
+- **SR-DO / SR-ACR / SR-NFR** — единственный владелец данных, PII-retention, покрытие BR через AC, измеримые пороги НФТ
+
+**Три режима:**
+- По умолчанию — полный прогон по всем 9 категориям
+- `fast` — только правила-кандидаты на «Критично» (быстрая проверка перед кодогенерацией)
+- `es` — урезанный набор для черновиков Event Storming (фокус на SR-UL, SR-BC, SR-AR, SR-EV)
+
+**Использование:**
+
+```
+/ucp-spec-review                              # полный прогон спеки в docs/spec/
+/ucp-spec-review fast                          # только критичные правила
+/ucp-spec-review es docs/event-storming.md    # ревью ES-черновика
+```
+
+**Типичный цикл:**
+
+```
+ucp-spec-design  →  спека в docs/spec/
+                          ↓
+                  ucp-spec-review        →  список замечаний с кодами правил
+                          ↓
+       пользователь правит спеку / перезапускает ucp-spec-design с поправками
+                          ↓
+                  ucp-spec-review (fast)  →  0 Критично → готова к коду
+                          ↓
+              ucp-pattern-design / ucp-ddd-tactical-design / ucp-api-design
 ```
 
 ### `/ucp-java-style-review`
@@ -228,13 +270,15 @@
 Для **целого сервиса от спеки до прода** одних `ucp-*`-скиллов мало — нужен
 оркестратор, который держит контекст плана между шагами и не теряет инварианты.
 Эту роль играет [плагин `superpowers`](https://github.com/anthropics/skills/tree/main/skills/superpowers).
-`superpowers` ничего не знает про UCP — это general-purpose дисциплина «брейнсторм → план →
+`superpowers` ничего не знает про UCP — это общая дисциплина «брейнсторм → план →
 исполни → проверь → закрой». UCP-скиллы ничего не знают про `superpowers` — они умеют
-делать ровно один артефакт. Когда они встречаются, получается полный pipeline.
+делать ровно один артефакт. Когда они встречаются, получается полный процесс.
 
 ```
 1. ИНПУТ — спецификация
    ucp-spec-design                              (если спеки ещё нет)
+   ucp-spec-review                              (валидация качества дизайна — до кода!)
+      ▸ замечания → правки → ucp-spec-review (fast) → 0 Критично
 
 2. ПЛАНИРОВАНИЕ
    superpowers:brainstorming                    (если требования размытые)
@@ -263,15 +307,19 @@
    superpowers:finishing-a-development-branch
 ```
 
-**Когда нужна связка:** новый сервис с нуля, миграция с легаси на UCP, большой
-рефакторинг с переходом на новый Tier. Везде, где «забыть шаг» = баг в проде.
+**Симметрия design ↔ review.** Для каждого design-скилла есть парный review:
+- `ucp-spec-design` ↔ `ucp-spec-review` (дизайн спеки)
+- `ucp-pattern-design` ↔ `ucp-pattern-review` (UseCase Pattern)
+- `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
+- `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
+- `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review` — без пары
 
-**Когда `superpowers` оверкилл:** одна операция, один UseCase, добавить
-endpoint в существующий сервис. Дёргайте `ucp-*-design` напрямую без
-оркестратора.
+**Когда нужна связка:** новый сервис с нуля, миграция с классической слоёной архитектуры на UCP, большой рефакторинг с переходом на новый Tier. Везде, где «забыть шаг» = баг в проде.
 
-`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)),
-не зависит от этого репозитория и нужен только когда требуется orchestration.
+**Когда `superpowers` избыточен:** одна операция, один UseCase, добавить эндпоинт в существующий сервис. Дёргай `ucp-*-design` напрямую без оркестратора.
+
+`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)), не зависит от этого репозитория и нужен только когда требуется оркестрация.
 
 ## Подключение к проекту
 
