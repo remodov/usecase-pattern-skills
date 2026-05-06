@@ -1,57 +1,57 @@
 ---
 name: ucp-pattern-review
-description: Review Java/Spring code for compliance with the team's Use Case Pattern Style Guide and correct usage of the usecase-pattern library. Use when reviewing controllers, UseCase classes, UseCaseHandlers, dispatchers, or layer mapping (JsonBean / Pojo / Domain).
+description: Проверить Java/Spring-код на соответствие командному Use Case Pattern Style Guide и правильное использование библиотеки usecase-pattern. Применяется при разборе контроллеров, классов UseCase, UseCaseHandler-ов, диспетчеров или маппинга слоёв (JsonBean / Pojo / Domain).
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---
 
-# Use Case Pattern Review
+# Ревью Use Case Pattern
 
-You are reviewing Java/Spring code for compliance with the Use Case Pattern Style Guide and correct usage of the `usecase-pattern` library (packages `ru.vikulinva.usecase`, `ru.vikulinva.usecase.cqrs`).
+Ты ревьюишь Java/Spring-код на соответствие Use Case Pattern Style Guide и правильное использование библиотеки `usecase-pattern` (пакеты `ru.vikulinva.usecase`, `ru.vikulinva.usecase.cqrs`).
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/usecase-pattern-style-guide.md` in the project root. Every rule has a code (`R-UC-1`, `R-HND-X2`, etc.) — cite codes in findings.
+1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` в корне проекта. У каждого правила есть код (`R-UC-1`, `R-HND-X2` и т.п.) — цитируй коды в замечаниях.
 
-2. **Detect the adoption level** by inspecting the project (style guide §2):
-   - Look for `core/<bc>/` + `adapter/in/`, `adapter/out/` → **Level 4 (Hexagonal)**.
-   - Look for `domain/aggregate/`, `Entity<ID>`, `AggregateRoot<ID>` → **Level 3 (DDD)**.
-   - Look for `UseCaseCommand` / `UseCaseQuery` markers → **Level 2 (CQRS)**.
-   - Otherwise → **Level 1 (basic)**.
+2. **Определи уровень внедрения** осмотрев проект (style guide §2):
+   - Найди `core/<bc>/` + `adapter/in/`, `adapter/out/` → **Уровень 4 (Hexagonal)**.
+   - Найди `domain/aggregate/`, `Entity<ID>`, `AggregateRoot<ID>` → **Уровень 3 (DDD)**.
+   - Найди маркеры `UseCaseCommand` / `UseCaseQuery` → **Уровень 2 (CQRS)**.
+   - Иначе → **Уровень 1 (базовый)**.
 
-   State the detected level at the start of your report. Apply the rules listed for that level in §2 of the style guide. On Level 3+, also load `.claude/docs/ddd-tactical-style-guide.md` and apply its rules to domain code.
+   Назови определённый уровень в начале отчёта. Применяй правила, перечисленные для этого уровня в §2 style guide. На Уровне 3+ дополнительно загрузи `.claude/docs/ddd-tactical-style-guide.md` и применяй его правила к доменному коду.
 
-3. **Identify what to review.** If the user named files — review those. Otherwise:
-   - Use `git diff` (working tree, staged, last commit) to find changed Java files.
-   - Look at `**/usecase/**`, `**/controller/**`, `**/handler/**`, `**/core/**`, `**/adapter/**`.
-   - Check `build.gradle` / `pom.xml` for `ru.vikulinva:usecase-pattern-starter` (or `usecase-pattern`). If absent → Info finding, but continue.
+3. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
+   - Используй `git diff` (working tree, staged, last commit), чтобы найти изменённые Java-файлы.
+   - Смотри `**/usecase/**`, `**/controller/**`, `**/handler/**`, `**/core/**`, `**/adapter/**`.
+   - Проверь `build.gradle` / `pom.xml` на `ru.vikulinva:usecase-pattern-starter` (или `usecase-pattern`). Если нет — замечание уровня **Замечание**, но продолжай.
 
-4. **Review against the relevant style-guide sections** at minimum:
+4. **Прогон по соответствующим разделам style guide** как минимум:
 
-   - **§3 UseCase**: record/final immutable; no logic inside; one operation per UseCase; `R` is the result type; no `void`.
-   - **§4 UseCaseHandler**: `@Component`; `useCaseType()` returns the correct class; `@Transactional` (or `readOnly = true` for queries); stateless; one handler per UseCase; constructor injection; no infrastructure exceptions leaking out.
-   - **§5 Dispatcher / Controller**: controller dispatches via `UseCaseDispatcher`; controllers do mapping + dispatch + response only; no business logic; no `HttpServletRequest` leaking into UseCase.
-   - **§6 CQRS** (Level 2+): commands implement `UseCaseCommand`, queries implement `UseCaseQuery`; queries don't mutate state; commands don't return huge read DTOs.
-   - **§7 Layers**: JsonBean ≠ Pojo ≠ Domain; mapping via MapStruct or explicit `@Component` mappers; no `BeanUtils.copyProperties` / reflection mappers.
-   - **§8 Hexagonal** (Level 4): `core/` doesn't import Spring/jOOQ/REST/Kafka; external interactions through ports.
-   - **§9 UseCaseStep**: extracted only when reused in ≥ 2 handlers; not nested; stateless.
-   - **§10 Transactions**: `@Transactional` on Handler, not Repository or Service; one transaction per UseCase; events published after `repository.save(...)`.
+   - **§3 UseCase**: record / final immutable; внутри без логики; одна операция = один UseCase; `R` — тип результата; нет `void`.
+   - **§4 UseCaseHandler**: `@Component`; `useCaseType()` возвращает правильный класс; `@Transactional` (или `readOnly = true` для запросов); без состояния; один обработчик на один UseCase; constructor injection; никаких инфраструктурных исключений наружу.
+   - **§5 Dispatcher / Controller**: контроллер диспатчит через `UseCaseDispatcher`; контроллеры делают только маппинг + диспатч + ответ; никакой бизнес-логики; никакого `HttpServletRequest` внутри UseCase.
+   - **§6 CQRS** (Уровень 2+): команды реализуют `UseCaseCommand`, запросы — `UseCaseQuery`; запросы не меняют состояние; команды не возвращают огромные read DTO.
+   - **§7 Слои**: JsonBean ≠ Pojo ≠ Domain; маппинг через MapStruct или явные `@Component`-мапперы; никакого `BeanUtils.copyProperties` / рефлекшн-мапперов.
+   - **§8 Hexagonal** (Уровень 4): `core/` не импортирует Spring/jOOQ/REST/Kafka; внешние взаимодействия — через порты.
+   - **§9 UseCaseStep**: выделять только если переиспользуется в ≥ 2 обработчиках; не вложен; без состояния.
+   - **§10 Транзакции**: `@Transactional` на Handler, не на Repository / Service; одна транзакция на UseCase; события публикуются после `repository.save(...)`.
 
-5. **Report findings** in this exact format:
+5. **Замечания** оформляй ровно так:
 
    ```
-   <FilePath>:<LineNumber>  [<RuleCode>]  <Severity>
-     Problem: <one-line description>
-     Why: <which rule is violated, quoting the rule briefly>
-     Fix: <concrete suggestion, ideally with a small code snippet>
+   <ПутьФайла>:<СтрокаНомер>  [<КодПравила>]  <Серьёзность>
+     Проблема: <однострочное описание>
+     Почему: <какое правило нарушено, краткой цитатой из правила>
+     Как исправить: <конкретное предложение, желательно с маленьким сниппетом кода>
    ```
 
-   Severities:
-   - **Critical** — breaks correctness or invariants (transactional boundary breach, command in query handler, Spring/jOOQ leaking into core, anemic UseCase with logic, controller bypassing dispatcher).
-   - **Warning** — deviates from convention (anaemic UseCase shape, missing markers, naming, package layout).
-   - **Info** — improvement or nit (could be a `record`, missing dependency, could promote to `UseCaseStep`).
+   Серьёзности:
+   - **Критично** — ломает корректность или инварианты (нарушение транзакционной границы, команда в query-handler, протечка Spring/jOOQ в core, анемичный UseCase с логикой, контроллер в обход диспетчера).
+   - **Предупреждение** — отклонение от конвенции (форма анемичного UseCase, отсутствие маркеров, нейминг, раскладка пакетов).
+   - **Замечание** — улучшение / придирка (можно сделать `record`, отсутствует зависимость, можно вынести в `UseCaseStep`).
 
-6. **End with a summary**: total findings by severity + a one-line verdict — "compliant", "minor deviations", or "needs rework". Mention the detected level explicitly.
+6. **Заверши резюме**: общее число замечаний по серьёзности + однострочный вердикт — «соответствует», «незначительные отклонения» или «требует доработки». Явно укажи определённый уровень.
 
-7. **Do not modify code.** This skill only reports. Suggestions in `Fix:` are textual.
+7. **Код не модифицируй.** Этот скилл только сообщает. Предложения в `Как исправить:` — текстовые.
 
 $ARGUMENTS

@@ -1,22 +1,22 @@
 ---
 name: ucp-java-style-review
-description: Review Java source files for compliance with the team's Java Style Guide (naming, imports, expressions, indentation). Use when reviewing PRs, before committing, or when onboarding a new module to the team's style.
+description: Проверить Java-исходники на соответствие командному Java Style Guide (нейминг, импорты, выражения, отступы). Применяется при ревью PR-ов, перед коммитом или при онбординге нового модуля под командный стиль.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---
 
-# Java Style Review
+# Ревью Java-стиля
 
-You are reviewing Java source files for compliance with the team's Java Style Guide. This skill is intentionally narrow — it only checks **style** (naming, imports, expressions, formatting). Architecture, DDD invariants, UseCase Pattern compliance, and API contracts are covered by other skills.
+Ты ревьюишь Java-исходники на соответствие командному Java Style Guide. Этот скилл намеренно узкий — проверяет только **стиль** (нейминг, импорты, выражения, форматирование). Архитектура, инварианты DDD, соответствие Use Case Pattern и API-контракты — задача других скиллов.
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/java-style-guide.md` in the project root. Every rule has a code (`JS-2.1`, `JS-4.7`, …) — cite codes in findings. Treat the guide as binding except where `JS-1.1` («любое нарушение допустимо, если оно улучшает читаемость») is explicitly applicable; in that case the contributor must justify the deviation in the PR description.
+1. **Прочитай style guide** из `.claude/docs/java-style-guide.md` в корне проекта. У каждого правила есть код (`JS-2.1`, `JS-4.7`, …) — цитируй коды в замечаниях. Гайд обязателен, кроме случаев, когда явно применимо `JS-1.1` («любое нарушение допустимо, если оно улучшает читаемость»); в этом случае автор должен обосновать отклонение в описании PR.
 
-2. **Identify what to review.** If the user named files — review those. Otherwise:
-   - Use `git diff` (working tree, staged, last commit) to find changed `.java` files.
-   - Default scope: only changed lines. Mention untouched violations in surrounding context as Info findings (so the contributor knows about them but isn't blocked).
+2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
+   - Используй `git diff` (working tree, staged, last commit), чтобы найти изменённые `.java`-файлы.
+   - По умолчанию — только изменённые строки. О нарушениях в окружающем контексте сообщай как **Замечание** (чтобы автор знал, но не блокировался).
 
-3. **Review against every section of the guide:**
+3. **Прогон по каждому разделу гайда:**
 
    - **§2 Именование (`JS-2.1`–`JS-2.8`):**
      - Имена пакетов lowercase, без `_` и спецсимволов (`JS-2.1`).
@@ -49,22 +49,22 @@ You are reviewing Java source files for compliance with the team's Java Style Gu
 
 4. **Не дублируй то, что ловит checkstyle.** Если в проекте есть `checkstyle.xml` — упомяни в начале отчёта, что часть правил автоматически проверяется им, и сосредоточься на правилах, которые требуют человеческого судьи (`JS-2.5` аббревиатуры, `JS-2.6.1` имена тестов, `JS-4.6` большие лямбды, `JS-4.7` guard expressions, `JS-5.2` перенос).
 
-5. **Report findings** in this exact format:
+5. **Замечания** оформляй ровно так:
 
    ```
-   <FilePath>:<LineNumber>  [<RuleCode>]  <Severity>
-     Problem: <one-line description>
-     Why: <which rule, quoting briefly>
-     Fix: <concrete suggestion, ideally a code snippet>
+   <ПутьФайла>:<СтрокаНомер>  [<КодПравила>]  <Серьёзность>
+     Проблема: <однострочное описание>
+     Почему: <какое правило, краткой цитатой>
+     Как исправить: <конкретное предложение, желательно сниппет кода>
    ```
 
-   Severities:
-   - **Critical** — нарушение, ломающее читаемость/поддерживаемость в моменте: имя класса как глагол, аббревиатура наперекосяк, гигантская лямбда без декомпозиции, булева сложность ≥ 5, длина строки ≥ 200.
-   - **Warning** — дисциплинарные: неявные модификаторы, плюрал в имени пакета, неиспользуемые импорты, отсутствие method reference, горизонтальное выравнивание.
-   - **Info** — мелкие или предложения: можно сделать чуть выразительнее, длина строки 121–140 символов, и т. п.
+   Серьёзности:
+   - **Критично** — нарушение, ломающее читаемость / поддерживаемость в моменте: имя класса как глагол, аббревиатура наперекосяк, гигантская лямбда без декомпозиции, булева сложность ≥ 5, длина строки ≥ 200.
+   - **Предупреждение** — дисциплинарные: неявные модификаторы, множественное число в имени пакета, неиспользуемые импорты, отсутствие method reference, горизонтальное выравнивание.
+   - **Замечание** — мелкие или предложения: можно сделать чуть выразительнее, длина строки 121–140 символов и т. п.
 
-6. **End with a summary**: количество findings по severity + одно-строчный вердикт — «compliant», «minor deviations», «needs rework».
+6. **Заверши резюме**: количество замечаний по серьёзности + однострочный вердикт — «соответствует», «незначительные отклонения» или «требует доработки».
 
-7. **Do not modify code.** Этот скилл только репортит. Авто-фикс — задача отдельного `java-style-fix` (если/когда появится).
+7. **Код не модифицируй.** Этот скилл только сообщает. Автоисправление — задача отдельного `java-style-fix` (если / когда появится).
 
 $ARGUMENTS

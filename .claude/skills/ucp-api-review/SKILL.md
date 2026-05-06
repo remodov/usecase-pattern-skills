@@ -1,49 +1,49 @@
 ---
 name: ucp-api-review
-description: Review REST API contract or code for compliance with the team's REST API Style Guide. Use when reviewing OpenAPI specs, controllers, DTOs, or error handling code.
+description: Проверить контракт REST API или код на соответствие командному REST API Style Guide. Применяется при разборе OpenAPI-спек, контроллеров, DTO или кода обработки ошибок.
 allowed-tools: Read Glob Grep Bash(git diff*) Agent
 ---
 
-# REST API Contract Review
+# Ревью контракта REST API
 
-You are reviewing a REST API contract (OpenAPI spec, controller code, DTOs, or error handling) for compliance with the team's REST API Style Guide.
+Ты ревьюишь контракт REST API (OpenAPI-спека, код контроллера, DTO или обработка ошибок) на соответствие командному REST API Style Guide.
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/rest-api-style-guide.md` in the project root. This is the single source of truth for all rules.
+1. **Прочитай style guide** из `.claude/docs/rest-api-style-guide.md` в корне проекта. Это единственный источник правды для всех правил.
 
-2. **Identify what to review.** If the user specified files — use those. Otherwise:
-   - Check `git diff` for recently changed files
-   - Look for OpenAPI specs (`*.yaml`, `*.yml` in resources/openapi or similar)
-   - Look for REST controllers, DTOs, exception handlers
+2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
+   - Посмотри `git diff` на недавно изменённые файлы
+   - Найди OpenAPI-спеки (`*.yaml`, `*.yml` в `resources/openapi` или похоже)
+   - Найди REST-контроллеры, DTO, обработчики исключений
 
-3. **Review against ALL sections** of the style guide. Check every applicable rule:
-   - URL format: lowercase, kebab-case, no trailing slash, no extensions, no verbs
-   - Resources: plural nouns, max 2 levels of nesting, `{id}` in path
-   - HTTP methods: correct method for operation, correct status codes
-   - Query params: camelCase, pagination (`page`/`size`), sorting, filtering
-   - JSON fields: camelCase, dates ISO 8601, enums UPPER_SNAKE_CASE, collections plural
-   - Response format: no envelope for single resources, `content` for collections, null handling
-   - Error handling: RFC 9457 ProblemDetails, `application/problem+json`, `code` enum, `violations`
-   - Headers: no `X-` prefix, `Idempotency-Key`, `traceparent`
-   - Versioning: `/api/v1/...`, version bump only on breaking changes
-   - OpenAPI metadata: `operationId`, `tags`, `summary`
-   - Action endpoints: verb in infinitive, always POST
-   - Batch, async, deprecation, file upload patterns
+3. **Прогон по ВСЕМ разделам** style guide. Проверь каждое применимое правило:
+   - Формат URL: lowercase, kebab-case, без слэша в конце, без расширений, без глаголов
+   - Ресурсы: множественные существительные, до 2 уровней вложенности, `{id}` в пути
+   - HTTP-методы: правильный метод под операцию, правильные статус-коды
+   - Query-параметры: camelCase, пагинация (`page` / `size`), сортировка, фильтрация
+   - JSON-поля: camelCase, даты ISO 8601, enum'ы UPPER_SNAKE_CASE, коллекции — множественное число
+   - Формат ответа: без обёртки для одиночного ресурса, `content` для коллекций, обработка null
+   - Обработка ошибок: RFC 9457 ProblemDetails, `application/problem+json`, `code` как enum, `violations`
+   - Заголовки: без префикса `X-`, `Idempotency-Key`, `traceparent`
+   - Версионирование: `/api/v1/...`, повышение версии только при ломающих изменениях
+   - OpenAPI-метаданные: `operationId`, `tags`, `summary`
+   - Action-эндпоинты: глагол в инфинитиве, всегда POST
+   - Паттерны batch, async, deprecation, загрузки файлов
 
-4. **Report findings** in this format:
+4. **Замечания** оформляй в таком формате:
 
-   For each violation:
-   - File and line (or endpoint path)
-   - Which rule is violated (section number from style guide)
-   - What's wrong
-   - How to fix
+   На каждое нарушение:
+   - Файл и строка (или путь эндпоинта)
+   - Какое правило нарушено (номер раздела из style guide)
+   - Что не так
+   - Как исправить
 
-   At the end — summary: total violations found, grouped by severity:
-   - **Critical** — breaks the contract standard (wrong HTTP method, missing error format, wrong status code)
-   - **Warning** — deviates from convention (naming, missing OpenAPI metadata)
-   - **Info** — suggestion for improvement
+   В конце — резюме: общее число нарушений, сгруппированных по серьёзности:
+   - **Критично** — ломает стандарт контракта (неправильный HTTP-метод, отсутствующий формат ошибки, неправильный статус-код)
+   - **Предупреждение** — отклонение от конвенции (нейминг, отсутствие OpenAPI-метаданных)
+   - **Замечание** — предложение по улучшению
 
-5. If everything is compliant, say so explicitly.
+5. Если всё в порядке — скажи это явно.
 
 $ARGUMENTS

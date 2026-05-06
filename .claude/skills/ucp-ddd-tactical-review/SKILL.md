@@ -1,50 +1,50 @@
 ---
 name: ucp-ddd-tactical-review
-description: Review domain code for compliance with the team's DDD Tactical Patterns Style Guide and correct usage of the ddd-building-blocks library. Use when reviewing aggregates, entities, value objects, domain events, repositories, or domain services.
+description: Проверить доменный код на соответствие командному DDD Tactical Patterns Style Guide и правильное использование библиотеки ddd-building-blocks. Применяется при разборе агрегатов, сущностей, value object'ов, доменных событий, репозиториев и доменных сервисов.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---
 
-# DDD Tactical Patterns Review
+# Ревью тактических паттернов DDD
 
-You are reviewing domain-layer code (aggregates, entities, value objects, domain events, repositories, domain services, specifications, factories) for compliance with the team's DDD Tactical Patterns Style Guide and correct usage of the `ddd-building-blocks` library (package `ru.vikulinva.ddd`).
+Ты ревьюишь код доменного слоя (агрегаты, сущности, value object'ы, доменные события, репозитории, доменные сервисы, спецификации, фабрики) на соответствие командному DDD Tactical Patterns Style Guide и правильное использование библиотеки `ddd-building-blocks` (пакет `ru.vikulinva.ddd`).
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/ddd-tactical-style-guide.md` in the project root. It is the single source of truth — every rule is identified by code (`R-ENT-1`, `R-AGG-X3`, etc.). Cite these codes in findings.
+1. **Прочитай style guide** из `.claude/docs/ddd-tactical-style-guide.md` в корне проекта. Это единственный источник правды — у каждого правила есть код (`R-ENT-1`, `R-AGG-X3` и т.п.). Цитируй коды в замечаниях.
 
-2. **Identify what to review.** If the user named files — review those. Otherwise:
-   - Use `git diff` (working tree, staged, last commit) to find changed Java files in domain packages.
-   - Look in `**/domain/**/*.java` and any package containing `aggregate/`, `entity/`, `valueobject/`, `event/`, `repository/`, `specification/`.
-   - Read `build.gradle` / `pom.xml` to confirm `ddd-building-blocks` is a dependency. If not — flag it as an Info finding and continue review against the style guide regardless.
+2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
+   - Используй `git diff` (working tree, staged, last commit), чтобы найти изменённые Java-файлы в доменных пакетах.
+   - Смотри `**/domain/**/*.java` и любые пакеты, содержащие `aggregate/`, `entity/`, `valueobject/`, `event/`, `repository/`, `specification/`.
+   - Прочитай `build.gradle` / `pom.xml` — убедись, что `ddd-building-blocks` подключён. Если нет — пометь как **Замечание** и продолжай ревью по гайду в любом случае.
 
-3. **Review each file against the relevant section of the style guide.** Cover at minimum:
+3. **Прогон каждого файла по соответствующему разделу гайда.** Покрой как минимум:
 
-   - **Entity (§2):** extends `Entity<ID>`; `id` is `final`; no overridden `equals`/`hashCode`; no public setters; constructor validates invariants; no references to other aggregates by object (only by ID).
-   - **Value Object (§3):** implements `ValueObject`; `final class` (or `record`); all fields `final`; equals by value; invariants checked in constructor; mutating ops return new instance.
-   - **Aggregate Root (§4):** extends `AggregateRoot<ID>`; events registered via `registerEvent(...)` inside the root, not outside; transactional boundary = aggregate; no cross-aggregate object refs.
-   - **Domain Event (§5):** extends `DomainEvent` with `super(aggregateType, aggregateId)`; past-tense name; immutable; carries IDs/values, not aggregate refs; `AFTER_COMMIT` not used for critical effects.
-   - **Repository (§6):** extends `AggregateRepository<T, ID>`; interface in domain, impl in adapter; one root per repo; `save` publishes events via `DomainEventPublisher` and calls `clearDomainEvents()`; methods named in domain language; returns domain types only.
-   - **Domain Service (§7):** introduced only for ≥ 2-aggregate logic; stateless; no orchestration; works with domain types.
-   - **Factory (§8):** introduced only when constructor is insufficient; returns valid aggregate including initial events.
-   - **Specification (§9):** extends `Specification<T>`; used only when reused or combined; not used for SQL generation.
-   - **Module (§10):** packages grouped by domain (not by type — no top-level `entity/`, `service/`, `repository/`); domain packages don't import Spring / JPA / jOOQ.
+   - **Entity (§2):** наследует `Entity<ID>`; `id` — `final`; не переопределены `equals` / `hashCode`; нет публичных setter-ов; конструктор проверяет инварианты; нет ссылок на другие агрегаты как на объекты (только по ID).
+   - **Value Object (§3):** реализует `ValueObject`; `final class` (или `record`); все поля `final`; equals по значению; инварианты в конструкторе; мутирующие операции возвращают новый экземпляр.
+   - **Aggregate Root (§4):** наследует `AggregateRoot<ID>`; события регистрируются через `registerEvent(...)` внутри корня, не снаружи; транзакционная граница = агрегат; нет ссылок на объекты других агрегатов.
+   - **Domain Event (§5):** наследует `DomainEvent` с `super(aggregateType, aggregateId)`; имя в прошедшем времени; иммутабельный; несёт ID-ы / значения, не ссылки на агрегаты; `AFTER_COMMIT` не используется для критичных эффектов.
+   - **Repository (§6):** наследует `AggregateRepository<T, ID>`; интерфейс в домене, реализация в адаптере; один корень на репозиторий; `save` публикует события через `DomainEventPublisher` и зовёт `clearDomainEvents()`; методы названы в доменных терминах; возвращает только доменные типы.
+   - **Domain Service (§7):** вводится только для логики на ≥ 2 агрегатах; без состояния; не оркестратор; работает с доменными типами.
+   - **Factory (§8):** вводится только если конструктора недостаточно; возвращает валидный агрегат, включая начальные события.
+   - **Specification (§9):** наследует `Specification<T>`; используется только при переиспользовании или композиции; не используется для генерации SQL.
+   - **Module (§10):** пакеты группируются по домену (не по типу — никаких корневых `entity/`, `service/`, `repository/`); доменные пакеты не импортируют Spring / JPA / jOOQ.
 
-4. **Report findings** in this exact format:
+4. **Замечания** оформляй ровно так:
 
    ```
-   <FilePath>:<LineNumber>  [<RuleCode>]  <Severity>
-     Problem: <one-line description>
-     Why: <which rule is violated, quoting the rule briefly>
-     Fix: <concrete suggestion, ideally with a code snippet>
+   <ПутьФайла>:<СтрокаНомер>  [<КодПравила>]  <Серьёзность>
+     Проблема: <однострочное описание>
+     Почему: <какое правило нарушено, краткой цитатой из правила>
+     Как исправить: <конкретное предложение, желательно со сниппетом кода>
    ```
 
-   Severities:
-   - **Critical** — breaks an invariant or correctness rule (mutable VO, events outside root, equals overridden on Entity, cross-aggregate object refs, transactional boundary breach).
-   - **Warning** — deviates from convention (anemic model, missing `ValueObject` marker, naming, package layout).
-   - **Info** — improvement or nit (could promote a primitive to VO; could simplify with `record`; missing dependency).
+   Серьёзности:
+   - **Критично** — ломает инвариант или правило корректности (мутабельный VO, события вне корня, переопределённый equals на Entity, ссылки между агрегатами как объекты, нарушение транзакционной границы).
+   - **Предупреждение** — отклонение от конвенции (анемичная модель, отсутствие маркера `ValueObject`, нейминг, раскладка пакетов).
+   - **Замечание** — улучшение или придирка (примитив можно поднять до VO; можно упростить с `record`; отсутствует зависимость).
 
-5. **End with a summary**: total findings by severity, plus a one-line verdict — "compliant", "minor deviations", or "needs rework". If everything passes, say so explicitly and reference which sections you covered.
+5. **Заверши резюме**: общее число замечаний по серьёзности + однострочный вердикт — «соответствует», «незначительные отклонения» или «требует доработки». Если всё в порядке — скажи это явно и сошлись на разделы, которые ты покрыл.
 
-6. **Do not fix the code.** This skill only reports. Suggestions in `Fix:` are textual.
+6. **Код не правь.** Этот скилл только сообщает. Предложения в `Как исправить:` — текстовые.
 
 $ARGUMENTS

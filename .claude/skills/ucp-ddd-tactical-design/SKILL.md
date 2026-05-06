@@ -1,38 +1,38 @@
 ---
 name: ucp-ddd-tactical-design
-description: Design or scaffold a new domain model (aggregate, entities, value objects, events, repository) following the team's DDD Tactical Patterns Style Guide and using the ddd-building-blocks library. Use when modelling a new bounded context, adding an aggregate, or introducing a new domain event.
+description: Спроектировать или зашаблонить новую доменную модель (агрегат, сущности, value object'ы, события, репозиторий) по командному DDD Tactical Patterns Style Guide и с библиотекой ddd-building-blocks. Применяется при моделировании нового bounded context, добавлении агрегата или введении нового доменного события.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
-# DDD Tactical Patterns Design
+# DDD Tactical Patterns — проектирование
 
-You are designing or scaffolding a new domain model: a bounded context, an aggregate, a value object, or a domain event. The implementation must follow the team's DDD Tactical Patterns Style Guide and use the abstractions from the `ddd-building-blocks` library (package `ru.vikulinva.ddd`).
+Ты проектируешь или генерируешь шаблон новой доменной модели: bounded context, агрегат, value object или доменное событие. Реализация должна следовать командному DDD Tactical Patterns Style Guide и использовать абстракции из библиотеки `ddd-building-blocks` (пакет `ru.vikulinva.ddd`).
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/ddd-tactical-style-guide.md`. Treat every `R-*` rule as binding. Cite the rules you rely on **в design-обосновании ответа пользователю** — но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
+1. **Прочитай style guide** из `.claude/docs/ddd-tactical-style-guide.md`. Считай каждое правило `R-*` обязательным. Цитируй правила, на которые опираешься, **в design-обосновании ответа пользователю** — но **не в комментариях сгенерированного кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
 
-2. **Confirm the library is available.** Check `build.gradle` / `pom.xml` for `ru.vikulinva:ddd-building-blocks`. If absent, instruct the user to add it (and offer the dependency snippet) — do not invent local copies of `Entity`/`AggregateRoot`/`ValueObject`.
+2. **Подтверди наличие библиотеки.** Проверь `build.gradle` / `pom.xml` на `ru.vikulinva:ddd-building-blocks`. Если нет — попроси пользователя добавить (предложи сниппет зависимости) — не выдумывай локальные копии `Entity` / `AggregateRoot` / `ValueObject`.
 
-3. **Clarify the model from the user's description.** Determine:
-   - The bounded context name and the package root for it (`core/<bc>/domain/...`).
-   - The aggregate root: what business invariant does it protect?
-   - Internal entities (if any) and their lifecycle within the root.
-   - Value Objects to extract (kill primitive obsession: `Money`, `Email`, `OrderId`, etc.).
-   - Domain events emitted by the root, named in past tense.
-   - Cross-aggregate references — must be by ID only.
-   - Whether a Factory, Domain Service or Specification is justified (default: no).
+3. **Уточни модель из описания пользователя.** Определи:
+   - Имя bounded context и корневой пакет под него (`core/<bc>/domain/...`).
+   - Корень агрегата: какой бизнес-инвариант он защищает?
+   - Внутренние сущности (если есть) и их жизненный цикл внутри корня.
+   - Value Objects, которые надо выделить (бьём примитивную одержимость: `Money`, `Email`, `OrderId` и т.п.).
+   - Доменные события, которые публикует корень, в прошедшем времени.
+   - Ссылки между агрегатами — только по ID.
+   - Оправдана ли Factory, Domain Service или Specification (по умолчанию — нет).
 
-4. **Produce the code.** For each class, write a complete Java file (Java 21+). На VO/Entity/Aggregate Lombok **не** применяем (`JS-6.4` — records уже дают ctor / accessors / equals; на агрегатах `@Builder` обходит инварианты, см. `JS-6.7`). Lombok оправдан только на **handler'ах / сервисах** в слое UseCase, не в `domain/`.
+4. **Произведи код.** Для каждого класса напиши полный Java-файл (Java 21+). На VO / Entity / Aggregate Lombok **не** применяем (`JS-6.4` — records уже дают ctor / accessors / equals; на агрегатах `@Builder` обходит инварианты, см. `JS-6.7`). Lombok оправдан только на **handler-ах / сервисах** в слое UseCase, не в `domain/`.
 
-   - **Value Objects** as Java `record`s implementing `ValueObject`, with compact constructor validating invariants. If a record is not a fit (mutable algorithms, custom equals semantics), use `final class` with `final` fields.
-   - **Entities** extending `Entity<ID>`, `id` `final`, only business methods (no setters), validation in constructor. Do not override `equals`/`hashCode`.
-   - **Aggregate Roots** extending `AggregateRoot<ID>`, mutating methods enforce invariants and call `registerEvent(new SomethingHappened(...))`.
-   - **Domain Events** as `final class` extending `DomainEvent`, calling `super(aggregateType, aggregateId)`; all fields `final`; past-tense name (`OrderPaid`, not `PayOrder`).
-   - **Repository** as an interface in `domain/repository/` extending `AggregateRepository<T, ID>` with domain-named methods. Place implementation under `adapter/out/<storage>/`.
-   - **Domain Service / Factory / Specification** only if the rules in the style guide say they're warranted. State the justification.
+   - **Value Objects** — Java `record`'ы, реализующие `ValueObject`, с compact-конструктором, проверяющим инварианты. Если record не подходит (мутирующие алгоритмы, кастомный equals), используй `final class` с `final` полями.
+   - **Entities** — наследуют `Entity<ID>`, `id` — `final`, только бизнес-методы (без setter-ов), валидация в конструкторе. Не переопределяй `equals` / `hashCode`.
+   - **Aggregate Roots** — наследуют `AggregateRoot<ID>`, мутирующие методы держат инварианты и зовут `registerEvent(new SomethingHappened(...))`.
+   - **Domain Events** — `final class`, наследует `DomainEvent`, зовёт `super(aggregateType, aggregateId)`; все поля `final`; имя в прошедшем времени (`OrderPaid`, не `PayOrder`).
+   - **Repository** — интерфейс в `domain/repository/`, наследует `AggregateRepository<T, ID>`, методы названы в доменных терминах. Реализация — в `adapter/out/<storage>/`.
+   - **Domain Service / Factory / Specification** — только если правила style guide говорят, что оправдано. Укажи обоснование.
 
-5. **Lay out the packages by domain, not by type** (style guide §10):
+5. **Раскладывай пакеты по домену, не по типу** (style guide §10):
 
    ```
    core/<bc>/domain/
@@ -50,21 +50,21 @@ You are designing or scaffolding a new domain model: a bounded context, an aggre
    adapter/out/<storage>/<RepositoryImpl>.java
    ```
 
-   Domain packages must not import Spring, JPA, jOOQ, or the persistence schema.
+   Доменные пакеты не должны импортировать Spring, JPA, jOOQ или схему персистенса.
 
-6. **Self-review before presenting.** Walk through these checks (style guide §11) and only output when they pass:
-   - Entity equals/hashCode not overridden; ID `final`.
-   - Every VO is immutable and equals by value.
-   - All state changes go through aggregate-root methods.
-   - Events created inside the root, not in services or repositories.
-   - Cross-aggregate references are IDs only.
-   - Repository interface in domain, impl in adapter, returns domain types, publishes & clears events on `save`.
-   - Package layout grouped by domain.
+6. **Самопроверка перед выдачей.** Пройди эти проверки (style guide §11) и выдавай только когда они проходят:
+   - Entity не переопределяет equals / hashCode; ID — `final`.
+   - Каждый VO иммутабельный и equals по значению.
+   - Все изменения состояния идут через методы корня агрегата.
+   - События создаются внутри корня, не в сервисах или репозиториях.
+   - Ссылки между агрегатами — только ID.
+   - Интерфейс репозитория в домене, реализация в адаптере, возвращает доменные типы, публикует и очищает события на `save`.
+   - Раскладка пакетов сгруппирована по домену.
 
-7. **Output structure:**
-   1. Short design summary (3–8 bullet points): aggregate, invariants protected, events emitted, repositories, anything intentionally omitted.
-   2. File tree of new files.
-   3. Each file as a separate code block titled with its path.
-   4. **Implementation notes**: dependencies needed, suggested test cases (one per invariant + one per event).
+7. **Структура вывода:**
+   1. Краткий обзор дизайна (3–8 буллетов): агрегат, защищаемые инварианты, публикуемые события, репозитории, что намеренно опущено.
+   2. Дерево новых файлов.
+   3. Каждый файл — отдельный code block с путём в заголовке.
+   4. **Заметки по реализации**: нужные зависимости, предлагаемые тест-кейсы (по одному на инвариант + по одному на событие).
 
 $ARGUMENTS
