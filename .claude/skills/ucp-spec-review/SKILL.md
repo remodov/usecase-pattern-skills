@@ -1,175 +1,175 @@
 ---
 name: ucp-spec-review
-description: Review a Use Case specification (or Event Storming draft) for design-quality issues — Ubiquitous Language consistency, Bounded Context boundaries, aggregate invariant load, missing actors, command/event ownership, failure domain coverage, data ownership, acceptance criteria coverage. AI as design critic, not code reviewer. Use when validating a spec produced by `ucp-spec-design`, reviewing an Event Storming draft, or onboarding a brownfield service whose existing spec needs honest audit.
+description: Проверить Use Case спецификацию (или черновик Event Storming) на проблемы качества дизайна — согласованность Ubiquitous Language, границы Bounded Context, перегрузка инвариантами в агрегатах, отсутствующие акторы, владельцы команд и событий, покрытие зон отказа, владелец данных, покрытие критериями приёмки. AI как design-критик, не код-ревьюер. Применяется при валидации спеки, сделанной `ucp-spec-design`, при разборе черновика Event Storming или при онбординге существующего сервиса, чьей спеке нужен честный аудит.
 allowed-tools: Read Glob Grep Bash(git diff*) Agent
 ---
 
-# Use Case Specification — review (design critic)
+# Use Case спецификация — ревью (design-критик)
 
-You are reviewing a Use Case specification (or an Event Storming draft) for **design quality**, not for code-level compliance. The goal is to catch what a careful architect catches but that often slips past:
+Ты ревьюишь Use Case спецификацию (или черновик Event Storming) на **качество дизайна**, не на код-уровне. Цель — поймать то, что внимательный архитектор ловит, но что часто проскакивает мимо:
 
-- contradictions in domain language;
-- aggregates that quietly grew too many invariants;
-- commands without a clear owner or error path;
-- domain events without consumers;
-- entities with unclear data ownership;
-- failure domains the team forgot to consider;
-- acceptance criteria that don't actually cover the business rules.
+- противоречия в доменном языке;
+- агрегаты, которые незаметно набрали слишком много инвариантов;
+- команды без явного владельца или без пути обработки ошибок;
+- доменные события без потребителей;
+- сущности с неясным владельцем данных;
+- зоны отказа, про которые команда забыла;
+- критерии приёмки, которые на деле не покрывают бизнес-правила.
 
-This is **AI as design critic**, the counterpart to `ucp-spec-design`: the spec was generated or hand-written, now we look for cracks before code is written against it.
+Это **AI как design-критик**, парный к `ucp-spec-design`: спека сгенерирована или написана руками, теперь ищем трещины до того, как против неё начнут писать код.
 
-## Instructions
+## Инструкции
 
-1. **Read the spec template** from `.claude/docs/usecase-spec-template.md` in the project root. It defines the 16-section structure, Tier requirements (A / B / C), and what each section must contain. Treat the template as the source of truth for completeness rules.
+1. **Прочитай шаблон спеки** из `.claude/docs/usecase-spec-template.md` в корне проекта. Он определяет структуру 16 разделов, требования по Tier (A / B / C) и что должно быть в каждом разделе. Шаблон — источник правды для правил полноты.
 
-2. **Locate the spec under review.** Three common cases:
+2. **Найди спеку для ревью.** Три типичных случая:
 
-   - **Generated spec from `ucp-spec-design`** — usually under `docs/spec/`, one folder per section.
-   - **Hand-written spec in a single markdown file** (legacy or brownfield).
-   - **Event Storming draft** — text export from Miro / Notion / Mermaid file. Less structured; review what's there against the same design-quality categories where applicable.
+   - **Сгенерированная спека из `ucp-spec-design`** — обычно лежит под `docs/spec/`, по папке на каждый раздел.
+   - **Спека от руки в одном markdown-файле** (старый или уже существующий сервис).
+   - **Черновик Event Storming** — текстовый экспорт из Miro / Notion / Mermaid-файла. Менее структурированный; разбираем то, что есть, по тем же категориям качества дизайна, где применимо.
 
-   If the user named files — review those. Otherwise discover the spec via `Glob` (`docs/spec/**/*.md`, `docs/**/*-spec*.md`).
+   Если пользователь назвал файлы — ревьюй их. Иначе ищи спеку через `Glob` (`docs/spec/**/*.md`, `docs/**/*-spec*.md`).
 
-3. **Determine the declared Tier** (A / B / C):
-   - Look for explicit "(Tier A/B/C)" in the title or §«Уровни спеки» of the spec.
-   - If absent — infer from content: presence of aggregates / domain events → Tier C; UseCase-Handler vocabulary → Tier B; only Controller/Service → Tier A.
-   - State the detected Tier at the start of the report.
+3. **Определи объявленный Tier** (A / B / C):
+   - Найди явное «(Tier A/B/C)» в заголовке или в §«Уровни спеки» спеки.
+   - Если нет — выведи из содержания: есть агрегаты / доменные события → Tier C; словарь UseCase-Handler → Tier B; только Controller/Service → Tier A.
+   - Укажи определённый Tier в самом начале отчёта.
 
-4. **Run the review categories below.** Each rule has a code (`SR-UL-1`, `SR-AG-3`, etc.) — cite the code in every finding. Don't skip categories: if a category is irrelevant for the declared Tier (e.g., events on Tier A), state that explicitly with `not applicable on Tier A`.
+4. **Прогони категории ревью ниже.** У каждого правила есть код (`SR-UL-1`, `SR-AG-3` и т.п.) — цитируй код в каждом замечании. Не пропускай категории: если категория неприменима для объявленного Tier (например, события на Tier A), напиши явно `неприменимо на Tier A`.
 
-### SR-T (Tier consistency)
+### SR-T (Tier consistency — согласованность Tier)
 
-- **SR-T-1** Declared Tier matches content depth. *Tier C* claim with no aggregates or events → **Critical**. *Tier A* claim with full aggregates → **Warning** (mis-classified).
-- **SR-T-2** Sections required for the declared Tier are present (per template's coverage table). Missing = **Critical** for required, **Warning** for optional-on-Tier.
+- **SR-T-1** Объявленный Tier совпадает с глубиной содержания. Заявка *Tier C* без агрегатов и событий → **Критично**. Заявка *Tier A* с полными агрегатами → **Предупреждение** (классификация ошибочна).
+- **SR-T-2** Разделы, обязательные для объявленного Tier, присутствуют (см. таблицу покрытия в шаблоне). Отсутствие = **Критично** для обязательных, **Предупреждение** для опциональных-на-Tier.
 
-### SR-UL (Ubiquitous Language)
+### SR-UL (Ubiquitous Language — единый язык домена)
 
-- **SR-UL-1** Each glossary term is used in at least one other section.
-- **SR-UL-2** A concept appears under exactly one name. Synonyms outside the glossary (e.g., `Order` vs `Purchase` vs `Sale` for the same thing) → **Critical**.
-- **SR-UL-3** Use-case names, command names, and event names use glossary terms — no domain words invented in §7/§8/§10 that aren't in §2.
-- **SR-UL-4** Each glossary term has a definition (≥ one sentence). Bare entries → **Warning**.
+- **SR-UL-1** Каждый термин глоссария используется хотя бы в одном другом разделе.
+- **SR-UL-2** Один концепт встречается ровно под одним именем. Синонимы вне глоссария (например, `Order` vs `Purchase` vs `Sale` для одного и того же) → **Критично**.
+- **SR-UL-3** Имена use-case'ов, команд и событий используют термины глоссария — никаких доменных слов, выдуманных в §7/§8/§10 и отсутствующих в §2.
+- **SR-UL-4** У каждого термина глоссария есть определение (≥ одного предложения). Голые записи → **Предупреждение**.
 
-### SR-BC (Bounded Context)
+### SR-BC (Bounded Context — ограниченный контекст)
 
-- **SR-BC-1** §1 has explicit `scope` AND `not-scope`. Missing not-scope → **Warning** (boundary unclear).
-- **SR-BC-2** Every command in §7 belongs to this context. Cross-context commands → **Critical** (move to neighbour context or document via §14 Context Mapping).
-- **SR-BC-3** No silent overlap with neighbours: if §14 lists `Catalog` as upstream, this spec must not also own product entities.
-- **SR-BC-4** Tier B/C: §1 names neighbour contexts and the relationship type (Upstream/Downstream, Customer/Supplier, ACL, etc.).
+- **SR-BC-1** В §1 явно описан `scope` И `not-scope`. Отсутствие not-scope → **Предупреждение** (граница не очевидна).
+- **SR-BC-2** Каждая команда из §7 принадлежит этому контексту. Команды из чужого контекста → **Критично** (вынести в соседний контекст или задокументировать через §14 Context Mapping).
+- **SR-BC-3** Нет невидимого пересечения с соседями: если §14 называет `Catalog` upstream-ом, эта спека не должна владеть сущностями товаров.
+- **SR-BC-4** Tier B/C: §1 называет соседние контексты и тип отношений (Upstream/Downstream, Customer/Supplier, ACL и т.п.).
 
-### SR-AG (Aggregates / Domain Model — Tier C, partial Tier B)
+### SR-AG (Aggregates / Domain Model — Tier C, частично Tier B)
 
-- **SR-AG-1** Each aggregate has ≤ 7 invariants. More → **Warning** (split candidate; document why if intentional).
-- **SR-AG-2** Aggregate root is explicit. Sub-entities live inside one root, accessed only through it.
-- **SR-AG-3** No cyclic references between aggregates. If A holds `B.id` and B holds `A.id` → **Critical**.
-- **SR-AG-4** Value Objects are documented as immutable. Mutable VOs → **Warning**.
-- **SR-AG-5** Each aggregate has a clear identity type (`OrderId`, not `Long`). Primitive obsession in IDs → **Warning**.
-- **SR-AG-6** Tier C: every state-changing command on the aggregate registers a domain event (cross-check with §8). Silent state changes → **Warning**.
+- **SR-AG-1** У каждого агрегата ≤ 7 инвариантов. Больше → **Предупреждение** (кандидат на разделение; задокументируй причину если умышленно).
+- **SR-AG-2** Корень агрегата явный. Под-сущности живут внутри одного корня и доступны только через него.
+- **SR-AG-3** Нет циклических ссылок между агрегатами. Если A держит `B.id` и B держит `A.id` → **Критично**.
+- **SR-AG-4** Value Objects описаны как иммутабельные. Мутабельные VO → **Предупреждение**.
+- **SR-AG-5** У каждого агрегата явный тип идентификатора (`OrderId`, не `Long`). Примитивная одержимость в ID → **Предупреждение**.
+- **SR-AG-6** Tier C: каждая команда, меняющая состояние агрегата, регистрирует доменное событие (сверь с §8). Молчаливые изменения состояния → **Предупреждение**.
 
-### SR-AR (Actors / Roles)
+### SR-AR (Actors / Roles — акторы и роли)
 
-- **SR-AR-1** Every actor mentioned in §10 use-cases or §7 commands appears in §5 roles. Orphan actor → **Critical**.
-- **SR-AR-2** Every role in §5 has a permissions matrix against §7 commands and §9 queries. Missing matrix → **Warning**.
-- **SR-AR-3** Each command in §7 declares which role(s) can invoke it. Missing permission tag → **Warning**.
+- **SR-AR-1** Каждый актор, упомянутый в §10 use-cases или §7 commands, есть в §5 ролей. Осиротевший актор → **Критично**.
+- **SR-AR-2** У каждой роли в §5 есть матрица прав по командам §7 и запросам §9. Отсутствие матрицы → **Предупреждение**.
+- **SR-AR-3** Каждая команда в §7 декларирует, какие роли могут её вызывать. Отсутствие тега прав → **Предупреждение**.
 
-### SR-CM (Commands)
+### SR-CM (Commands — команды)
 
-- **SR-CM-1** Each command has: success result type, set of business errors (referencing §13), and pre-conditions. Missing any → **Warning**.
-- **SR-CM-2** Tier C: each command names the aggregate it targets. Free-floating commands → **Critical**.
-- **SR-CM-3** CQRS service (Tier B+ with markers): commands return identifier or empty result, not full read DTO. Read DTO in command → **Warning** (CQRS leak).
-- **SR-CM-4** Commands have explicit idempotency contract: idempotent / not idempotent / requires `Idempotency-Key`. Money-touching commands without idempotency → **Critical**.
+- **SR-CM-1** У каждой команды: тип успешного результата, набор бизнес-ошибок (со ссылкой на §13) и предусловия. Отсутствие любого из них → **Предупреждение**.
+- **SR-CM-2** Tier C: каждая команда называет агрегат-цель. Команды без привязки → **Критично**.
+- **SR-CM-3** CQRS-сервис (Tier B+ с маркерами): команды возвращают идентификатор или пустой результат, не толстый read-DTO. Read-DTO в команде → **Предупреждение** (CQRS-протечка).
+- **SR-CM-4** У команды явный контракт идемпотентности: идемпотентна / не идемпотентна / требует `Idempotency-Key`. Money-команды без идемпотентности → **Критично**.
 
-### SR-EV (Domain Events — Tier B with Kafka, Tier C always)
+### SR-EV (Domain Events — доменные события; Tier B с Kafka, Tier C всегда)
 
-- **SR-EV-1** Each event has at least one consumer (internal handler or external subscriber documented in §14). Orphan events → **Critical** (either remove or document subscriber).
-- **SR-EV-2** Event names are verbs in past tense (`OrderPaid`, not `PayOrder` / `OrderPayment`).
-- **SR-EV-3** Each event with `retryable=true` requires an idempotent consumer. Missing idempotency note → **Warning**.
-- **SR-EV-4** Event payload is documented (fields, types). Just a name without payload → **Warning**.
-- **SR-EV-5** Tier C: events are published transactionally (Outbox). If §8 mentions `eventBus.publish()` after `save()` outside Outbox → **Critical**.
+- **SR-EV-1** У каждого события минимум один потребитель (внутренний обработчик или внешний подписчик из §14). Осиротевшие события → **Критично** (либо удалить, либо задокументировать подписчика).
+- **SR-EV-2** Имена событий — глаголы в прошедшем времени (`OrderPaid`, не `PayOrder` / `OrderPayment`).
+- **SR-EV-3** Каждое событие с `retryable=true` требует идемпотентного потребителя. Отсутствие пометки про идемпотентность → **Предупреждение**.
+- **SR-EV-4** Payload события задокументирован (поля, типы). Просто имя без payload → **Предупреждение**.
+- **SR-EV-5** Tier C: события публикуются транзакционно (Outbox). Если §8 говорит `eventBus.publish()` после `save()` без Outbox → **Критично**.
 
-### SR-FD (Failure Domains)
+### SR-FD (Failure Domains — зоны отказа)
 
-- **SR-FD-1** Every external dependency in §14 has a documented strategy at failure: graceful degradation / queue / fallback / refusal. Missing → **Warning**.
-- **SR-FD-2** §16 NFR specifies where eventual consistency is acceptable and where strong consistency is required. Silent on this → **Warning**.
-- **SR-FD-3** External call has either timeout or circuit breaker documented. Missing both → **Critical** (production hazard).
+- **SR-FD-1** У каждой внешней зависимости в §14 задокументирована стратегия при отказе: плавная деградация / очередь / запасной путь / отказ в обслуживании. Отсутствие → **Предупреждение**.
+- **SR-FD-2** §16 НФТ говорит, где допустим eventual consistency, где обязательна strong consistency. Молчание про это → **Предупреждение**.
+- **SR-FD-3** У внешнего вызова задокументированы либо таймаут, либо Circuit Breaker. Отсутствие обоих → **Критично** (производственный риск).
 
-### SR-DO (Data Ownership)
+### SR-DO (Data Ownership — владелец данных)
 
-- **SR-DO-1** Every entity in §3 has exactly one owner service. Shared ownership → **Critical**.
-- **SR-DO-2** Read-only access to neighbour data is via documented integration (§14: REST, Kafka projection, CDC). Direct DB access to another service's tables → **Critical**.
-- **SR-DO-3** PII / regulated fields have explicit retention and deletion policy (§16 NFR or §6 Security cross-link). Missing for fields tagged PII → **Critical**.
+- **SR-DO-1** Каждая сущность из §3 имеет ровно одного владельца-сервис. Совладение → **Критично**.
+- **SR-DO-2** Чтение чужих данных идёт через документированную интеграцию (§14: REST, Kafka-проекция, CDC). Прямой доступ к таблицам чужого сервиса → **Критично**.
+- **SR-DO-3** PII / регулируемые поля имеют явную политику хранения и удаления (§16 НФТ или ссылка на §6 Security). Отсутствие для PII-полей → **Критично**.
 
-### SR-ACR (Acceptance Criteria — §15)
+### SR-ACR (Acceptance Criteria — критерии приёмки, §15)
 
-- **SR-ACR-1** Every business rule in §6 has at least one `AC-N` covering it. Uncovered rule → **Warning**.
-- **SR-ACR-2** Every command in §7 has at least one happy-path AC and one error-path AC. Missing error-path → **Warning**.
-- **SR-ACR-3** AC are written as `Given / When / Then`, not free-form prose. Free-form → **Warning**.
+- **SR-ACR-1** Каждое бизнес-правило из §6 покрыто хотя бы одним `AC-N`. Непокрытое правило → **Предупреждение**.
+- **SR-ACR-2** У каждой команды из §7 есть хотя бы один AC на успешный путь и один на путь ошибки. Отсутствие пути ошибки → **Предупреждение**.
+- **SR-ACR-3** AC написаны в формате `Given / When / Then`, не свободной прозой. Свободная проза → **Предупреждение**.
 
-### SR-NFR (Non-Functional — §16)
+### SR-NFR (Non-Functional — нефункциональные, §16)
 
-- **SR-NFR-1** Each NFR has measurable threshold (`p95 ≤ 200 ms`, `RPS = 50`), not just words. Vague NFR → **Warning**.
-- **SR-NFR-2** Each NFR has a measurement / alert mechanism. Threshold without «как меряем» → **Warning**.
+- **SR-NFR-1** У каждого НФТ измеримый порог (`p95 ≤ 200 ms`, `RPS = 50`), не общие слова. Расплывчатый НФТ → **Предупреждение**.
+- **SR-NFR-2** У каждого НФТ есть способ измерения / алёртинга. Порог без «как меряем» → **Предупреждение**.
 
-## Output
+## Формат вывода
 
-5. **Report findings** in this exact format:
-
-   ```
-   <SpecPath>:<SectionRef>  [<RuleCode>]  <Severity>
-     Problem: <one-line description>
-     Why: <which design property is violated>
-     Fix: <concrete suggestion — what to add/move/remove>
-   ```
-
-   `<SectionRef>` examples: `§7 Commands · CancelOrder`, `§3 Domain Model · Order aggregate`, `§14 Integrations · Catalog upstream`.
-
-   Severities:
-   - **Critical** — design defect that will produce wrong code or unsafe production behaviour. Fix before any code generation.
-   - **Warning** — design weakness that won't crash the service but will create rework, hidden coupling, or knowledge debt.
-   - **Info** — improvement / nit (optional glossary entry, more precise NFR threshold, etc.).
-
-6. **End with a structured summary**:
+5. **Замечания** оформляй ровно так:
 
    ```
-   Tier: <A | B | C>  (declared / inferred)
-
-   Findings:
-     Critical: <n>
-     Warning:  <n>
-     Info:     <n>
-
-   Categories with most findings: <top 3>
-
-   Verdict: <ready for code generation | needs design rework | not enough material>
+   <ПутьСпеки>:<СсылкаНаРаздел>  [<КодПравила>]  <Серьёзность>
+     Проблема: <однострочное описание>
+     Почему: <какое свойство дизайна нарушено>
+     Как исправить: <конкретное предложение — что добавить / перенести / убрать>
    ```
 
-   - `ready for code generation` — 0 Critical, ≤ 5 Warnings.
-   - `needs design rework` — any Critical OR > 5 Warnings.
-   - `not enough material` — spec is too thin (< 5 of 16 required sections).
+   Примеры `<СсылкаНаРаздел>`: `§7 Commands · CancelOrder`, `§3 Domain Model · Order aggregate`, `§14 Integrations · Catalog upstream`.
 
-7. **Do not modify the spec.** This skill only reports. Suggestions in `Fix:` are textual.
+   Серьёзности:
+   - **Критично** — дефект дизайна, который приведёт к неправильному коду или небезопасному поведению в проде. Чинить до любой кодогенерации.
+   - **Предупреждение** — слабость дизайна, которая не уронит сервис, но приведёт к переписыванию, скрытой связности или знание-долгу.
+   - **Замечание** — улучшение / придирка (опциональная запись в глоссарии, более точный порог НФТ и т.п.).
 
-## Modes
+6. **Закончи структурированным резюме**:
 
-- **Default** — full review of all categories.
-- **Fast** (user passes `fast` argument) — only Critical-eligible rules: SR-T-1, SR-UL-2, SR-BC-2, SR-AG-3, SR-AR-1, SR-CM-2, SR-CM-4, SR-EV-1, SR-EV-5, SR-FD-3, SR-DO-1, SR-DO-2, SR-DO-3.
-- **ES-draft** (user passes `es` argument) — review an Event Storming export (less structured): focus on SR-UL, SR-BC, SR-AR, SR-EV. Skip rules that need fully filled spec sections.
+   ```
+   Tier: <A | B | C>  (объявленный / выведенный)
 
-## Pairing
+   Замечаний:
+     Критично:        <n>
+     Предупреждение:  <n>
+     Замечание:       <n>
 
-This skill is the review counterpart to `ucp-spec-design`. Typical loop:
+   Категории с наибольшим числом замечаний: <топ-3>
+
+   Вердикт: <готова к кодогенерации | требует переработки дизайна | недостаточно материала>
+   ```
+
+   - `готова к кодогенерации` — 0 Критично, ≤ 5 Предупреждений.
+   - `требует переработки дизайна` — есть Критично ИЛИ > 5 Предупреждений.
+   - `недостаточно материала` — спека слишком тонкая (заполнено < 5 из 16 обязательных разделов).
+
+7. **Спеку не модифицируй.** Этот скилл только сообщает. Предложения в `Как исправить:` — текстовые.
+
+## Режимы
+
+- **По умолчанию** — полный прогон по всем категориям.
+- **Fast** (пользователь передаёт аргумент `fast`) — только правила-кандидаты на Критично: SR-T-1, SR-UL-2, SR-BC-2, SR-AG-3, SR-AR-1, SR-CM-2, SR-CM-4, SR-EV-1, SR-EV-5, SR-FD-3, SR-DO-1, SR-DO-2, SR-DO-3.
+- **ES-черновик** (пользователь передаёт аргумент `es`) — ревью экспорта Event Storming (менее структурирован): фокус на SR-UL, SR-BC, SR-AR, SR-EV. Пропускаем правила, требующие полностью заполненных разделов спеки.
+
+## Парность
+
+Этот скилл — review-парный к `ucp-spec-design`. Типичный цикл:
 
 ```
-ucp-spec-design  →  spec in docs/spec/
+ucp-spec-design  →  спека в docs/spec/
                           ↓
-                  ucp-spec-review  →  findings
+                  ucp-spec-review  →  замечания
                           ↓
-              user fixes spec / re-runs ucp-spec-design with corrections
+       пользователь правит спеку / перезапускает ucp-spec-design с поправками
                           ↓
-                  ucp-spec-review (Fast)  →  0 Critical → ready for code
+                  ucp-spec-review (Fast)  →  0 Критично → готова к коду
                           ↓
               ucp-pattern-design / ucp-ddd-tactical-design / ucp-api-design
 ```
 
-The skill validates **design before code**. AI catches contradictions a human reviewer would miss because a human reads top-to-bottom; AI cross-references all 16 sections in one pass.
+Скилл валидирует **дизайн до кода**. AI ловит противоречия, которые человеческий ревьюер пропускает, потому что человек читает сверху вниз; AI кросс-ссылается все 16 разделов в одном проходе.
 
 $ARGUMENTS
