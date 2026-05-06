@@ -1,23 +1,23 @@
 ---
 name: ucp-auth-design
-description: Scaffold Spring Security + OAuth2 Resource Server config for a UCP-style service — JWT validation, role mapping, RBAC on endpoints, ABAC helpers (`AuthenticatedX`, `@Component("access")`), audit log aspect, secrets layout, idempotency. Use when starting a new service or adding auth to an existing one.
+description: Зашаблонить конфиг Spring Security + OAuth2 Resource Server для UCP-сервиса — валидация JWT, маппинг ролей, RBAC на эндпоинтах, ABAC-хелперы (`AuthenticatedX`, `@Component("access")`), audit log-аспект, раскладка секретов, идемпотентность. Применяется при старте нового сервиса или добавлении auth в существующий.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
-# Auth Patterns Design
+# Проектирование паттернов аутентификации/авторизации
 
-You are scaffolding the security/auth layer for a Java/Spring service following the team's auth-patterns style guide.
+Ты шаблонируешь слой безопасности / auth для Java/Spring-сервиса по командному auth-patterns style guide.
 
-## Instructions
+## Инструкции
 
-1. **Read the style guide** from `.claude/docs/auth-patterns-style-guide.md`. Cite `AUTH-N` rules **в design-обосновании ответа пользователю**, но **не в комментариях сгенерённого кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
+1. **Прочитай style guide** из `.claude/docs/auth-patterns-style-guide.md`. Цитируй правила `AUTH-N` **в design-обосновании ответа пользователю**, но **не в комментариях сгенерированного кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
 
-2. **Confirm the layer.** Determine:
-   - **Gateway** — здесь только JWT validation + rate limiting. Сервис обычно не Gateway; если перед тобой именно Gateway — генерируешь правила маршрутизации, но не RBAC handler-ов.
-   - **BFF** — JWT validation + RBAC по ролям, агрегация вызовов. Сессия в Redis при необходимости.
-   - **Domain Service** — JWT validation (передаётся от Gateway/BFF) + RBAC + ABAC по владению ресурсом + audit log для admin.
+2. **Подтверди слой.** Определи:
+   - **Gateway** — здесь только валидация JWT + rate limiting. Сервис обычно не Gateway; если перед тобой именно Gateway — генерируешь правила маршрутизации, но не RBAC handler-ов.
+   - **BFF** — валидация JWT + RBAC по ролям, агрегация вызовов. При необходимости — сессия в Redis.
+   - **Domain Service** — валидация JWT (передаётся от Gateway / BFF) + RBAC + ABAC по владельцу ресурса + audit log для admin.
 
-   Спроси если непонятно. По умолчанию для UCP — **Domain Service**.
+   Спроси, если непонятно. По умолчанию для UCP — **Domain Service**.
 
 3. **Подключить зависимости:**
 
@@ -57,7 +57,7 @@ You are scaffolding the security/auth layer for a Java/Spring service following 
    }
    ```
 
-5. **`AuthenticatedX` хелперы** (по одному на роль, что задействована):
+5. **`AuthenticatedX`-хелперы** (по одному на каждую задействованную роль):
 
    ```java
    @Component
@@ -69,7 +69,7 @@ You are scaffolding the security/auth layer for a Java/Spring service following 
    }
    ```
 
-6. **`@Component("access")`** для не-тривиального ABAC (если есть ≥ 2 эндпоинта с проверкой владения):
+6. **`@Component("access")`** для нетривиального ABAC (если есть ≥ 2 эндпоинта с проверкой владения):
 
    ```java
    @Component("access")
@@ -86,33 +86,33 @@ You are scaffolding the security/auth layer for a Java/Spring service following 
    }
    ```
 
-7. **На каждом REST-endpoint** — `@PreAuthorize` (`AUTH-9`):
+7. **На каждом REST-эндпоинте** — `@PreAuthorize` (`AUTH-9`):
 
-   - Прямой роле-чек: `@PreAuthorize("hasRole('customer')")`.
-   - Ownership через бин: `@PreAuthorize("@access.canViewOrder(#id, authentication)")`.
+   - Прямая проверка роли: `@PreAuthorize("hasRole('customer')")`.
+   - Проверка владельца через бин: `@PreAuthorize("@access.canViewOrder(#id, authentication)")`.
 
 8. **Audit log для admin** (`AUTH-15`):
 
-   - Таблица `<bc>_audit_log` (см. шаблон в спеке §3.5).
-   - Аспект `@Around("@within(InboundAdapter) && execution(* *(..))")` который проверяет роль `admin` и пишет строку. Или явный вызов в Handler.
+   - Таблица `<bc>_audit_log` (шаблон в спеке §3.5).
+   - Аспект `@Around("@within(InboundAdapter) && execution(* *(..))")`, который проверяет роль `admin` и пишет строку. Или явный вызов в Handler.
 
 9. **Идемпотентность** (`AUTH-19`) — для денежных команд:
 
-   - Header `Idempotency-Key` в OpenAPI обязательный.
-   - Таблица `idempotency_keys` (см. шаблон).
-   - Handler сначала чекает ключ, потом исполняет команду; в той же транзакции пишет ключ.
+   - Заголовок `Idempotency-Key` в OpenAPI обязательный.
+   - Таблица `idempotency_keys` (шаблон).
+   - Handler сначала проверяет ключ, потом исполняет команду; в той же транзакции пишет ключ.
 
 10. **PII / секреты** (`AUTH-16`..`AUTH-18`):
 
-    - Logback фильтр на маскирование email/phone/cardNumber (генерируй стандартный `MaskingPatternLogger`).
+    - Logback-фильтр на маскирование email / phone / cardNumber (генерируй стандартный `MaskingPatternLogger`).
     - `RestControllerAdvice`: переписывай `cause.getMessage()` на статический title по коду ошибки (никогда не пробрасывай).
     - `application-prod.yml` — только плейсхолдеры (`${KAFKA_PASSWORD}`); секреты — внешние.
 
-11. **Output structure:**
+11. **Структура вывода:**
 
-    1. **Detected layer** + summary (1–2 параграфа).
-    2. **File tree** новых файлов.
+    1. **Определённый слой** + краткий обзор (1–2 абзаца).
+    2. **Дерево файлов** новых файлов.
     3. **Каждый файл** в своём code block с путём.
-    4. **Implementation notes**: что нужно в `application.yml` (`spring.security.oauth2.resourceserver.jwt.jwk-set-uri`), какие переменные окружения, какие тесты добавить (см. `ucp-test-design`).
+    4. **Заметки по реализации**: что нужно в `application.yml` (`spring.security.oauth2.resourceserver.jwt.jwk-set-uri`), какие переменные окружения, какие тесты добавить (см. `ucp-test-design`).
 
 $ARGUMENTS
