@@ -1,18 +1,17 @@
-# usecase-pattern-skills
+# claude-code-java
 
-Скиллы (slash-команды) для Claude Code, привязанные к статьям [vikulin-va.ru](https://vikulin-va.ru/use-case-pattern/) о методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; полное описание правил с диаграммами и примерами — на сайте.
+Скиллы (slash-команды) для Claude Code по методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; полные style-guide-снапшоты лежат в `.claude/docs/*.md`.
 
 ## Принцип
 
-- **Сайт vikulin-va.ru — единственный источник истины.** Если правила в скилле и в статье расходятся, прав сайт.
-- **Локальный `docs/*.md`** — снапшот соответствующей статьи (агент читает его быстро, без сетевого вызова).
+- **`.claude/docs/*.md` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15` и т.д.), агент читает соответствующий гайд при работе.
 - **Скиллы** — короткие инструкции для агента: что проверить, как отчитаться.
 
 ## Скиллы
 
 ### `/ucp-api-review`
 
-Ревью REST API контракта или кода на соответствие [REST API Style Guide](https://vikulin-va.ru/rest-api-style-guide/).
+Ревью REST API контракта или кода на соответствие REST API Style Guide (`.claude/docs/rest-api-style-guide.md`).
 
 **Что проверяет:**
 - Формат URL (kebab-case, множественное число, вложенность)
@@ -51,7 +50,7 @@
 
 ### `/ucp-ddd-tactical-review`
 
-Ревью доменного кода на соответствие [тактическим паттернам DDD](https://vikulin-va.ru/domain-driven-design/tactical-patterns/) и корректное использование библиотеки [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks).
+Ревью доменного кода на соответствие тактическим паттернам DDD (`.claude/docs/ddd-tactical-style-guide.md`) и корректное использование библиотеки [`ddd-building-blocks`](https://gitlab.mosmetro.tech/common/ddd-building-blocks).
 
 **Что проверяет:**
 - Entity → `Entity<ID>`, equals/hashCode не переопределены, ID `final`
@@ -71,7 +70,7 @@
 
 ### `/ucp-pattern-review`
 
-Ревью Java/Spring-кода на соответствие [методологии Use Case Pattern](https://vikulin-va.ru/use-case-pattern/) и корректное использование библиотеки [`usecase-pattern`](https://github.com/remodov/usecase-pattern).
+Ревью Java/Spring-кода на соответствие методологии Use Case Pattern (`.claude/docs/usecase-pattern-style-guide.md`) и корректное использование библиотеки [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern).
 
 **Что проверяет:**
 - UseCase — immutable record/final, без логики
@@ -130,10 +129,10 @@
 
 ### `/ucp-spec-design`
 
-Написание [Use Case спецификации](https://vikulin-va.ru/use-case-pattern/spec-template/) сервиса по бизнес-описанию. Сама определяет нужный Tier (A — legacy, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
+Написание Use Case спецификации (`.claude/docs/usecase-spec-template.md`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
 
 **Что генерирует:**
-- Папка `docs/spec/` с **split-файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — single-file спеки скилл больше не делает.
+- Папка `docs/spec/` с **разбитыми по разделам файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — спеки одним файлом скилл больше не делает.
 - 16 разделов: Bounded Context, глоссарий, доменная модель, состояния, роли, бизнес-правила, команды, события, queries, use cases, UI, саги, ошибки, интеграции, критерии приёмки, НФТ
 - Frontmatter с `tier`, `service`, `last_updated`
 - Кросс-ссылки между разделами (BR ↔ commands ↔ errors)
@@ -145,9 +144,51 @@
 /ucp-spec-design Tier C, Order Service, см. case.md и текущие агрегаты в src/
 ```
 
+### `/ucp-spec-review`
+
+**Парный к `/ucp-spec-design`** — AI как design-критик: проверка качества спецификации (или черновика Event Storming) **до кодогенерации**. Закрывает симметрию design ↔ review на спека-слое — то, что архитектор ловит на review, но что часто проскакивает мимо.
+
+**Что проверяет (9 категорий правил):**
+- **SR-T** Tier consistency — заявленный Tier vs реальная глубина содержания
+- **SR-UL** Ubiquitous Language — синонимы вне глоссария, осиротевшие термины, термины без определения
+- **SR-BC** Bounded Context — явный scope/not-scope, чужие команды, невидимое пересечение с соседями
+- **SR-AG** Aggregates — > 7 инвариантов (кандидат на разделение), циклические ссылки, identity-типы вместо примитивов
+- **SR-AR** Actors / Roles — orphan-актор, отсутствие permissions matrix, команды без роли-владельца
+- **SR-CM** Commands — pre/post-conditions, идемпотентность для money-операций, CQRS-leak (read-DTO в команде)
+- **SR-EV** Domain Events — события без потребителей, payload без типов, retryable без идемпотентного консьюмера, события вне Outbox
+- **SR-FD** Failure Domains — стратегия при отказе для каждого внешнего соседа, таймаут / Circuit Breaker
+- **SR-DO / SR-ACR / SR-NFR** — единственный владелец данных, PII-retention, покрытие BR через AC, измеримые пороги НФТ
+
+**Три режима:**
+- По умолчанию — полный прогон по всем 9 категориям
+- `fast` — только правила-кандидаты на «Критично» (быстрая проверка перед кодогенерацией)
+- `es` — урезанный набор для черновиков Event Storming (фокус на SR-UL, SR-BC, SR-AR, SR-EV)
+
+**Использование:**
+
+```
+/ucp-spec-review                              # полный прогон спеки в docs/spec/
+/ucp-spec-review fast                          # только критичные правила
+/ucp-spec-review es docs/event-storming.md    # ревью ES-черновика
+```
+
+**Типичный цикл:**
+
+```
+ucp-spec-design  →  спека в docs/spec/
+                          ↓
+                  ucp-spec-review        →  список замечаний с кодами правил
+                          ↓
+       пользователь правит спеку / перезапускает ucp-spec-design с поправками
+                          ↓
+                  ucp-spec-review (fast)  →  0 Критично → готова к коду
+                          ↓
+              ucp-pattern-design / ucp-ddd-tactical-design / ucp-api-design
+```
+
 ### `/ucp-java-style-review`
 
-Ревью Java-кода на соответствие [Java Style Guide](https://vikulin-va.ru/java-style-guide/) — именование, импорты, выражения, отступы. Каждое нарушение цитируется кодом правила (`JS-2.5`, `JS-4.7` и т.д.).
+Ревью Java-кода на соответствие Java Style Guide (`.claude/docs/java-style-guide.md`) — именование, импорты, выражения, отступы. Каждое нарушение цитируется кодом правила (`JS-2.5`, `JS-4.7` и т.д.).
 
 **Что проверяет:**
 - Именование (классы — существительные; интерфейсы — без `I`; аббревиатуры по правилу 2/3 букв; константы UPPER_SNAKE_CASE; имена тестов).
@@ -166,7 +207,7 @@
 
 ### `/ucp-auth-review`
 
-Ревью кода на соответствие [паттернам авторизации](https://vikulin-va.ru/auth-patterns/) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
+Ревью кода на соответствие паттернам авторизации (`.claude/docs/auth-patterns-style-guide.md`) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
 
 **Что проверяет:**
 - JWT validation через `oauth2ResourceServer().jwt()`, без кастомных фильтров.
@@ -204,7 +245,7 @@
 
 ### `/ucp-test-design`
 
-Проектирование интеграционных и unit-тестов под [стратегию тестов](https://vikulin-va.ru/test-strategy/): синхронные, только PostgreSQL + WireMock, без Kafka/Redis в базовом классе, события через in-memory publisher.
+Проектирование интеграционных и unit-тестов под стратегию тестов (`.claude/docs/test-strategy.md`): синхронные, только PostgreSQL + WireMock, без Kafka/Redis в базовом классе, события через in-memory publisher.
 
 **Что генерирует:**
 - `BaseIntegrationTest` (если ещё нет) — Testcontainers PostgreSQL с reuse, WireMock, in-memory `DomainEventPublisher`.
@@ -229,13 +270,15 @@
 Для **целого сервиса от спеки до прода** одних `ucp-*`-скиллов мало — нужен
 оркестратор, который держит контекст плана между шагами и не теряет инварианты.
 Эту роль играет [плагин `superpowers`](https://github.com/anthropics/skills/tree/main/skills/superpowers).
-`superpowers` ничего не знает про UCP — это general-purpose дисциплина «брейнсторм → план →
+`superpowers` ничего не знает про UCP — это общая дисциплина «брейнсторм → план →
 исполни → проверь → закрой». UCP-скиллы ничего не знают про `superpowers` — они умеют
-делать ровно один артефакт. Когда они встречаются, получается полный pipeline.
+делать ровно один артефакт. Когда они встречаются, получается полный процесс.
 
 ```
 1. ИНПУТ — спецификация
    ucp-spec-design                              (если спеки ещё нет)
+   ucp-spec-review                              (валидация качества дизайна — до кода!)
+      ▸ замечания → правки → ucp-spec-review (fast) → 0 Критично
 
 2. ПЛАНИРОВАНИЕ
    superpowers:brainstorming                    (если требования размытые)
@@ -264,23 +307,27 @@
    superpowers:finishing-a-development-branch
 ```
 
-**Когда нужна связка:** новый сервис с нуля, миграция с легаси на UCP, большой
-рефакторинг с переходом на новый Tier. Везде, где «забыть шаг» = баг в проде.
+**Симметрия design ↔ review.** Для каждого design-скилла есть парный review:
+- `ucp-spec-design` ↔ `ucp-spec-review` (дизайн спеки)
+- `ucp-pattern-design` ↔ `ucp-pattern-review` (UseCase Pattern)
+- `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
+- `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
+- `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review` — без пары
 
-**Когда `superpowers` оверкилл:** одна операция, один UseCase, добавить
-endpoint в существующий сервис. Дёргайте `ucp-*-design` напрямую без
-оркестратора.
+**Когда нужна связка:** новый сервис с нуля, миграция с классической слоёной архитектуры на UCP, большой рефакторинг с переходом на новый Tier. Везде, где «забыть шаг» = баг в проде.
 
-`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)),
-не зависит от этого репозитория и нужен только когда требуется orchestration.
+**Когда `superpowers` избыточен:** одна операция, один UseCase, добавить эндпоинт в существующий сервис. Дёргай `ucp-*-design` напрямую без оркестратора.
+
+`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)), не зависит от этого репозитория и нужен только когда требуется оркестрация.
 
 ## Подключение к проекту
 
 ### Через `install.sh` (рекомендуется)
 
 ```bash
-git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/usecase-pattern-skills
-cd ~/projects/usecase-pattern-skills
+git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/claude-code-java
+cd ~/projects/claude-code-java
 
 # подключить все скиллы и style-guide-снапшоты в свой Java-проект:
 ./install.sh ~/my-java-project
@@ -316,17 +363,46 @@ Style-guide-ы — это **инструментальные** документ�
 Большинство скиллов (11 из 12) работают **без внешних плагинов** — только на
 стандартных tools (Read, Glob, Grep, Write, Edit, Bash, Agent).
 
-Скилл `ucp-spec-design` опционально использует:
+Скилл `ucp-spec-design` опционально использует два расширения.
 
-- **`superpowers`** — для общих практик планирования и работы с TodoWrite.
-  Установка: `claude plugins install superpowers`
-- **`context7`** (MCP) — для подтягивания актуальной документации библиотек
-  (Spring Boot, jOOQ и т.п.) в выходную спеку.
-  Установка: `claude mcp add context7`
+#### `superpowers` — планирование, TodoWrite, TDD-дисциплина
 
-Без них `ucp-spec-design` всё равно работает — просто без TodoWrite-планирования
-и без проверки актуальности версий библиотек. Остальные 11 скиллов их не
-требуют вообще.
+Marketplace плагинов от obra ([obra/superpowers-marketplace](https://github.com/obra/superpowers-marketplace)):
+
+```bash
+claude plugin marketplace add obra/superpowers-marketplace
+claude plugin install superpowers@superpowers-marketplace
+```
+
+После установки доступны скиллы `superpowers:writing-plans`,
+`superpowers:executing-plans`, `superpowers:brainstorming`,
+`superpowers:test-driven-development` и т.д. — `ucp-spec-design`
+интегрируется с ними автоматически.
+
+#### `context7` — MCP-сервер с актуальной документацией библиотек
+
+Сервер от Upstash ([upstash/context7](https://github.com/upstash/context7)).
+Stdio-вариант (рекомендуется, не требует серверной части):
+
+```bash
+claude mcp add context7 -- npx -y @upstash/context7-mcp
+```
+
+HTTP-вариант (если предпочитаете remote endpoint):
+
+```bash
+claude mcp add --transport http context7 https://mcp.context7.com/mcp
+```
+
+После установки `ucp-spec-design` и другие скиллы могут запросить актуальные
+версии Spring Boot, jOOQ и других зависимостей через
+`mcp__plugin_context7_context7__resolve-library-id` и `query-docs`.
+
+#### Без плагинов
+
+`ucp-spec-design` всё равно работает — просто без TodoWrite-планирования
+и без проверки актуальности версий библиотек. Остальные 11 скиллов их
+не требуют вообще.
 
 ## Структура
 
@@ -344,24 +420,23 @@ Style-guide-ы — это **инструментальные** документ�
 ├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
-docs/
-├── rest-api-style-guide.md          # снапшот vikulin-va.ru/rest-api-style-guide/
-├── usecase-pattern-style-guide.md   # снапшот vikulin-va.ru/use-case-pattern/
-├── ddd-tactical-style-guide.md      # снапшот vikulin-va.ru/domain-driven-design/tactical-patterns/
-├── usecase-spec-template.md         # снапшот vikulin-va.ru/use-case-pattern/spec-template/
-├── java-style-guide.md              # снапшот vikulin-va.ru/java-style-guide/
-├── test-strategy.md                 # снапшот vikulin-va.ru/test-strategy/
-└── auth-patterns-style-guide.md     # снапшот vikulin-va.ru/auth-patterns/
+.claude/docs/
+├── rest-api-style-guide.md          # REST API Style Guide
+├── usecase-pattern-style-guide.md   # Use Case Pattern
+├── ddd-tactical-style-guide.md      # тактические паттерны DDD
+├── usecase-spec-template.md         # шаблон Use Case спецификации
+├── java-style-guide.md              # Java Style Guide
+├── test-strategy.md                 # стратегия тестов
+└── auth-patterns-style-guide.md     # паттерны авторизации
 ```
 
-## Связанные статьи и библиотеки
+## Связанные библиотеки
 
-- [REST API Style Guide](https://vikulin-va.ru/rest-api-style-guide/) — свод правил с диаграммами.
-- [Тактические паттерны DDD](https://vikulin-va.ru/domain-driven-design/tactical-patterns/) — Entity, Value Object, Aggregate, Domain Event, Repository.
-- [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks) — Java-библиотека базовых DDD-абстракций, на которой опираются скиллы DDD.
-- [Use Case Pattern](https://vikulin-va.ru/use-case-pattern/) — методология, объединяющая всё вместе.
+- [`ddd-building-blocks`](https://gitlab.mosmetro.tech/common/ddd-building-blocks) — Java-библиотека базовых DDD-абстракций, на которой опираются скиллы DDD.
+- [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
+- [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для остальных статей сайта (CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka, Auth Patterns).
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka.
 
 ## Лицензия
 
