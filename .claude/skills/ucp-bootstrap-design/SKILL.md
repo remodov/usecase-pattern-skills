@@ -66,7 +66,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 9. **Persistence — только jOOQ, только сгенерированный.** По `BS-17/18/19/20`:
    - **Никакого JdbcTemplate, JPA, MyBatis.** Это применимо на **каждом** Tier (A/B/C). Если видишь репозиторий на JdbcTemplate или JPA `@Entity` — это нарушение; перепиши на jOOQ DSL над сгенерированными таблицами.
-   - **Codegen-плагин**: `nu.studer.jooq` 10.x со стратегией PASCAL `_Pojo`. Codegen работает против **применённой** Liquibase-схемы в локальном Postgres — workflow: `./gradlew update && ./gradlew generateJooq && ./gradlew test`. Добавь задачу `regenerate`, объединяющую обе.
+   - **Codegen-плагин**: `nu.studer.jooq` 10.x со стратегией PASCAL `_Pojo`. Codegen работает против **применённой** Liquibase-схемы в локальном Postgres — последовательность команд: `./gradlew update && ./gradlew generateJooq && ./gradlew test`. Добавь задачу `regenerate`, объединяющую обе.
    - **Используй сгенерированные POJO и enum-ы** (`<service>.generated.tables.pojos.*Pojo`, `<service>.generated.enums.*`) напрямую в репозиториях, сервисах, мапперах DTO контроллеров. Ручные классы `Notification` / `Channel` / `NotificationStatus`, дублирующие layout строки — удали.
    - **Колонки VARCHAR с фиксированными значениями → Postgres ENUM-типы.** Добавь отдельный ChangeSet `v-1.x/enum-types.yaml`, который создаёт enum и `ALTER`-ит колонку под него. Тогда jOOQ codegen сгенерирует Java-enum автоматически — никакого `forcedType`, никакого ручного enum.
    - **Сгенерированные классы не модифицируются.** Если на enum'е нужны методы (`isTerminal()`, `canRetry()`) — встрой проверку на use-sites или положи хелперы в utility-класс. Не редактируй сгенерированный код, он будет перезатёрт.
