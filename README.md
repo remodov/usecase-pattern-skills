@@ -260,6 +260,42 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-test-design Покрой UC-1..UC-3 + BR-001..BR-007
 ```
 
+### `/ucp-pg-schema-review`
+
+Ревью PostgreSQL-схемы и миграций (DDL Liquibase / Flyway / сырой SQL) против `pg-types-style-guide.md` (правила `PG-T-NNN`).
+
+**Что проверяет:**
+- Числа: `bigint IDENTITY` для PK, `numeric(p,s)` для денег, без `serial`/`float`.
+- Строки: `text` по умолчанию, `varchar(N)` только под доменное правило, без `varchar(255)`.
+- Время: `timestamptz` для бизнес-времени, никогда `timestamp without time zone`.
+- UUID: тип `uuid`, не `varchar(36)`; v7 для PK; индексы по FK.
+- Boolean / enum / JSONB / массивы / range — правила выбора.
+
+**Использование:**
+
+```
+/ucp-pg-schema-review                          # все DDL-файлы из git diff
+/ucp-pg-schema-review db/changelog/v0001.xml   # конкретный changeset
+```
+
+### `/ucp-pg-explain-review`
+
+Ревью индексов и плана запроса PostgreSQL против `pg-indexes-style-guide.md` (правила `PG-I-NNN`, `PG-E-NNN`).
+
+**Что проверяет:**
+- Composite-индексы: левый префикс, порядок полей, range последним.
+- Типы индексов: B-tree / GIN / GiST / BRIN / pg_trgm / partial / `INCLUDE` — выбор под задачу.
+- Селективность через `pg_stats`, ловушка с `Index Only Scan` на «неподходящем» индексе для `count(1)`.
+- Чтение `EXPLAIN (ANALYZE, BUFFERS)`: `Filter` vs `Index Cond`, `Heap Fetches`, `Rows Removed by Filter`, `external merge Disk`, Nested Loop `loops`.
+- `CREATE INDEX CONCURRENTLY` в продакшен-миграциях.
+
+**Использование:**
+
+```
+/ucp-pg-explain-review                                  # из git diff (DDL индексов)
+/ucp-pg-explain-review                                  # с приложенным EXPLAIN ANALYZE
+```
+
 ## Workflow: маленькая задача vs целый сервис
 
 Скиллы UCP — атомарные операции «сделай один артефакт по правилам». Для

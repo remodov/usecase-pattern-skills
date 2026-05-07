@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` в корне проекта. У каждого правила есть код (`R-UC-1`, `R-HND-X2` и т.п.) — цитируй коды в замечаниях.
+1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` в корне проекта. У каждого правила есть код (`R-UC-1`, `R-HND-X2` и т.п.) — цитируй коды в замечаниях. Если в diff есть DDL (`*.sql`, Liquibase changeset) или новые миграции — отдельно вызови `ucp-pg-schema-review` для проверки типов колонок (правила `PG-T-NNN`).
 
 2. **Определи уровень внедрения** осмотрев проект (style guide §2):
    - Найди `core/<bc>/` + `adapter/in/`, `adapter/out/` → **Уровень 4 (Hexagonal)**.
