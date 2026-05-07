@@ -39,7 +39,8 @@
    ucp-pattern-review + ucp-api-review + ucp-ddd-tactical-review +
    ucp-java-style-review + ucp-auth-review
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
-   ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks)
+   ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
+   ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
    superpowers:requesting-code-review           (внешний review)
 
 5. ЗАВЕРШЕНИЕ
@@ -53,7 +54,7 @@
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review` — без пары
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -368,6 +369,28 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-pg-runtime-review                                  # все Java/SQL изменения из git diff
 /ucp-pg-runtime-review src/main/java/.../OutboxRelay.java
 ```
+
+### `/ucp-pg-migration-review`
+
+Ревью PostgreSQL миграций (Liquibase / Flyway / сырой SQL) на безопасность для прода против `pg-migrations-style-guide.md` (правила `PG-M-NNN`).
+
+**Что проверяет:**
+- Lock-агрессивность: `ALTER TABLE` без `lock_timeout`, `CREATE INDEX` без `CONCURRENTLY`, `ADD CONSTRAINT FK` без `NOT VALID`.
+- Expand-contract: `RENAME COLUMN`, `DROP COLUMN`, `ALTER TYPE` одним statement без 3+ релизов.
+- N-1 совместимость: миграция работает с предыдущей версией кода.
+- `SET NOT NULL` через `CHECK NOT VALID + VALIDATE + SET NOT NULL`.
+- `UPDATE` миллионов строк в миграции (должно быть в backfill-job).
+- Удаление значения из enum (только через теневой тип).
+- `down`-миграции (почти всегда не работают на проде).
+
+**Использование:**
+
+```
+/ucp-pg-migration-review                              # из git diff (миграции)
+/ucp-pg-migration-review db/changelog/v0042.xml       # конкретный changeset
+```
+
+**Обязательный шаг ПРОВЕРКИ.** Любой PR с миграцией должен пройти этот скилл. На проде это разница между «прокатилось за минуту» и «легло на 30 минут с лок-стормом».
 
 ## Подключение к проекту
 

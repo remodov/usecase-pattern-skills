@@ -1,6 +1,6 @@
-# PostgreSQL Runtime Style Guide — WAL, VACUUM, Locks
+# PostgreSQL Runtime Style Guide — WAL, VACUUM, Locks, Pool, Isolation
 
-Правила работы с runtime-аспектами PostgreSQL: Write-Ahead Log, autovacuum/bloat, блокировки. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks) ссылается скилл `ucp-pg-runtime-review`.
+Правила работы с runtime-аспектами PostgreSQL: Write-Ahead Log, autovacuum/bloat, блокировки, connection pool, уровни изоляции. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation) ссылается скилл `ucp-pg-runtime-review`.
 
 Базовый принцип: **скорость и стабильность OLTP-нагрузки определяются не SQL, а тем, как код взаимодействует с MVCC**. Длинная транзакция, кривой `UPDATE`, лишний индекс — всё это перетекает в WAL, в bloat, в локи.
 
@@ -202,6 +202,136 @@ WHERE id=? AND version=?;   -- 0 rows = конфликт
 `PG-L-094` Брать локи в разном порядке в разных методах → deadlock.
 
 `PG-L-095` `SELECT FOR UPDATE` без `LIMIT` на большой таблице — внезапно блокирует всё.
+
+---
+
+## 4. Connection pool
+
+### HikariCP
+
+`PG-CP-001` **Размер пула — формула Wooldridge: `connections = (core_count × 2) + effective_spindle_count`.** Для современных SSD-серверов с N CPU-ядрами оптимум 2N+1 = ~10–20 соединений на инстанс. «Больше = лучше» — миф.
+
+`PG-CP-002` **Целевой размер пула на инстанс: 10–20.** Если кажется, что нужно больше — сначала измерь, узкое место чаще в долгих запросах/транзакциях.
+
+`PG-CP-003` **Бюджет соединений PG = `max_connections` (default 100).** Раздели между всеми инстансами всех сервисов. На 10 инстансов по 20 — уже 200. Решение — увеличить max_connections (300–500 разумно) или PgBouncer.
+
+`PG-CP-010` **Минимальная конфигурация Spring Boot:**
+```yaml
+spring:
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 20             # = max, иначе ramp-up на холодную
+      connection-timeout: 3000
+      max-lifetime: 1800000        # 30 мин (меньше LB-таймаута)
+      leak-detection-threshold: 60000
+```
+
+`PG-CP-011` **`maximum-pool-size = minimum-idle`** — пул всегда полный, нет latency-всплесков.
+
+`PG-CP-012` **`connection-timeout: 3 сек`** — лучше упасть, чем ждать.
+
+`PG-CP-013` **`max-lifetime: 30 мин`** — защита от утечек памяти PG и от поломки соединений за LB. Должен быть меньше серверного `idle_in_transaction_session_timeout` и таймаутов балансировщиков.
+
+`PG-CP-014` **`leak-detection-threshold: 60 сек`** — алёрт на забытый close или `@Transactional` вокруг долгого HTTP. Не отключай.
+
+`PG-CP-030` **Метрики HikariCP в Micrometer:** `connections.active/idle/pending/usage/timeout`. Алёрт на `pending > 0` стабильно или `timeout` > 0.
+
+### PgBouncer
+
+`PG-CP-040` **PgBouncer оправдан**: десятки инстансов одного сервиса, общий PG для нескольких сервисов, serverless workers, ограничение connections к PG ниже суммы пулов.
+
+`PG-CP-041` **Уровень `transaction` (default для нашего стека)** — соединение возвращается в пул после COMMIT/ROLLBACK. Не работают: server-side prepared statements (без 1.21+), session-level vars (`SET` без `LOCAL`), `LISTEN`/`NOTIFY`, advisory locks (sessionном scope).
+
+`PG-CP-042` **`session` mode** — когда нужны prepared/listen/notify. Эффективность ниже.
+
+`PG-CP-045` **На transaction mode + JDBC: `prepareThreshold = 0`** в HikariCP — отключить server-side prepared. Иначе теряются между транзакциями.
+
+`PG-CP-050` **С PgBouncer пул HikariCP может быть БОЛЬШЕ.** Соотношение app_pool : pgbouncer_to_pg = 5:1 или больше.
+
+### Read-replica routing
+
+`PG-CP-060` **Отдельный DataSource + отдельный HikariCP пул для реплики.** Через `AbstractRoutingDataSource` Spring выбирает на основе `@Transactional(readOnly = true)`.
+
+`PG-CP-061` **Реплика — eventual consistency.** Replication lag — миллисекунды, под нагрузкой может расти. Не используй реплику для read-after-write.
+
+### Антипаттерны Pool
+
+`PG-CP-080` Огромный пул (`maximum-pool-size = 200`) — почти всегда пессимизация.
+
+`PG-CP-081` Разные пулы на одну БД для одного приложения — каждый думает, что владеет всеми соединениями.
+
+`PG-CP-082` `@Transactional` вокруг внешнего HTTP-вызова — соединение удерживается всё время вызова (см. `PG-W-061`).
+
+`PG-CP-083` Отключение `leak-detection-threshold` — сокрытие проблемы.
+
+`PG-CP-085` PgBouncer на `session` mode без явной причины — теряется главный выигрыш.
+
+`PG-CP-086` PgBouncer transaction + server-side prepared без отключения `prepareThreshold` — JDBC дёргает PG на каждом запросе.
+
+---
+
+## 5. Уровни изоляции
+
+`PG-IS-001` **Дефолт PG `READ COMMITTED` правильный в 95% случаев.** Поднимать уровень — только когда понимаешь, какую конкретно аномалию предотвращаешь.
+
+### Три уровня PostgreSQL
+
+| Уровень | Dirty | Non-repeatable | Phantom | Serialization |
+|---|---|---|---|---|
+| `READ COMMITTED` (default) | предотвр. | разрешает | разрешает | разрешает |
+| `REPEATABLE READ` (snapshot) | предотвр. | предотвр. | предотвр. | разрешает |
+| `SERIALIZABLE` (SSI) | предотвр. | предотвр. | предотвр. | предотвр. |
+
+`PG-IS-002` **PG `READ COMMITTED` строже стандарта** — dirty read невозможен через MVCC.
+
+`PG-IS-003` **PG `REPEATABLE READ` = snapshot isolation** — phantom тоже предотвращён.
+
+`PG-IS-010` **`READ COMMITTED` минимизирует блокировки.** В большинстве OLTP — правильный выбор.
+
+### REPEATABLE READ
+
+`PG-IS-020` **RR фиксирует snapshot на момент первого запроса в транзакции.** Все последующие SELECT видят то же состояние.
+
+`PG-IS-021` **Когда RR оправдан:** длинный отчёт по нескольким таблицам с консистентным срезом, `pg_dump`, перенос данных по сложной логике.
+
+`PG-IS-022` **На RR `UPDATE` той же строки, что изменилась после snapshot, упадёт с `40001 serialization_failure`.** Java должен делать retry.
+
+`PG-IS-023` **Не используй RR в hot path просто «на всякий случай»** — будет всплеск 40001-ошибок.
+
+### SERIALIZABLE
+
+`PG-IS-030` **`SERIALIZABLE` через SSI гарантирует: результат параллельных TX = результат последовательных.** Сильнее, чем RR.
+
+`PG-IS-031` **Классический пример write skew, который RR пропускает, а SERIALIZABLE ловит:** инвариант «всегда хотя бы один врач на смене», две параллельные TX освобождают разных врачей.
+
+`PG-IS-032` **Когда SERIALIZABLE:** сложные инварианты, которые невозможно выразить через `CHECK` или `FOR UPDATE`. Финансовые расчёты с множественными правилами.
+
+`PG-IS-033` **SERIALIZABLE дороже:** PG отслеживает зависимости, race-condition → откат с 40001 → retry.
+
+`PG-IS-034` **На большинстве OLTP НЕ оправдан.** Дешевле выразить инвариант через `SELECT FOR UPDATE` + ручной CHECK.
+
+### Spring
+
+`PG-IS-040` **`@Transactional(isolation = Isolation.SERIALIZABLE)` или `Isolation.REPEATABLE_READ`** на конкретном методе.
+
+`PG-IS-041` **`READ_COMMITTED` — дефолт, не указывай явно.** Пусть в коде явно стоит только то, что отличается от стандарта.
+
+`PG-IS-042` **На SERIALIZABLE / RR — обязателен retry на `CannotSerializeTransactionException` (PG код 40001).** 1–3 попытки с back-off.
+
+`PG-IS-070` **Серверный `idle_in_transaction_session_timeout = 30–60 сек`** — автоматически убивает idle-транзакции.
+
+### Антипаттерны Isolation
+
+`PG-IS-080` `@Transactional(isolation = SERIALIZABLE)` на каждом методе «на всякий случай» — % rollback'ов скакнёт.
+
+`PG-IS-081` `Isolation.REPEATABLE_READ` на коротком read-modify-write вместо `SELECT FOR UPDATE`.
+
+`PG-IS-082` Поднимать уровень изоляции, когда корень проблемы — отсутствие constraint'а в схеме (CHECK / EXCLUDE).
+
+`PG-IS-083` SERIALIZABLE без retry на `CannotSerializeTransactionException`.
+
+`PG-IS-084` Долгие RR/SERIALIZABLE-транзакции — каждая держит snapshot, мешает autovacuum.
 
 ---
 
