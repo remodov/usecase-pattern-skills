@@ -10,7 +10,9 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-types-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. У каждого правила код `PG-T-NNN`.
+- **`.claude/docs/pg-types-style-guide.md`** — типы колонок (`PG-T-NNN`).
+- **`.claude/docs/pg-naming-style-guide.md`** — конвенции именования (`PG-N-NNN`).
+- **`.claude/docs/pg-partitioning-style-guide.md`** — партиционирование (`PG-P-NNN`).
 
 ## Инструкции
 
@@ -79,6 +81,31 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ### Антипаттерны (сводно — `PG-T-080` — `PG-T-093`)
 
 Эти 14 правил повторяют категории выше — используй их когда ссылаешься на «классический» антипаттерн в одном слове.
+
+### Именование (`PG-N-NNN`) — обязательно проверяй на каждом DDL
+
+- `PG-N-001`/`002` snake_case без двойных кавычек.
+- `PG-N-010` Таблицы — едино singular или plural.
+- `PG-N-020` PK — `id`, не `<table>_id`.
+- `PG-N-021` FK — `<parent>_id`.
+- `PG-N-022` Boolean с префиксом `is_`/`has_`/`can_`.
+- `PG-N-023` Времена — `_at`/`_on`.
+- `PG-N-024`/`025` Деньги/длительности с осмысленным суффиксом.
+- `PG-N-030` Audit-набор: `created_at`, `updated_at`, `version`.
+- `PG-N-031` Soft-delete через `deleted_at`, не `is_deleted`.
+- `PG-N-040`–`045` Префиксы `ix_`/`uk_`/`fk_`/`ck_`. CHECK с явным именем.
+- `PG-N-050` Не зарезервированные слова.
+- `PG-N-060`/`061` Длина ≤ 30 символов.
+- `PG-N-094` Не `data`/`info` jsonb для основной модели.
+
+### Партиционирование (`PG-P-NNN`) — если вижу `PARTITION BY` в DDL
+
+- `PG-P-001` Таблица > 50 GB / time-series / multi-tenant — оправдан выбор.
+- `PG-P-003` PK включает ключ партиционирования.
+- `PG-P-020` Ключ в `WHERE` большинства запросов.
+- `PG-P-030` Размер партиции 1–50 GB.
+- `PG-P-040` Есть план автоматического создания новых партиций.
+- `PG-P-085` Partition key не обновляется в типичных операциях.
 
 ## Формат вывода
 

@@ -39,6 +39,7 @@
    ucp-pattern-review + ucp-api-review + ucp-ddd-tactical-review +
    ucp-java-style-review + ucp-auth-review
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
+   ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks)
    superpowers:requesting-code-review           (внешний review)
 
 5. ЗАВЕРШЕНИЕ
@@ -52,7 +53,7 @@
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review` — без пары
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -349,6 +350,23 @@ ucp-spec-design  →  спека в docs/spec/
 ```
 /ucp-pg-explain-review                                  # из git diff (DDL индексов)
 /ucp-pg-explain-review                                  # с приложенным EXPLAIN ANALYZE
+```
+
+### `/ucp-pg-runtime-review`
+
+Ревью runtime-аспектов PostgreSQL против `pg-runtime-style-guide.md` (правила `PG-W-NNN`, `PG-V-NNN`, `PG-L-NNN`).
+
+**Что проверяет:**
+- WAL: длинные транзакции в `@Transactional` (HTTP/Kafka/S3 внутри), bulk-операции (COPY vs цикл INSERT), HOT/fillfactor, JSONB с горячими полями.
+- VACUUM: `autovacuum_enabled = false`, отсутствие `VACUUM ANALYZE` после big-миграции, тюнинг `scale_factor` для горячих таблиц.
+- Locks: `SELECT FOR UPDATE` без `@Transactional`, отсутствие `SKIP LOCKED` в outbox-relay/очередях, deadlock-prone порядок блокировок (multi-row без сортировки по id), `pg_advisory_xact_lock` для singleton scheduled-job, optimistic vs pessimistic выбор.
+- `lock_timeout` в миграциях, `synchronous_commit = off` для метрик.
+
+**Использование:**
+
+```
+/ucp-pg-runtime-review                                  # все Java/SQL изменения из git diff
+/ucp-pg-runtime-review src/main/java/.../OutboxRelay.java
 ```
 
 ## Подключение к проекту
