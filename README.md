@@ -4,8 +4,63 @@
 
 ## Принцип
 
-- **`.claude/docs/*.md` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15` и т.д.), агент читает соответствующий гайд при работе.
+- **`.claude/docs/*.md` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15`, `PG-T-013` и т.д.), агент читает соответствующий гайд при работе.
 - **Скиллы** — короткие инструкции для агента: что проверить, как отчитаться.
+
+## Workflow: как пользоваться скиллами
+
+Скиллы UCP — атомарные операции «сделай один артефакт по правилам». Для небольших задач этого хватает: открыл `ucp-pattern-design`, описал команду, получил `UseCase + Handler + контроллер`. Для **целого сервиса от спеки до прода** нужен оркестратор — эту роль играет [плагин `superpowers`](https://github.com/anthropics/skills/tree/main/skills/superpowers).
+
+```
+1. ИНПУТ — спецификация
+   ucp-spec-design                              (если спеки ещё нет)
+   ucp-spec-review                              (валидация дизайна — до кода!)
+      ▸ замечания → правки → ucp-spec-review (fast) → 0 Критично
+
+2. ПЛАНИРОВАНИЕ
+   superpowers:brainstorming                    (если требования размытые)
+   superpowers:writing-plans                    (читает спеку → план по шагам)
+
+3. ИСПОЛНЕНИЕ
+   superpowers:executing-plans                  (оркестратор)
+      └─ на каждом шаге вызывает один из:
+          ucp-bootstrap-design                  (gradle, профили, Liquibase, jOOQ codegen)
+          ucp-ddd-tactical-design               (агрегаты, VO, события)
+          ucp-pattern-design                    (UseCase + Handler + Controller)
+          ucp-auth-design                       (Spring Security + RBAC + ABAC)
+          ucp-api-design                        (OpenAPI + ProblemDetails)
+          ucp-test-design                       (тесты на UC + BR)
+   superpowers:test-driven-development          (TDD-дисциплина по ходу)
+   superpowers:subagent-driven-development      (параллельно независимые шаги)
+
+4. ПРОВЕРКА (обязательная)
+   superpowers:verification-before-completion   (compileJava, test — всё зелёное)
+   ucp-pg-schema-review     ← ОБЯЗАТЕЛЬНО на каждый PR с DDL/миграцией
+   ucp-pattern-review + ucp-api-review + ucp-ddd-tactical-review +
+   ucp-java-style-review + ucp-auth-review
+   ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
+   superpowers:requesting-code-review           (внешний review)
+
+5. ЗАВЕРШЕНИЕ
+   superpowers:using-git-worktrees              (изоляция от main)
+   superpowers:finishing-a-development-branch
+```
+
+**Симметрия design ↔ review.** Для каждого design-скилла есть парный review:
+- `ucp-spec-design` ↔ `ucp-spec-review` (дизайн спеки)
+- `ucp-pattern-design` ↔ `ucp-pattern-review` (UseCase Pattern)
+- `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
+- `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
+- `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review` — без пары
+
+**`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
+
+**Когда нужна вся связка:** новый сервис с нуля, миграция с классической слоёной архитектуры на UCP, большой рефакторинг с переходом на новый Tier.
+
+**Когда `superpowers` избыточен:** одна операция, один UseCase, добавить эндпоинт в существующий сервис. Дёргай `ucp-*-design` напрямую. Но `ucp-pg-schema-review` всё равно вызывай, если меняется DDL.
+
+`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)), не зависит от этого репозитория.
 
 ## Скиллы
 
@@ -295,67 +350,6 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-pg-explain-review                                  # из git diff (DDL индексов)
 /ucp-pg-explain-review                                  # с приложенным EXPLAIN ANALYZE
 ```
-
-## Workflow: маленькая задача vs целый сервис
-
-Скиллы UCP — атомарные операции «сделай один артефакт по правилам». Для
-небольших задач этого хватает: открыл `ucp-pattern-design`, описал команду,
-получил `UseCase + Handler + контроллер`. Дальше человек читает результат и
-коммитит.
-
-Для **целого сервиса от спеки до прода** одних `ucp-*`-скиллов мало — нужен
-оркестратор, который держит контекст плана между шагами и не теряет инварианты.
-Эту роль играет [плагин `superpowers`](https://github.com/anthropics/skills/tree/main/skills/superpowers).
-`superpowers` ничего не знает про UCP — это общая дисциплина «брейнсторм → план →
-исполни → проверь → закрой». UCP-скиллы ничего не знают про `superpowers` — они умеют
-делать ровно один артефакт. Когда они встречаются, получается полный процесс.
-
-```
-1. ИНПУТ — спецификация
-   ucp-spec-design                              (если спеки ещё нет)
-   ucp-spec-review                              (валидация качества дизайна — до кода!)
-      ▸ замечания → правки → ucp-spec-review (fast) → 0 Критично
-
-2. ПЛАНИРОВАНИЕ
-   superpowers:brainstorming                    (если требования размытые)
-   superpowers:writing-plans                    (читает спеку → план по шагам)
-
-3. ИСПОЛНЕНИЕ
-   superpowers:executing-plans                  (оркестратор)
-      └─ на каждом шаге вызывает один из:
-          ucp-bootstrap-design                  (gradle, профили, Liquibase, jOOQ codegen)
-          ucp-ddd-tactical-design               (агрегаты, VO, события)
-          ucp-pattern-design                    (UseCase + Handler + Controller)
-          ucp-auth-design                       (Spring Security + RBAC + ABAC)
-          ucp-api-design                        (OpenAPI + ProblemDetails)
-          ucp-test-design                       (тесты на UC + BR)
-   superpowers:test-driven-development          (TDD-дисциплина по ходу)
-   superpowers:subagent-driven-development      (параллельно независимые шаги)
-
-4. ПРОВЕРКА
-   superpowers:verification-before-completion   (compileJava, test — всё зелёное)
-   ucp-pattern-review + ucp-api-review +        (методология)
-   ucp-ddd-tactical-review + ucp-java-style-review + ucp-auth-review
-   superpowers:requesting-code-review           (внешний review)
-
-5. ЗАВЕРШЕНИЕ
-   superpowers:using-git-worktrees              (изоляция от main)
-   superpowers:finishing-a-development-branch
-```
-
-**Симметрия design ↔ review.** Для каждого design-скилла есть парный review:
-- `ucp-spec-design` ↔ `ucp-spec-review` (дизайн спеки)
-- `ucp-pattern-design` ↔ `ucp-pattern-review` (UseCase Pattern)
-- `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
-- `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
-- `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review` — без пары
-
-**Когда нужна связка:** новый сервис с нуля, миграция с классической слоёной архитектуры на UCP, большой рефакторинг с переходом на новый Tier. Везде, где «забыть шаг» = баг в проде.
-
-**Когда `superpowers` избыточен:** одна операция, один UseCase, добавить эндпоинт в существующий сервис. Дёргай `ucp-*-design` напрямую без оркестратора.
-
-`superpowers` ставится отдельно (см. [skills marketplace](https://github.com/anthropics/skills)), не зависит от этого репозитория и нужен только когда требуется оркестрация.
 
 ## Подключение к проекту
 
