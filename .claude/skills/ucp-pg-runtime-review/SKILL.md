@@ -1,16 +1,16 @@
 ---
 name: ucp-pg-runtime-review
-description: Ревью PostgreSQL runtime-аспектов — WAL-нагрузка, autovacuum/bloat, блокировки в коде. Проверяет fillfactor на write-heavy таблицах, длинные транзакции (Spring @Transactional вокруг HTTP/Kafka), bulk-операции (COPY vs INSERT), SELECT FOR UPDATE / SKIP LOCKED через jOOQ, advisory locks, deadlock-prone порядок блокировок, мониторинг bloat и replication slots. Вызывается при тормозах под нагрузкой, ревью кода с транзакциями, разборе WAL/disk-issues.
+description: Ревью PostgreSQL runtime-аспектов — WAL-нагрузка, autovacuum/bloat, блокировки, connection pool, уровни изоляции. Проверяет fillfactor, длинные транзакции (@Transactional вокруг HTTP/Kafka), bulk-операции (COPY vs INSERT), SELECT FOR UPDATE / SKIP LOCKED через jOOQ, advisory locks, deadlock-prone порядок блокировок, HikariCP/PgBouncer-настройку, выбор Isolation level, retry на 40001. Вызывается при тормозах под нагрузкой, ревью кода с транзакциями, тюнинге пула.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью PostgreSQL runtime
 
-Ты ревьюишь Java/Spring-код и DDL-миграции на runtime-проблемы PostgreSQL: излишний WAL, bloat от плохого autovacuum, неправильные блокировки.
+Ты ревьюишь Java/Spring-код, DDL-миграции и application config на runtime-проблемы PostgreSQL: излишний WAL, bloat от плохого autovacuum, неправильные блокировки, неверная настройка HikariCP/PgBouncer, неверно поднятый уровень изоляции без retry.
 
 ## Зависимости
 
-- **`.claude/docs/pg-runtime-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks).
+- **`.claude/docs/pg-runtime-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
 
 ## Инструкции
 
@@ -89,10 +89,48 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 [важно] PG-W-021 order_doc создаётся без fillfactor.
    Эта таблица — write-heavy (UPDATE статуса при каждом изменении заказа).
    Должно быть: CREATE TABLE order_doc (...) WITH (fillfactor = 85);
+
+[критично] PG-CP-082 OrderService.processOrder @Transactional оборачивает HTTP-вызов.
+   File: src/main/java/.../OrderService.java:42
+   Соединение из HikariCP-пула удерживается всё время HTTP-вызова (~3 сек).
+   При нагрузке пул полностью занят, новые запросы ждут или таймаутят.
+   Должно быть: разделить на 2 транзакции, HTTP вне @Transactional.
+
+[критично] PG-IS-083 @Transactional(isolation = SERIALIZABLE) без retry.
+   File: src/main/java/.../TransferHandler.java:18
+   Под нагрузкой будут случайные 40001 (CannotSerializeTransactionException).
+   Должно быть: + @Retryable(retryFor = CannotSerializeTransactionException.class,
+                              maxAttempts = 3, backoff = @Backoff(delay = 50)).
+
+[важно] PG-CP-002 maximum-pool-size = 100 для одного инстанса.
+   Если у вас 10 инстансов и default max_connections=100 PG, общая сумма 1000
+   при дефолте PG. Снизь до 20 либо подними max_connections.
 ```
+
+## Чек-лист правил (расширение)
+
+Помимо указанных выше WAL/VACUUM/Locks-правил, проверяй также:
+
+### Connection pool (`PG-CP-*`)
+
+- `PG-CP-002` Размер пула 10–20 на инстанс, не сотни.
+- `PG-CP-010` `maximum-pool-size = minimum-idle`.
+- `PG-CP-014` `leak-detection-threshold` включён (60s).
+- `PG-CP-013` `max-lifetime: 30 мин` (меньше LB-таймаута).
+- `PG-CP-045` При PgBouncer + transaction mode: `prepareThreshold = 0` или PgBouncer 1.21+.
+- `PG-CP-060` Read-replica routing — отдельный DataSource через `@Transactional(readOnly = true)`.
+- `PG-CP-082` `@Transactional` НЕ вокруг HTTP/Kafka/S3.
+
+### Isolation (`PG-IS-*`)
+
+- `PG-IS-041` Дефолтный `READ COMMITTED` не указывать явно.
+- `PG-IS-022`/`PG-IS-042` На `Isolation.REPEATABLE_READ` / `SERIALIZABLE` обязательно `@Retryable` на `CannotSerializeTransactionException`.
+- `PG-IS-033` SERIALIZABLE — только когда инвариант невозможно выразить через CHECK / FOR UPDATE.
+- `PG-IS-070` Серверный `idle_in_transaction_session_timeout = 30–60 сек`.
 
 ## Что не входит
 
 - Типы колонок и naming — это `ucp-pg-schema-review`.
 - Композитные индексы и план запроса — это `ucp-pg-explain-review`.
+- DDL-миграции, expand-contract, ACCESS EXCLUSIVE — это `ucp-pg-migration-review`.
 - Чисто Java-код без DB-взаимодействия — это `ucp-pattern-review`.

@@ -135,5 +135,5 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Что не входит
 
 - Производительность запросов и индексы — это `ucp-pg-explain-review`.
-- Миграционные операции (`ALTER TABLE` локи, `CONCURRENTLY`, expand-contract) — это `ucp-pg-migration-review` (когда появится).
+- Миграционные операции (`ALTER TABLE` локи, `CONCURRENTLY`, expand-contract) — это `ucp-pg-migration-review`.
 - Если в PR есть и DDL, и Java-код — для Java вызывай `ucp-pattern-review` отдельно.
