@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` и считай каждое правило `R-*` обязательным. На Уровне 3+ дополнительно прочитай `.claude/docs/ddd-tactical-style-guide.md`.
+1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` и считай каждое правило `R-*` обязательным. На Уровне 3+ дополнительно прочитай `.claude/docs/ddd-tactical-style-guide.md`. Если в дизайне есть DDL новой таблицы или колонки — также прочитай `.claude/docs/pg-types-style-guide.md` и применяй правила `PG-T-NNN` к выбору типов (`bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `Instant`/`OffsetDateTime` на Java-стороне для `timestamptz`).
 
 2. **Подтверди наличие библиотеки.** Проверь `build.gradle` / `pom.xml` на `ru.vikulinva:usecase-pattern-starter`. Если нет — попроси пользователя добавить (и предложи сниппет зависимости) — не выдумывай локальные копии `UseCase` / `UseCaseHandler` / `UseCaseDispatcher`.
 
