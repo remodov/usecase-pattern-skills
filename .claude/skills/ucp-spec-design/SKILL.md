@@ -135,7 +135,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
 5. **Заполни все 16 разделов** в порядке из шаблона:
    1. Bounded Context (Tier A: «модуль / компонент»; Tier B+: полноценный BC).
    2. Ubiquitous Language — таблица глоссария.
-   3. Domain Model — ER для A; +UseCase-модели для B; +агрегаты / VO / события для C.
+   3. Domain Model — ER для A; +UseCase-модели для B; +агрегаты / VO / события для C. **При выборе типов колонок — следуй `pg-types-style-guide.md` (правила `PG-T-NNN`):** `bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `text` для строк без бизнес-длины. Антипаттерны (`varchar(255)`, `timestamp` без TZ, `varchar(36)` для UUID, `float` для денег) — не должны попасть в ER даже на Tier A.
    4. Жизненный цикл и состояния — только если у сущности есть статусы.
    5. Роли и права доступа — матрица «акторы × команды» + ABAC-условия.
    6. Бизнес-правила (BR-001, BR-002, …).
