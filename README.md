@@ -39,6 +39,7 @@
    ucp-pattern-review + ucp-api-review + ucp-ddd-tactical-review +
    ucp-java-style-review + ucp-auth-review
    ucp-jooq-review                              (при ревью persistence/ — Jooq*Repository, *DomainRecordMapper, *FilterConditionBuilder)
+   ucp-resilience-review                        (при ревью *-out-adapter/ — *ClientConfig, *ClientAdapter, application.yml resilience4j)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -55,7 +56,7 @@
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-resilience-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -288,6 +289,33 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-jooq-review persistence/.../order/   # весь пакет
 ```
 
+### `/ucp-resilience-review`
+
+Ревью защиты сервиса от отказов внешних систем на соответствие Resilience Style Guide (`.claude/docs/resilience-style-guide.md`) — timeouts, circuit breaker, retry, bulkhead, fallback, health checks, связка с OpenAPI generator. Каждое нарушение цитируется кодом из подгрупп (`R-RES-CB-1`, `R-RES-OAS-X1` и т. д.).
+
+**Что проверяет:**
+- Per-system isolation: свой `OkHttpClient`/`RestClient` bean + pool + dispatcher на каждую внешнюю систему (Sber, OdnaKassa, etc.). Shared pool — критическое нарушение.
+- Timeouts: `connectTimeout < readTimeout < callTimeout`, типовые значения, обоснования отклонений в yml.
+- Circuit Breaker: `@CircuitBreaker(name = "<system>")` на public-методе adapter (не на generated client, не на helper, не на репозитории), per-system конфиг через `application.yml`.
+- Retry только при идемпотентности: GET либо команда с `Idempotency-Key` (`AUTH-19`); не на 4xx; обязательный exp backoff; не Spring-Retry.
+- Bulkhead: semaphore-based (не thread-pool), отдельный слой защиты от connection pool.
+- Fallback: cached read / default / async-mode (queue + 202 Accepted) — да; null/zero для money — нет.
+- Конфиг через `application.yml` (Spring Cloud Config friendly), не программный `CircuitBreakerConfig.custom()`.
+- **Связка с OpenAPI generator:** аннотации на adapter-методе (не на generated `<X>Api`), `spring-restclient` target для нового кода (Retrofit2 — только legacy), mapper между generated DTO и domain.
+- HealthIndicator per-system, cached с TTL 30s, light probe (не business-операция).
+- `Thread.sleep` цикл в sync-handler — критическое нарушение, переводить в task-queue.
+- Resilience4j metrics через Micrometer не отключены, OTel-spans с `circuit_breaker.state`.
+
+Скилл сфокусирован на **outbound HTTP к внешним системам**. Inbound rate-limiting обычно живёт в API Gateway (Spring Cloud Gateway / Kong / Istio), не в каждом сервисе.
+
+**Использование:**
+
+```
+/ucp-resilience-review                    # ревью изменений из git diff
+/ucp-resilience-review sber-out-adapter/  # весь модуль
+/ucp-resilience-review src/main/resources/application.yml  # только конфиг
+```
+
 ### `/ucp-auth-review`
 
 Ревью кода на соответствие паттернам авторизации (`.claude/docs/auth-patterns-style-guide.md`) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
@@ -514,6 +542,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-spec-design/        # написание Use Case спецификации сервиса
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
 ├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
+├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-test-design/        # проектирование интеграционных и unit-тестов
 ├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
@@ -525,6 +554,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── usecase-spec-template.md         # шаблон Use Case спецификации
 ├── java-style-guide.md              # Java Style Guide (JS-*)
 ├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
+├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -535,7 +565,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka. Также — `ucp-jooq-design` парный к `ucp-jooq-review` (генерация скелета `Jooq<X>Repository` из доменного интерфейса).
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также — `ucp-jooq-design` парный к `ucp-jooq-review` (генерация скелета `Jooq<X>Repository` из доменного интерфейса) и `ucp-resilience-design` парный к `ucp-resilience-review` (генерация `<System>ClientConfig` + аннотированного `*ClientAdapter` из доменного port-интерфейса).
 
 ## Лицензия
 
