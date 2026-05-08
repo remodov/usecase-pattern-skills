@@ -49,6 +49,6 @@ allowed-tools: Read Glob Grep Write Edit
    - **Подключение генератора**: плагин `org.openapi.generator` должен быть в `build.gradle.kts` (если нет — флаг для `ucp-bootstrap-design`). Output: `build/generated/openapi/src/main/java`. Сгенерированные артефакты — `<package>.generated.api.<Tag>Api` (интерфейс контроллера) + `<package>.generated.api.model.<Schema>` (DTO).
    - **Контракт контроллера**: `<X>Controller implements <Tag>Api` — НЕ ручной класс с `@RequestMapping` и handcrafted DTO. См. `ucp-pattern-design`.
    - Какие error codes добавить в Java-enum `ErrorCode` (если он отдельный) или в маппинг `@ExceptionHandler`.
-   - Что **не пишем руками**: request DTO, response DTO, page DTO, интерфейс `<Tag>Api` — всё генерируется. Ручные DTO в пакете `jsonbean/` — нарушение `BS-20` (это касается DB-Pojo) **и** §12.2 (это касается API-DTO).
+   - Что **не пишем руками**: request DTO, response DTO, page DTO, интерфейс `<Tag>Api` — всё генерируется. Ручные DTO в пакете `jsonbean/` — нарушение `BS-20` (это касается DB-Pojo) **и** REST API style guide (это касается API-DTO — схемы определены в OpenAPI, см. `R-OAS-1`).
 
 $ARGUMENTS
