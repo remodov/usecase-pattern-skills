@@ -24,23 +24,26 @@ allowed-tools: Read Glob Grep Write Edit
    - Ответ: статус-код, структура тела, заголовки
    - Ошибки: применимые HTTP-коды со значениями `code`-enum и примерами `detail`
 
-4. **Выход — OpenAPI-спека** (YAML). **Файл — `<module>/src/main/resources/openapi/<service>.openapi.yaml`** (style guide §12.2 — OpenAPI-first). НЕ `docs/api/`, НЕ рядом с markdown-спекой.
+4. **Выход — OpenAPI-спека** (YAML). **Файл — `<module>/src/main/resources/openapi/<service>.openapi.yaml`** (OpenAPI-first). НЕ `docs/api/`, НЕ рядом с markdown-спекой.
 
    Включи:
-   - Paths с `operationId`, `tags`, `summary`, `description` — `operationId` станет именем метода в `*Api`, `tags` определят имя интерфейса (`<Tag>Api`).
+   - Paths с `operationId`, `tags`, `summary`, `description` (`R-OAS-1`, `R-OAS-2`, `R-OAS-4`) — `operationId` станет именем метода в `*Api`, `tags` определят имя интерфейса (`<Tag>Api`).
+   - Параметры пути в OpenAPI — уникальные имена (`{orderId}`, `{itemId}`), хотя в дизайне URL используется `{id}` (`R-OAS-3`, `R-NEST-4`).
    - Request / response schemas под `components/schemas`. Имена схем — это имена сгенерированных Java-классов (`ProductDto`, `CreateProductRequest`, `ProductPageDto`).
-   - Schemas `ProblemDetails` и `Violation` (скопировать из раздела 13.7 style guide).
-   - Enum `ErrorCode` со всеми применимыми business error codes.
-   - Примеры error response для каждого эндпоинта (раздел 13.8).
-   - Структуру пагинации, если есть list-эндпоинты.
+   - Schemas `ProblemDetails` и `Violation` (см. правило `R-ERR-7`).
+   - Enum `ErrorCode` со всеми применимыми business error codes (`R-ERR-4`).
+   - Примеры error response для каждого эндпоинта (`R-ERR-8`, секция 13.3 в гайде — готовые YAML).
+   - Структуру пагинации, если есть list-эндпоинты (`R-QRY-4` или `R-QRY-5`).
 
-5. **Самопроверка перед выдачей.** Проверь по style guide:
-   - URL: lowercase, kebab-case, множественное число существительных, префикс `/api/v1/`, до 2 уровней вложенности
-   - Path-параметры: `{id}` (не `{orderId}`), уникальные имена в OpenAPI
-   - Query-параметры: camelCase, `page` / `size` для пагинации, `sort` для сортировки
-   - JSON-поля: camelCase, суффикс `Id` для идентификаторов, даты ISO 8601, enum'ы UPPER_SNAKE_CASE
-   - Ответы: без обёртки, массив `content` для коллекций, без null-полей
-   - Ошибки: RFC 9457, `application/problem+json`, `violations` для 400 validation
+5. **Самопроверка перед выдачей.** Проверь по style guide и в комментарии к выдаче укажи коды правил, которые применил:
+   - URL — `R-URL-1`..`R-URL-3`, `R-RES-1`..`R-RES-3`, `R-NEST-1`..`R-NEST-2`, `R-VER-3`
+   - Path-параметры — `R-NEST-4` (дизайн `{id}`), `R-OAS-3` (уникальные в OpenAPI)
+   - Query-параметры — `R-QRY-1`..`R-QRY-9` (camelCase, пагинация `R-QRY-4`/`R-QRY-5`, сортировка `R-QRY-6`, фильтры `R-QRY-2`/`R-QRY-3`)
+   - JSON-поля — `R-FLD-1`..`R-FLD-5` (camelCase, `Id`-суффикс, ISO 8601, UPPER_SNAKE_CASE для enum)
+   - Ответы — `R-RSP-1`..`R-RSP-8` (без обёртки, `content` для коллекций, без `null`)
+   - Ошибки — `R-ERR-1`..`R-ERR-9` (RFC 9457, `application/problem+json`, URN в `type`, `violations` для 400)
+   - Action-эндпоинты — `R-ACT-1`..`R-ACT-4`
+   - Заголовки — `R-HDR-1`..`R-HDR-4` (без `X-`-префикса по `R-HDR-X1`)
 
 6. После OpenAPI-спеки добавь короткий блок **заметок по реализации**:
    - **Подключение генератора**: плагин `org.openapi.generator` должен быть в `build.gradle.kts` (если нет — флаг для `ucp-bootstrap-design`). Output: `build/generated/openapi/src/main/java`. Сгенерированные артефакты — `<package>.generated.api.<Tag>Api` (интерфейс контроллера) + `<package>.generated.api.model.<Schema>` (DTO).
