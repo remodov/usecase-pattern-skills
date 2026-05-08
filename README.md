@@ -35,6 +35,7 @@
           ucp-pg-schema-design                  (Liquibase changeset для нового агрегата под PG-T-*/PG-N-*)
           ucp-pg-migration-design               (expand-contract шаблоны: RENAME/DROP COLUMN, ALTER TYPE, FK NOT VALID + VALIDATE)
           ucp-pg-runtime-design                 (outbox-relay, task-queue, advisory-lock, optimistic-lock с @Retryable)
+          ucp-validation-design                 (custom Jakarta-constraints, validation groups, cross-field-валидаторы)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -46,6 +47,7 @@
    ucp-java-style-review + ucp-auth-review
    ucp-jooq-review                              (при ревью persistence/ — Jooq*Repository, *DomainRecordMapper, *FilterConditionBuilder)
    ucp-resilience-review                        (при ревью *-out-adapter/ — *ClientConfig, *ClientAdapter, application.yml resilience4j)
+   ucp-validation-review                        (при ревью контроллеров, DTO, custom validators, @ConfigurationProperties)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -67,6 +69,7 @@
 - `ucp-pg-schema-design` ↔ `ucp-pg-schema-review` (Liquibase changeset для нового агрегата)
 - `ucp-pg-migration-design` ↔ `ucp-pg-migration-review` (expand-contract шаблоны для breaking changes)
 - `ucp-pg-runtime-design` ↔ `ucp-pg-runtime-review` (outbox-relay, task-queue, advisory-lock, optimistic-lock)
+- `ucp-validation-design` ↔ `ucp-validation-review` (Jakarta Validation: custom constraints, groups, cross-field, @ConfigurationProperties)
 - `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
@@ -434,6 +437,55 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-pg-runtime-design Optimistic locking для агрегата Order
 ```
 
+### `/ucp-validation-review`
+
+Ревью валидации входных данных (Jakarta Validation) на соответствие Validation Style Guide (`.claude/docs/validation-style-guide.md`) — где валидируем, какие constraints, custom-валидаторы, validation groups, cross-field, OpenAPI integration. Каждое нарушение цитируется кодом из подгрупп (`R-VLD-WHERE-1`, `R-VLD-OAS-X1` и т. д.).
+
+**Что проверяет:**
+- `@Valid` на `@RequestBody`/`@RequestParam` контроллеров и на nested-полях DTO (без `@Valid` nested не валидируется).
+- `@Validated` на каждом `@ConfigurationProperties` классе (невалидный конфиг → fail-fast на старте).
+- Manual `if (cmd.x < 0) throw` в Handler — критическое нарушение (теряется единый формат `violations` в ProblemDetails).
+- `@NotNull` на примитивах — мёртвый код.
+- `@Pattern` с regex для email — должен быть `@Email`.
+- Custom validators в правильных местах (`core/<bc>/validation/` для domain, `common/validation/` для общих).
+- Custom validator: `isValid(null) → true` (для композиции с `@NotBlank`/`@NotNull`).
+- Cross-field правила как class-level annotations, не `@AssertTrue`-методы.
+- Validation groups только для одного DTO с разными required-полями (Create/Update), не для «строгая/мягкая».
+- `useBeanValidation = true` в openapi-generator конфиге.
+- Аннотации руками в generated DTO (затрётся при regenerate) — критическое.
+- `message` на русском, не английском.
+
+Связь с `R-ERR-5`/`R-ERR-6` (REST API): violations возвращаются в стандартном формате ProblemDetails, не пиши свой обработчик.
+
+**Использование:**
+
+```
+/ucp-validation-review                          # ревью изменений из git diff
+/ucp-validation-review user-api-in-adapter/     # все контроллеры + DTO модуля
+/ucp-validation-review src/main/java/.../validation/   # custom-validators
+```
+
+### `/ucp-validation-design`
+
+**Парный к `/ucp-validation-review`.** Генерирует кастомный Jakarta Validation constraint, validation group или cross-field-валидатор по Validation Style Guide:
+- **Field-level custom constraint** (`@RussianPhone`, `@VatNumber`, `@Iso8601Duration`) — annotation interface + `ConstraintValidator` implementation, расположение по domain (`core/<bc>/validation/` для domain-specific, `common/validation/` для общих технических).
+- **Validation group** — пустой interface с doc-comment («применяется в Create/Update»).
+- **Cross-field constraint** (`@DateRange`, `@PasswordsMatch`) — class-level annotation с `addPropertyNode(<field>)` для прицепления ошибки к конкретному полю в violations.
+
+Решает по входным параметрам:
+- **Куда положить** — domain-vocabulary в `core/<bc>/validation/`, общий технический в `common/validation/`.
+- **Имя** — `@<DomainTerm>` без префиксов `Valid`/`Check`/`Is`.
+- **`isValid(null)` → `true`** — обязательно для композиции с `@NotNull`/`@NotBlank`.
+- **Standard composition** (только `@NotBlank + @Size + @Pattern`) — НЕ создаёт custom constraint, использовать standard-аннотации напрямую.
+
+**Использование:**
+
+```
+/ucp-validation-design Custom constraint @RussianPhone — формат +7XXXXXXXXXX
+/ucp-validation-design Validation group OnCreate / OnUpdate для OrderRequest
+/ucp-validation-design Cross-field @DateRange для OrderFilterRequest
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -685,6 +737,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-pg-schema-design/   # Liquibase changeset для нового агрегата (PG-T-*/PG-N-*)
 ├── ucp-pg-migration-design/ # expand-contract шаблоны для breaking changes (PG-M-*)
 ├── ucp-pg-runtime-design/  # outbox-relay, task-queue, advisory-lock, optimistic-lock (PG-W/L-*)
+├── ucp-validation-review/  # ревью Jakarta Validation (R-VLD-*)
+├── ucp-validation-design/  # генерация custom constraints, groups, cross-field
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -700,6 +754,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── java-style-guide.md              # Java Style Guide (JS-*)
 ├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
 ├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
+├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -710,7 +765,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka.
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Caching, Kafka.
 
 ## Лицензия
 
