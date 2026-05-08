@@ -32,6 +32,9 @@
           ucp-integration-design                (новый out-adapter с CB/Bulkhead/Retry + HealthIndicator)
           ucp-resilience-design                 (миграция existing out-adapter под R-RES-*)
           ucp-jooq-design                       (Jooq<X>Repository + Mapper + FilterConditionBuilder + ViewRepository)
+          ucp-pg-schema-design                  (Liquibase changeset для нового агрегата под PG-T-*/PG-N-*)
+          ucp-pg-migration-design               (expand-contract шаблоны: RENAME/DROP COLUMN, ALTER TYPE, FK NOT VALID + VALIDATE)
+          ucp-pg-runtime-design                 (outbox-relay, task-queue, advisory-lock, optimistic-lock с @Retryable)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -61,7 +64,10 @@
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
 - `ucp-integration-design` / `ucp-resilience-design` ↔ `ucp-resilience-review` (out-adapter, CB/Bulkhead/Retry; integration — новый, resilience-design — миграция existing)
 - `ucp-jooq-design` ↔ `ucp-jooq-review` (persistence-слой: репозиторий, mapper, filter-builder, view-репозиторий)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
+- `ucp-pg-schema-design` ↔ `ucp-pg-schema-review` (Liquibase changeset для нового агрегата)
+- `ucp-pg-migration-design` ↔ `ucp-pg-migration-review` (expand-contract шаблоны для breaking changes)
+- `ucp-pg-runtime-design` ↔ `ucp-pg-runtime-review` (outbox-relay, task-queue, advisory-lock, optimistic-lock)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -370,6 +376,64 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-jooq-design persistence для Receipt — есть OrderViewRepository с summary-проекциями
 ```
 
+### `/ucp-pg-schema-design`
+
+**Парный к `/ucp-pg-schema-review`.** Генерирует Liquibase changeset (YAML) для нового агрегата под `pg-types-style-guide.md` (`PG-T-*`) и `pg-naming-style-guide.md` (`PG-N-*`):
+- `CREATE TABLE` с типами: `bigint IDENTITY` или `uuid v7` для PK, `numeric(p,s)` для денег, `timestamptz` для бизнес-времени, `text` для строк (без `varchar(255)`), JSONB для VO с complex structure.
+- FK constraints с CASCADE-стратегией (`ON DELETE CASCADE` для child-сущностей агрегата).
+- Индексы под фильтрацию (FK всегда отдельным индексом + composite под `<X>Filter`).
+- Audit-колонки (`created_at` / `updated_at`), soft-delete (`deleted_at` если применимо).
+- Подключение в `migrations/db/changelog-master.yaml` через include.
+
+Применяется **после** `ucp-ddd-tactical-design` (Aggregate Root уже существует) и **до** `ucp-jooq-design` (jOOQ codegen из живой схемы).
+
+**Использование:**
+
+```
+/ucp-pg-schema-design DDL для агрегата Order: items, status, totalAmount, customerId, soft-delete
+/ucp-pg-schema-design Schema для Receipt с child Receipt_Item, JSONB для fiscal-данных
+```
+
+### `/ucp-pg-migration-design`
+
+**Парный к `/ucp-pg-migration-review`.** Генерирует **безопасные** expand-contract Liquibase changeset'ы для типовых breaking changes по `pg-migrations-style-guide.md` (`PG-M-*`):
+- `RENAME COLUMN` — 3 фазы (add new + sync trigger → deploy code → drop trigger + drop old).
+- `ALTER TYPE` — 2-3 фазы через теневую колонку + swap.
+- `ADD CONSTRAINT FK` — 2 фазы (`NOT VALID` + отдельный `VALIDATE`).
+- `SET NOT NULL` — через `CHECK NOT VALID + VALIDATE + SET NOT NULL` (PG12+).
+- `CREATE INDEX` — `CONCURRENTLY` + `runInTransaction: false` + `VACUUM` после.
+- Удаление значения enum — через теневой тип.
+
+Каждая phase имеет `SET LOCAL lock_timeout = '3s'`. Все операции обеспечивают **N-1 совместимость** (миграция работает с предыдущей версией кода). Без down-rollback'ов: `PG-M-*` правило — forward fix, не rollback.
+
+**Использование:**
+
+```
+/ucp-pg-migration-design RENAME COLUMN customer.email → primary_email
+/ucp-pg-migration-design SET NOT NULL для order.confirmed_at, таблица 50M строк
+/ucp-pg-migration-design Добавить FK order.customer_id → customer.id в проде
+```
+
+### `/ucp-pg-runtime-design`
+
+**Парный к `/ucp-pg-runtime-review`.** Генерирует runtime-инфраструктуру для четырёх типовых PG-сценариев по `pg-runtime-style-guide.md`:
+
+1. **Outbox-relay** — durable publishing доменных событий. DDL `outbox_event` с partial-индексом `WHERE published_at IS NULL`, scheduler с `FOR UPDATE SKIP LOCKED` (`PG-L-021`), запись в outbox в той же транзакции что и UPDATE агрегата.
+2. **Task-queue** — durable retry для resilience-fallback (см. `R-RES-FB-1`). DDL `<x>_task` с retry_count + next_attempt_at, scheduler-poll, `Process<X>TaskCommandHandler` с exponential backoff.
+3. **Advisory lock** — singleton scheduled-job в кластере (`PG-L-060`). `pg_try_advisory_xact_lock` (xact-вариант, отпускается на коммите).
+4. **Optimistic lock** — через `version`-колонку (`PG-L-051`), UPDATE с проверкой `version`, Spring `@Retryable` на `OptimisticLockException` (`PG-L-072`).
+
+При выборе сценария скилл уточняет один из четырёх параметров и генерирует только нужное.
+
+**Использование:**
+
+```
+/ucp-pg-runtime-design Outbox-relay для domain-событий Order
+/ucp-pg-runtime-design Task-queue для платёжных задач (PaymentTask)
+/ucp-pg-runtime-design Advisory lock для DailyReportJob — только один инстанс
+/ucp-pg-runtime-design Optimistic locking для агрегата Order
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -618,6 +682,9 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
 ├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
 ├── ucp-jooq-design/        # генерация Jooq<X>Repository + Mapper + FilterConditionBuilder + ViewRepository
+├── ucp-pg-schema-design/   # Liquibase changeset для нового агрегата (PG-T-*/PG-N-*)
+├── ucp-pg-migration-design/ # expand-contract шаблоны для breaking changes (PG-M-*)
+├── ucp-pg-runtime-design/  # outbox-relay, task-queue, advisory-lock, optimistic-lock (PG-W/L-*)
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -643,7 +710,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также рассматриваются design-парные к существующим review-скиллам без пары: `ucp-pg-schema-design` (Liquibase changeset из агрегата под `PG-T-*`), `ucp-pg-migration-design` (expand-contract шаблоны под `PG-M-*`).
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka.
 
 ## Лицензия
 
