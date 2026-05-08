@@ -47,6 +47,9 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Validation groups для «strict/loose» — `R-VLD-GRP-X1` (нужны разные DTO).
    - В `build.gradle.kts`/`pom.xml` openapi-generator с `useBeanValidation = false` или без указания — `R-VLD-OAS-X2`.
    - Modified-date generated DTO с `@NotNull` руками — `R-VLD-OAS-X1`.
+   - `class <X>Request` в `*-in-adapter/jsonbean/` или подобном handcrafted-пакете без `@Generated` — `R-VLD-OAS-X5`.
+   - В Java-коде `@Pattern("^\\+7\\d{10}$")` на поле, при этом то же `pattern` уже в OpenAPI YAML — `R-VLD-OAS-X4` (дублирование).
+   - Контроллер с `@RestController` + `@RequestMapping` ручной без `implements <Tag>Api` — `R-VLD-OAS-4` (нарушение).
    - `@Value("${prop.required}")` — `R-VLD-CFG-X2`.
    - English в `message`-параметре аннотации — `R-VLD-MSG-X1`.
 
