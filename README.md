@@ -38,6 +38,7 @@
    ucp-pg-schema-review     ← ОБЯЗАТЕЛЬНО на каждый PR с DDL/миграцией
    ucp-pattern-review + ucp-api-review + ucp-ddd-tactical-review +
    ucp-java-style-review + ucp-auth-review
+   ucp-jooq-review                              (при ревью persistence/ — Jooq*Repository, *DomainRecordMapper, *FilterConditionBuilder)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -54,7 +55,7 @@
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -260,6 +261,31 @@ ucp-spec-design  →  спека в docs/spec/
 ```
 /ucp-java-style-review                         # ревью изменений из git diff
 /ucp-java-style-review src/main/java/.../OrderHandler.java
+```
+
+### `/ucp-jooq-review`
+
+Ревью persistence-слоя (модуль `persistence/`) на соответствие jOOQ Style Guide (`.claude/docs/jooq-style-guide.md`) — repository-pattern, multiset, фильтры, маппинг record↔domain, SelectMode, view-репозитории, transaction boundaries. Каждое нарушение цитируется кодом из подгрупп (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1` и т. д.).
+
+**Что проверяет:**
+- Codegen-конфиг: `setDaos(false)`, `setImmutablePojos(false)`, `OffsetDateTime` для timestamptz, `<enumConverter>true</enumConverter>` для domain-enum'ов.
+- Repository-pattern: `Jooq<X>Repository implements <X>Repository` (interface в `core/`), конструкторная инъекция `DSLContext`, public-методы возвращают domain-типы, `SelectMode mode` параметром.
+- Запросы: правильные fetch-методы (`fetchOptional`, `fetchExists`), UPDATE через `dslContext.update().set()`, не plain SQL.
+- Multiset для nested-fetch: alias-keys в `SelectMultisetAliasKeys`, `RecordMappingUtils` для извлечения, batch-fetch при много parents.
+- Filter-builders: `<X>FilterConditionBuilder` Spring-bean + `FilterConditionHelper.andIfNotNull/Empty/True`, EXISTS для cross-table.
+- Mapper: plain Java class (Spring `@Component`), не MapStruct; `toDomain` / `fromDomain` / `assembleAggregate`; enum через `forcedType` или `fromValue`; JSONB через `JooqJsonbHelper`.
+- Locks: `SelectMode` enum в `core/`, `applyLock()` switch, `forUpdate()` всегда внутри `@Transactional`.
+- Транзакции: `@Transactional` на handler, не на репозитории; `readOnly = true` для query-handler'ов.
+- View-репозитории: `<X>ViewRepository` отдельно от `<X>Repository`, если read-проекция отличается.
+
+Скилл фокусируется на **jOOQ-фасаде** над PostgreSQL. Настройки runtime (WAL, autovacuum, connection pool) — это `ucp-pg-runtime-review`. Сама схема — `ucp-pg-schema-review`.
+
+**Использование:**
+
+```
+/ucp-jooq-review                          # ревью изменений из git diff
+/ucp-jooq-review persistence/.../order/JooqOrderRepository.java
+/ucp-jooq-review persistence/.../order/   # весь пакет
 ```
 
 ### `/ucp-auth-review`
@@ -487,18 +513,20 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-ddd-tactical-design/        # проектирование агрегата (DDD tactical)
 ├── ucp-spec-design/        # написание Use Case спецификации сервиса
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
+├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
 ├── ucp-test-design/        # проектирование интеграционных и unit-тестов
 ├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
 .claude/docs/
-├── rest-api-style-guide.md          # REST API Style Guide
-├── usecase-pattern-style-guide.md   # Use Case Pattern
-├── ddd-tactical-style-guide.md      # тактические паттерны DDD
+├── rest-api-style-guide.md          # REST API Style Guide (R-*-*)
+├── usecase-pattern-style-guide.md   # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
+├── ddd-tactical-style-guide.md      # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*)
 ├── usecase-spec-template.md         # шаблон Use Case спецификации
-├── java-style-guide.md              # Java Style Guide
+├── java-style-guide.md              # Java Style Guide (JS-*)
+├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
 ├── test-strategy.md                 # стратегия тестов
-└── auth-patterns-style-guide.md     # паттерны авторизации
+└── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
 
 ## Связанные библиотеки
@@ -507,7 +535,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka.
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Resilience, Kafka. Также — `ucp-jooq-design` парный к `ucp-jooq-review` (генерация скелета `Jooq<X>Repository` из доменного интерфейса).
 
 ## Лицензия
 
