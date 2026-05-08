@@ -257,24 +257,58 @@ Validation groups — механизм «один класс, разные пр�
 
 ## 6. OpenAPI-сгенерированные DTO
 
-Связка с REST API style guide: контроллеры implements generated `<Tag>Api`, DTO генерируются openapi-generator.
+Связка с REST API style guide: контроллеры implements generated `<Tag>Api`, DTO генерируются `openapi-generator`. Принцип в команде — **OpenAPI-first для валидации**: все правила входных DTO формулируются в OpenAPI YAML, codegen превращает их в Jakarta-аннотации автоматически. Java-код только подключает `@Valid` на параметре контроллера и (при необходимости) добавляет custom constraints, которых нет в OpenAPI.
+
+Workflow для нового эндпоинта:
+```
+ucp-api-design → src/main/resources/openapi/<service>.openapi.yaml
+                  ↓ ./gradlew openApiGenerate
+              build/generated/.../*Request.java   ← с Jakarta-аннотациями
+                  ↓ controller implements <Tag>Api + @Valid
+              automatic 400 + violations при невалидных данных
+```
 
 ### 6.1 Обязательно
 
-- **R-VLD-OAS-1.** Опция `useBeanValidation = true` в `openapi-generator` config. Тогда constraints из OpenAPI YAML (`pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `required`, `format: email`) генерируются как Jakarta-аннотации в DTO.
+- **R-VLD-OAS-1.** **OpenAPI-first.** Все validation-правила для входных DTO живут в OpenAPI YAML, не в Java-коде. Если правило выражается через standard OpenAPI keywords — пиши в YAML, не дописывай аннотации в коде. В Java добавляются **только** custom constraints, которых OpenAPI не покрывает (см. `R-VLD-OAS-5`).
+
+- **R-VLD-OAS-2.** Опция `useBeanValidation = true` в `openapi-generator` config. Без неё generated DTO без аннотаций, `@Valid` на контроллере ничего не делает.
   ```kotlin
   // <module>/build.gradle.kts
   openApiGenerate {
-      ...
+      generatorName.set("spring")          // или spring-restclient для outbound
       configOptions.set(mapOf(
           "useSpringBoot3" to "true",
           "useJakartaEe" to "true",
-          "useBeanValidation" to "true"
+          "useBeanValidation" to "true"     // ← обязательно
       ))
   }
   ```
 
-- **R-VLD-OAS-2.** OpenAPI YAML формулирует constraints на уровне схемы:
+- **R-VLD-OAS-3.** OpenAPI YAML формулирует constraints на уровне схемы. Соответствие keyword → Java type → Jakarta annotation:
+
+  | OpenAPI keyword | Java type | Jakarta annotation |
+  |---|---|---|
+  | `required: [field]` | object property | `@NotNull` (для object/Long), без `@NotBlank` для строк |
+  | `minLength: 1` | `String` | `@Size(min=1)` (фактически not-empty) |
+  | `maxLength: N` | `String` | `@Size(max=N)` |
+  | `minLength: 1, maxLength: N` | `String` | `@Size(min=1, max=N)` |
+  | `pattern: '^...$'` | `String` | `@Pattern(regexp = "^...$")` |
+  | `format: email` | `String` | `@Email` |
+  | `format: uuid` | `UUID` | (тип, не аннотация) |
+  | `format: date` | `LocalDate` | (тип) |
+  | `format: date-time` | `OffsetDateTime` | (тип) |
+  | `minimum: N` | `int`/`long` | `@Min(N)` |
+  | `minimum: 0.01` | `BigDecimal` | `@DecimalMin("0.01")` |
+  | `maximum: N` | `int`/`long` | `@Max(N)` |
+  | `exclusiveMinimum: true` + `minimum: 0` | numbers | `@DecimalMin(value = "0", inclusive = false)` |
+  | `minItems: N` | `List`/`Set` | `@Size(min=N)` |
+  | `maxItems: N` | `List`/`Set` | `@Size(max=N)` |
+  | `uniqueItems: true` | array | **не генерируется** — нужен custom validator или `Set<X>` тип |
+  | `enum: [A, B]` | java enum | (тип, не аннотация) |
+  | `$ref: '#/.../X'` | nested object | `@Valid` (рекурсивная валидация) |
+
+  Пример входного DTO в YAML:
   ```yaml
   CreateOrderRequest:
     type: object
@@ -292,23 +326,70 @@ Validation groups — механизм «один класс, разные пр�
       phone:
         type: string
         pattern: '^\+7\d{10}$'
+      totalAmount:
+        type: number
+        format: double
+        minimum: 0.01
       items:
         type: array
         minItems: 1
+        maxItems: 100
         items:
           $ref: '#/components/schemas/OrderItemRequest'
   ```
-  Контроллер: `@Valid @RequestBody CreateOrderRequest req` — generated DTO уже содержит `@NotNull`, `@Min(1)`, `@Email`, `@Pattern("^\\+7\\d{10}$")`, `@NotEmpty`, `@Valid` на nested.
+  Generated `CreateOrderRequest.java` уже содержит: `@NotNull`, `@Min(1)`, `@Email`, `@Pattern("^\\+7\\d{10}$")`, `@DecimalMin("0.01")`, `@NotEmpty`, `@Size(min=1, max=100)`, `@Valid` на nested.
 
-- **R-VLD-OAS-3.** Custom constraint, который не выражается через OpenAPI schema, добавляется на **wrapper-class** или domain entity, не на generated DTO. Generated DTO — детали транспорта.
+  Контроллер тривиален:
+  ```java
+  @PostMapping("/orders")
+  public ResponseEntity<OrderJson> create(@Valid @RequestBody CreateOrderRequest req) { ... }
+  ```
+
+- **R-VLD-OAS-4.** Контроллер обязательно `implements <Tag>Api` (generated interface), не `@RestController` с handcrafted маппингом. Это гарантирует что generated `@Valid`/Jakarta-аннотации применяются (см. `R-OAS-1` REST guide).
+  ```java
+  @RestController
+  public class OrderController implements OrdersApi {
+      @Override
+      public ResponseEntity<OrderJson> createOrder(CreateOrderRequest req) { ... }
+      // generated OrdersApi method signature уже имеет @Valid внутри (благодаря useBeanValidation)
+  }
+  ```
+
+- **R-VLD-OAS-5.** Custom constraint, который **не выражается** standard OpenAPI keywords:
+
+  **Вариант А (рекомендуется):** custom формат уже выражается через `pattern: '^...$'` — пиши в OpenAPI напрямую. Например `@RussianPhone` = `pattern: '^\+7\d{10}$'`. Дублирование java-аннотации не нужно.
+
+  **Вариант Б:** правило не сводится к pattern (например бизнес-проверка ИНН с контрольной суммой). Применяй на **wrapper-class** в коде проекта:
+  ```java
+  // адаптер в *-in-adapter
+  public record CreateOrderInput(@Valid @RussianInn String inn, @Valid CreateOrderRequest body) {}
+
+  @PostMapping
+  public ResponseEntity<OrderJson> create(@Valid @RequestBody CreateOrderInput input) { ... }
+  ```
+  Generated `CreateOrderRequest` остаётся регенерируемым; custom-логика — на wrapper.
+
+  **Вариант В (если генератор поддерживает):** OpenAPI extension `x-validation`:
+  ```yaml
+  inn:
+    type: string
+    x-validation: russianInn      # генератор-специфичный extension
+  ```
+  Поддержка зависит от templates генератора — обычно нужно кастомизировать mustache-шаблон. **Не используй без явного решения** в команде; дефолт — Вариант А или Б.
+
+- **R-VLD-OAS-6.** **Двойной контракт generated vs UseCase.** Generated DTO (`CreateOrderRequest`) валидируется через `@Valid` на контроллере. После маппинга в UseCase command (`CreateOrderCommand` record) — **повторная валидация не делается**. Команда пришла «уже чистой» из контроллера. Domain-инварианты (`R-VLD-WHERE-3`) — отдельный концерн на агрегате, не Jakarta.
 
 ### 6.2 Запрещено
 
-- **R-VLD-OAS-X1.** Дописывать `@Valid`/`@NotNull` руками в generated DTO — затрётся при regenerate.
+- **R-VLD-OAS-X1.** Дописывать `@Valid`/`@NotNull`/`@Pattern` руками в generated DTO (`build/generated/.../CreateOrderRequest.java`) — затрётся при следующем `compileJava`/`openApiGenerate`.
 
-- **R-VLD-OAS-X2.** `useBeanValidation = false`. Тогда generated DTO без constraints, контроллер `@Valid` ничего не валидирует — silent skip.
+- **R-VLD-OAS-X2.** `useBeanValidation = false` или отсутствие этой опции. Generated DTO без constraints; `@Valid` на контроллере silent-passes невалидные данные в Handler.
 
-- **R-VLD-OAS-X3.** Class-level `@DateRange` constraint на generated DTO (regenerate-safe нарушение). Если cross-field правило критично — переноси в wrapper-class в коде проекта.
+- **R-VLD-OAS-X3.** Class-level constraint (`@DateRange`) на generated DTO. Применяй на wrapper-class или формулируй cross-field правила через OpenAPI bool-логику (если возможно).
+
+- **R-VLD-OAS-X4.** Дублирование validation-правил: то же самое в OpenAPI YAML **и** руками в коде. Источник правды один — OpenAPI YAML. Если правило только в коде — оно не отразится в OpenAPI-документации, и фронт/потребители не узнают про ограничение.
+
+- **R-VLD-OAS-X5.** Handcrafted DTO в `jsonbean/` или подобном пакете для inbound REST API. Это нарушение `R-OAS-1`/`BS-20` — все request/response DTO генерируются из OpenAPI. Если видишь `class CreateOrderRequest` без `@Generated` — вырезать, перенести в YAML.
 
 ---
 
@@ -409,6 +490,8 @@ Validation groups — механизм «один класс, разные пр�
 | Дописывание `@Valid`/`@NotNull` в generated DTO | `R-VLD-OAS-X1` | constraints в OpenAPI YAML |
 | `useBeanValidation = false` | `R-VLD-OAS-X2` | `true` обязательно |
 | Class-level constraint на generated DTO | `R-VLD-OAS-X3` | wrapper-class в коде проекта |
+| Дублирование validation в YAML и в Java | `R-VLD-OAS-X4` | OpenAPI YAML — единственный источник |
+| Handcrafted request DTO без OpenAPI | `R-VLD-OAS-X5` | сгенерировать из YAML |
 | `@Value("${prop}")` для required-конфига | `R-VLD-CFG-X2` | `@ConfigurationProperties` typed |
 | Английский в `message` | `R-VLD-MSG-X1` | русский |
 | Технические термины в message | `R-VLD-MSG-X2` | пользовательский язык |
