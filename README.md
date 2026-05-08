@@ -36,6 +36,7 @@
           ucp-pg-migration-design               (expand-contract шаблоны: RENAME/DROP COLUMN, ALTER TYPE, FK NOT VALID + VALIDATE)
           ucp-pg-runtime-design                 (outbox-relay, task-queue, advisory-lock, optimistic-lock с @Retryable)
           ucp-validation-design                 (custom Jakarta-constraints, validation groups, cross-field-валидаторы)
+          ucp-caching-design                    (Spring Cache + Redis: CacheManager, TTL, @Cacheable, invalidation)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -48,6 +49,7 @@
    ucp-jooq-review                              (при ревью persistence/ — Jooq*Repository, *DomainRecordMapper, *FilterConditionBuilder)
    ucp-resilience-review                        (при ревью *-out-adapter/ — *ClientConfig, *ClientAdapter, application.yml resilience4j)
    ucp-validation-review                        (при ревью контроллеров, DTO, custom validators, @ConfigurationProperties)
+   ucp-caching-review                           (при ревью CacheConfig, @Cacheable / @CacheEvict, application.yml cache-блок)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -70,6 +72,7 @@
 - `ucp-pg-migration-design` ↔ `ucp-pg-migration-review` (expand-contract шаблоны для breaking changes)
 - `ucp-pg-runtime-design` ↔ `ucp-pg-runtime-review` (outbox-relay, task-queue, advisory-lock, optimistic-lock)
 - `ucp-validation-design` ↔ `ucp-validation-review` (Jakarta Validation: custom constraints, groups, cross-field, @ConfigurationProperties)
+- `ucp-caching-design` ↔ `ucp-caching-review` (Spring Cache + Redis: CacheManager, ключи, TTL, invalidation, паттерны, stampede)
 - `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
@@ -486,6 +489,54 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-validation-design Cross-field @DateRange для OrderFilterRequest
 ```
 
+### `/ucp-caching-review`
+
+Ревью кеширования (Spring Cache + Redis) на соответствие Caching Style Guide (`.claude/docs/caching-style-guide.md`) — где кешируем, конфигурация, ключи, TTL, invalidation, паттерны, stampede, observability. Каждое нарушение цитируется кодом из подгрупп (`R-CACHE-WHERE-X1`, `R-CACHE-CFG-X1` и т. д.).
+
+**Что проверяет:**
+- `@Cacheable` только на read-методах, не на write (`R-CACHE-WHERE-X1`); не на доменном агрегате целиком (`R-CACHE-WHERE-X2`); money-кеш с TTL ≤ 30s + строгий evict (`R-CACHE-WHERE-X3`).
+- Конфигурация: `RedisCacheManager` (не `ConcurrentMapCacheManager` в проде); `GenericJackson2JsonRedisSerializer` (не JDK — security CVE); per-cache TTL через `withInitialCacheConfigurations`; `@EnableCaching` + явный CacheManager bean (иначе silent NoOp).
+- Ключи: `cacheNames` slug per-entity; `key = "..."` SpEL явно для multi-arg методов; нет PII / токенов в plain-text.
+- TTL: explicit, ≤ 24h для бизнес-данных, ≤ 30s для money.
+- Invalidation: `@CacheEvict` на write-методах того же агрегата; `@Caching` композит для нескольких; `@EventListener + @CacheEvict` для domain-events; не `allEntries=true` без причины.
+- Паттерны: cache-aside дефолт; write-through через `@CachePut`; refresh-ahead для hot keys; не write-behind для money; не mix паттернов в одном cache.
+- Stampede: `sync=true` для local; distributed lock (Redisson) для Redis hot keys.
+- Metrics: cache hit rate включён, не отключён.
+
+Связь с `R-RES-FB-1` (Resilience): cache как fallback при отказе внешней системы — отдельная политика invalidation. Связь с `AUTH-16`: PII в кеше требует TTL и encryption.
+
+**Использование:**
+
+```
+/ucp-caching-review                              # ревью изменений из git diff
+/ucp-caching-review src/main/java/.../CacheConfig.java
+/ucp-caching-review src/main/resources/application.yml
+```
+
+### `/ucp-caching-design`
+
+**Парный к `/ucp-caching-review`.** Генерирует кеш-обвязку под Caching Style Guide:
+- `CacheSettings` (`@ConfigurationProperties` + `@Validated`) с per-cache TTL.
+- `CacheConfiguration` (`@Configuration` + `@EnableCaching`) с `RedisCacheManager` + `GenericJackson2JsonRedisSerializer` + `withInitialCacheConfigurations`.
+- `application.yml` patch — `spring.data.redis.*`, `spring.cache.type: redis`, `cache.caches.<name>.ttl`.
+- `@Cacheable` / `@CacheEvict` / `@CachePut` на конкретных методах с правильным `key` SpEL.
+- `@EventListener + @CacheEvict` invalidator для domain-events (если есть).
+- `@Scheduled` refresh-ahead для hot keys.
+
+Решает по входным параметрам:
+- **Тип данных** → TTL (static/profile/feature-flag/aggregation/money).
+- **Money** → cache-aside с TTL ≤ 30s + явный evict; альтернатива «не кешировать вообще» если возможно.
+- **Hot key** → refresh-ahead через `@Scheduled` каждые `TTL × 0.7`.
+- **Доменный агрегат целиком** → отказ генерировать (`R-CACHE-WHERE-X2`); кешируй read-проекцию.
+
+**Использование:**
+
+```
+/ucp-caching-design Кеш для UserProfile, TTL 15 мин, evict на UpdateProfile
+/ucp-caching-design Refresh-ahead для top-100 продуктов, hot key
+/ucp-caching-design Money-кеш для UserBalance, TTL 30s, evict на каждой charge
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -739,6 +790,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-pg-runtime-design/  # outbox-relay, task-queue, advisory-lock, optimistic-lock (PG-W/L-*)
 ├── ucp-validation-review/  # ревью Jakarta Validation (R-VLD-*)
 ├── ucp-validation-design/  # генерация custom constraints, groups, cross-field
+├── ucp-caching-review/     # ревью Spring Cache + Redis (R-CACHE-*)
+├── ucp-caching-design/     # генерация CacheManager, @Cacheable, @CacheEvict, refresh-ahead
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -755,6 +808,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
 ├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
 ├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
+├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -765,7 +819,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Caching, Kafka.
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Kafka.
 
 ## Лицензия
 
