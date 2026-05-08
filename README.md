@@ -31,6 +31,7 @@
           ucp-api-design                        (OpenAPI + ProblemDetails)
           ucp-integration-design                (новый out-adapter с CB/Bulkhead/Retry + HealthIndicator)
           ucp-resilience-design                 (миграция existing out-adapter под R-RES-*)
+          ucp-jooq-design                       (Jooq<X>Repository + Mapper + FilterConditionBuilder + ViewRepository)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -59,7 +60,8 @@
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
 - `ucp-integration-design` / `ucp-resilience-design` ↔ `ucp-resilience-review` (out-adapter, CB/Bulkhead/Retry; integration — новый, resilience-design — миграция existing)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
+- `ucp-jooq-design` ↔ `ucp-jooq-review` (persistence-слой: репозиторий, mapper, filter-builder, view-репозиторий)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -344,6 +346,30 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-integration-design Outbound для system X, read-heavy, без Idempotency-Key
 ```
 
+### `/ucp-jooq-design`
+
+**Парный к `/ucp-jooq-review`.** Генерирует persistence-слой на jOOQ из доменного `<X>Repository` интерфейса под jOOQ Style Guide. Создаёт:
+- `Jooq<X>Repository` — реализация с `DSLContext`, multiset для eager-fetch child-коллекций, `applyLock()` switch для `SelectMode`, private `toSortFields()` helper.
+- `<X>DomainRecordMapper` — Plain Java (если есть assemble-логика, enum-translation, JSONB) или MapStruct interface (для простых DTO ↔ POJO).
+- `<X>FilterConditionBuilder` — если фильтр > 3 полей или содержит EXISTS-условия. С `FilterConditionHelper.andIfNotNull/Empty/True`.
+- `Jooq<X>ViewRepository` — отдельный класс, если `<X>ViewRepository` интерфейс отличается от основного репозитория (read-проекции).
+- `SelectMode`, `PaginationView`, `SelectMultisetAliasKeys`, `FilterConditionHelper` в core/persistence — если ещё не существуют.
+
+Решает по входным параметрам:
+- **Aggregate с children** → multiset для eager-fetch, alias-key из `SelectMultisetAliasKeys`.
+- **Filter > 3 полей** → отдельный `<X>FilterConditionBuilder`, иначе inline-предикаты.
+- **Read-проекция отличается от агрегата** → `Jooq<X>ViewRepository` отдельно.
+- **Mapper с assemble/enum/JSONB** → Plain Java; иначе MapStruct interface.
+
+Предполагает, что `<X>Repository` интерфейс и Aggregate уже существуют (через `ucp-ddd-tactical-design`). Liquibase-миграции — отдельным шагом.
+
+**Использование:**
+
+```
+/ucp-jooq-design Репозиторий для агрегата Order: фильтр по статусам, customerId, диапазон дат
+/ucp-jooq-design persistence для Receipt — есть OrderViewRepository с summary-проекциями
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -591,6 +617,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-spec-design/        # написание Use Case спецификации сервиса
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
 ├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
+├── ucp-jooq-design/        # генерация Jooq<X>Repository + Mapper + FilterConditionBuilder + ViewRepository
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -616,7 +643,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также рассматриваются design-парные к существующим review-скиллам без пары: `ucp-jooq-design` (генерация скелета `Jooq<X>Repository` из доменного интерфейса), `ucp-pg-schema-design` (Liquibase changeset из агрегата под `PG-T-*`), `ucp-pg-migration-design` (expand-contract шаблоны под `PG-M-*`).
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также рассматриваются design-парные к существующим review-скиллам без пары: `ucp-pg-schema-design` (Liquibase changeset из агрегата под `PG-T-*`), `ucp-pg-migration-design` (expand-contract шаблоны под `PG-M-*`).
 
 ## Лицензия
 
