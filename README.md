@@ -29,6 +29,8 @@
           ucp-pattern-design                    (UseCase + Handler + Controller)
           ucp-auth-design                       (Spring Security + RBAC + ABAC)
           ucp-api-design                        (OpenAPI + ProblemDetails)
+          ucp-integration-design                (новый out-adapter с CB/Bulkhead/Retry + HealthIndicator)
+          ucp-resilience-design                 (миграция existing out-adapter под R-RES-*)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -56,7 +58,8 @@
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
 - `ucp-auth-design` ↔ `ucp-auth-review` (auth-паттерны)
-- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-resilience-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
+- `ucp-integration-design` / `ucp-resilience-design` ↔ `ucp-resilience-review` (out-adapter, CB/Bulkhead/Retry; integration — новый, resilience-design — миграция existing)
+- `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-jooq-review`, `ucp-pg-schema-review`, `ucp-pg-explain-review`, `ucp-pg-runtime-review`, `ucp-pg-migration-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
@@ -316,6 +319,52 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-resilience-review src/main/resources/application.yml  # только конфиг
 ```
 
+### `/ucp-integration-design`
+
+Генерирует **полный скелет outbound-интеграции** с новой внешней системой под Resilience Style Guide. Создаёт:
+- Доменный port в `core/<bc>/port/out/<system>/` (interface + command/result records).
+- Gradle-модуль `<system>-client-generator/` с `openapi-generator` плагином (target `spring-restclient`).
+- Gradle-модуль `<system>-out-adapter/` со всем требуемым: `<System>ClientConfig` + `ClientSettings` + `ClientAdapter` (с `@CircuitBreaker`/`@Bulkhead`/`@Retry`) + `Mapper` + `HealthIndicator` (TTL-кеш) + exception hierarchy (4xx/5xx).
+- Patch для `application.yml`: блок `client.<system>` + `resilience4j.{circuitbreaker,bulkhead,retry}.instances.<system>` + `management.health.<system>.enabled`.
+- Patch для `settings.gradle.kts` и `bootstrap/build.gradle.kts`.
+
+Решает по входным параметрам:
+- **Money** (`PaymentPort`, `BillingPort`) → CB failure rate `30%`, fallback = task-queue + 202 Accepted.
+- **Idempotent** (read или Idempotency-Key per `AUTH-19`) → `@Retry` добавляется.
+- **Non-idempotent write** → `@Retry` запрещён (`R-RES-RE-X1`), только CB+Bulkhead.
+- **Long-running (>30s)** → не sync-вызов, генерируется задача в task-queue (`R-RES-ASYNC-1`).
+
+После генерации — финальный шаг `/ucp-resilience-review` для верификации.
+
+**Использование:**
+
+```
+/ucp-integration-design Адаптер для twilio: SMS-уведомления, AUTH=apiKey
+/ucp-integration-design Платёжный адаптер для yandex-pay, money, OpenAPI здесь:...
+/ucp-integration-design Outbound для system X, read-heavy, без Idempotency-Key
+```
+
+### `/ucp-resilience-design`
+
+**Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
+
+Что делает:
+- Audit текущего адаптера: что есть из `R-RES-*`, чего нет.
+- Per-system isolation в `<X>ClientConfig` (если был shared bean — разделяет).
+- Аннотации `@CircuitBreaker`/`@Bulkhead`/`@Retry` на public-методах adapter.
+- Маркирует sleep-loop polling (`R-RES-ASYNC-X1`) **TODO-комментариями** + явно отмечает в отчёте «требует доработки в `core/`» (полный перевод в task-queue — отдельным шагом через `ucp-pattern-design`).
+- Добавляет `<System>HealthIndicator` если ещё нет.
+- Patch для `application.yml`: блок `resilience4j.*.instances.<system>`.
+
+Не создаёт новые модули, не трогает port в `core/`. Для **новых** интеграций — `/ucp-integration-design`.
+
+**Использование:**
+
+```
+/ucp-resilience-design sber-out-adapter/                     # миграция всего модуля
+/ucp-resilience-design insurance-out-adapter/                # включая sleep-loop → TODO
+```
+
 ### `/ucp-auth-review`
 
 Ревью кода на соответствие паттернам авторизации (`.claude/docs/auth-patterns-style-guide.md`) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
@@ -543,6 +592,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
 ├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
+├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
+├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
 ├── ucp-test-design/        # проектирование интеграционных и unit-тестов
 ├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
@@ -565,7 +616,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также — `ucp-jooq-design` парный к `ucp-jooq-review` (генерация скелета `Jooq<X>Repository` из доменного интерфейса) и `ucp-resilience-design` парный к `ucp-resilience-review` (генерация `<System>ClientConfig` + аннотированного `*ClientAdapter` из доменного port-интерфейса).
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Validation, Caching, Kafka. Также рассматриваются design-парные к существующим review-скиллам без пары: `ucp-jooq-design` (генерация скелета `Jooq<X>Repository` из доменного интерфейса), `ucp-pg-schema-design` (Liquibase changeset из агрегата под `PG-T-*`), `ucp-pg-migration-design` (expand-contract шаблоны под `PG-M-*`).
 
 ## Лицензия
 
