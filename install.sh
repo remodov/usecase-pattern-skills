@@ -10,9 +10,10 @@
 # в указанный проект. Симлинки означают, что обновления в этом репо
 # автоматически прилетят в проект — без ручного re-копирования.
 #
-# Дополнительно — устанавливает Eclipse jdtls (Java LSP) на машину один раз,
-# чтобы Claude и IDE могли пользоваться структурным анализом Java
-# (find references, type hierarchy, refactoring). На macOS — через brew.
+# Дополнительно — устанавливает Eclipse jdtls (Java LSP) и mcp-language-server
+# (LSP→MCP bridge) на машину один раз. В связке они дают Claude Code
+# структурный анализ Java: find references, type hierarchy, refactoring.
+# На macOS jdtls — через brew, mcp-language-server — через `go install`.
 #
 set -euo pipefail
 
@@ -160,6 +161,69 @@ else
   echo "      • Arch:    sudo pacman -S jdtls"
   echo "      • Debian:  загрузите с https://download.eclipse.org/jdtls/snapshots/"
   echo "      • Прочее:  https://github.com/eclipse-jdtls/eclipse.jdt.ls#installation"
+fi
+
+# mcp-language-server — bridge между LSP-серверами (jdtls и др.) и Claude Code
+# через MCP. Без него Claude jdtls сам не вызывает. Устанавливается через
+# `go install` (других дистрибуций пока нет).
+echo
+echo "==> Проверяю mcp-language-server (LSP→MCP bridge)"
+
+GOBIN="$(go env GOBIN 2>/dev/null || true)"
+GOPATH_BIN="$(go env GOPATH 2>/dev/null || true)/bin"
+MCP_LS_PATH=""
+if command -v mcp-language-server >/dev/null 2>&1; then
+  MCP_LS_PATH="$(command -v mcp-language-server)"
+elif [ -n "$GOBIN" ] && [ -x "$GOBIN/mcp-language-server" ]; then
+  MCP_LS_PATH="$GOBIN/mcp-language-server"
+elif [ -n "$GOPATH_BIN" ] && [ -x "$GOPATH_BIN/mcp-language-server" ]; then
+  MCP_LS_PATH="$GOPATH_BIN/mcp-language-server"
+fi
+
+if [ -n "$MCP_LS_PATH" ]; then
+  echo "    ✓ mcp-language-server уже установлен: $MCP_LS_PATH"
+elif command -v go >/dev/null 2>&1; then
+  echo "    устанавливаю через go install ..."
+  if go install github.com/isaacphi/mcp-language-server@latest >/tmp/mcp-ls-install.log 2>&1; then
+    NEW_PATH="${GOBIN:-$GOPATH_BIN}/mcp-language-server"
+    echo "    ✓ mcp-language-server установлен: $NEW_PATH"
+    if ! command -v mcp-language-server >/dev/null 2>&1; then
+      echo "    ⚠ ${GOBIN:-$GOPATH_BIN} не в PATH — добавьте: export PATH=\"\$PATH:${GOBIN:-$GOPATH_BIN}\""
+    fi
+  else
+    echo "    ⚠ go install упал — лог: /tmp/mcp-ls-install.log"
+  fi
+else
+  echo "    ⚠ Go не найден. Установите Go 1.21+ и затем:"
+  echo "      go install github.com/isaacphi/mcp-language-server@latest"
+  echo "      на macOS: brew install go"
+fi
+
+# Регистрация MCP в Claude Code для конкретного проекта (project scope).
+# Записывается в $PROJECT_DIR/.mcp.json — коммитится с проектом.
+if command -v claude >/dev/null 2>&1 \
+   && command -v mcp-language-server >/dev/null 2>&1 \
+   && command -v jdtls >/dev/null 2>&1; then
+  echo
+  echo "==> Регистрирую language-server как MCP для $PROJECT_DIR"
+  if [ -f "$PROJECT_DIR/.mcp.json" ] && grep -q '"language-server"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
+    echo "    ✓ MCP language-server уже зарегистрирован в .mcp.json"
+  else
+    (
+      cd "$PROJECT_DIR"
+      if claude mcp add language-server --scope project \
+           -- mcp-language-server --workspace "$PROJECT_DIR" --lsp jdtls 2>&1 | tail -3; then
+        echo "    ✓ MCP language-server зарегистрирован (project scope, .mcp.json)"
+      else
+        echo "    ⚠ claude mcp add упал — зарегистрируйте вручную:"
+        echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- mcp-language-server --workspace . --lsp jdtls"
+      fi
+    )
+  fi
+elif ! command -v claude >/dev/null 2>&1; then
+  echo
+  echo "    ⚠ claude CLI не найден — пропускаю регистрацию MCP. Поставьте Claude Code и затем:"
+  echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- mcp-language-server --workspace . --lsp jdtls"
 fi
 
 echo
