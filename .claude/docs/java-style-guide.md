@@ -264,22 +264,75 @@ public class Entity {
 
 Lombok применяется во всех модулях по умолчанию — он убирает шум boilerplate-конструкторов и логгеров, не меняя видимой семантики. Правила ниже — обязательные.
 
-### `JS-6.1` `@RequiredArgsConstructor` на всех Spring-бинах с DI
+### `JS-6.1` Конструктор строим через Lombok — всегда, без исключений по типу класса
 
-Любой `@Component` / `@Service` / `@Repository` / `@RestController` / `@Configuration` с DI-полями — `@RequiredArgsConstructor` + `private final` поля. Явный `public Foo(Bar bar) { this.bar = bar; }` не пишем.
+Правило универсальное: **любой класс с `private final`-полями, которые инициализируются конструктором** — `@RequiredArgsConstructor`. Не только Spring-бины. Применяется к:
+
+- `@Component` / `@Service` / `@Repository` / `@RestController` / `@Configuration` с DI.
+- Доменным `*Service` / `*Handler` / `*Mapper` / `*Validator` (могут быть Spring-бинами или просто POJO).
+- Адаптерам, helper-классам, integration-клиентам.
+- Custom exception-классам с payload-полями (см. также `JS-6.3` про `@Getter`).
+- Любому value-object'у, который **не record** (для record используется свой ctor — см. `JS-6.4`).
 
 ```java
+// Spring-бин
 @Component
 @RequiredArgsConstructor
 public class CreateOrderUseCaseHandler implements UseCaseHandler<CreateOrderUseCase, OrderDto> {
     private final OrderRepository orders;
     private final DateTimeService dateTimeService;
     private final UuidGenerator uuidGenerator;
-    // ... handle(...)
+}
+
+// Не Spring-бин — те же правила
+@RequiredArgsConstructor
+public class OrderTotalCalculator {
+    private final TaxService tax;
+    private final DiscountPolicy discounts;
+
+    public Money calculate(List<OrderItem> items) { /* ... */ }
+}
+
+// Custom exception с payload
+@Getter
+@RequiredArgsConstructor
+public class InvalidStateTransitionException extends RuntimeException {
+    private final ProductStatus from;
+    private final ProductStatus to;
 }
 ```
 
-Это перекрывает R-HND-5 из `usecase-pattern-style-guide.md`: Lombok — default, явный constructor — только для нестандартных кейсов (например, если нужно валидировать DI-аргументы или вызвать `super(...)`).
+Явный `public Foo(Bar bar) { this.bar = bar; }` **не пишем**. Это перекрывает `R-HND-5` из `usecase-pattern-style-guide.md`.
+
+**Когда явный конструктор всё-таки оправдан** (исключения, не основное правило):
+
+1. Нужна **валидация аргументов в конструкторе** (`Objects.requireNonNull`, `if (x < 0) throw ...`). Lombok не даёт хука.
+2. Нужен `super(...)`-вызов с не-стандартными аргументами (например, наследование от чужого класса, у которого нет no-arg ctor).
+3. Нужен **factory-метод** (`Order.draft(...)`, `Order.fromPersistence(...)`) — это уже не «конструктор», это бизнес-named ctor; для агрегатов это норма (см. `JS-6.7` про `@Builder` — то же мышление).
+4. Класс должен иметь **no-arg constructor для frameworks** (JPA entity, Jackson DTO без records). В этом случае часто используется `@NoArgsConstructor(access = AccessLevel.PROTECTED)` + `@Getter` + `@Setter` — но это кейс legacy-биндинга, см. `JS-6.5`.
+
+Во всех остальных случаях — `@RequiredArgsConstructor`.
+
+### `JS-6.X1` ❌ Явный all-args конструктор там, где подошёл `@RequiredArgsConstructor`
+
+```java
+// AVOID — boilerplate без причины
+public class CreateOrderUseCaseHandler {
+    private final OrderRepository orders;
+    private final DateTimeService dateTimeService;
+
+    public CreateOrderUseCaseHandler(OrderRepository orders, DateTimeService dateTimeService) {
+        this.orders = orders;
+        this.dateTimeService = dateTimeService;
+    }
+}
+```
+
+Превращаем в `@RequiredArgsConstructor`. Если есть валидация в ctor — оставляем явный, но с комментарием **зачем** (`JS-7.2`).
+
+### `JS-6.X2` ❌ `@AllArgsConstructor` на DI-классах
+
+`@AllArgsConstructor` генерит ctor для **всех** полей, включая non-final. Это значит — позже добавили `private boolean cached = false`, и ctor требует его передавать, ломаются все вызовы. Для DI правильный — `@RequiredArgsConstructor` (только final). `@AllArgsConstructor` — для DTO и тестовых fixtures.
 
 ### `JS-6.2` `@Slf4j` вместо ручного логгера
 
@@ -589,7 +642,7 @@ Lombok поверх records запрещён (`JS-6.4`). Если структу
 | Импорты | `JS-3.1`, `JS-3.2` |
 | Выражения | `JS-4.1`–`JS-4.7` |
 | Отступы | `JS-5.1`–`JS-5.3` |
-| Lombok | `JS-6.1`–`JS-6.7` |
+| Lombok | `JS-6.1`–`JS-6.7`, антипаттерны `JS-6.X1`–`JS-6.X2` |
 | Комментарии | `JS-7.1`–`JS-7.5`, антипаттерны `JS-7.X1`–`JS-7.X2` |
 | Java 21+ фичи | `JS-8.1`–`JS-8.7` (применимо если проект на Java 21+) |
 | Enforcement через Checkstyle | `JS-CS-1`–`JS-CS-5`, антипаттерны `JS-CS-X1`–`JS-CS-X3` |
