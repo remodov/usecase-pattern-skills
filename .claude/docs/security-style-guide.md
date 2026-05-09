@@ -75,7 +75,7 @@ tasks.named('spotbugsMain') {
 
 ## 2. CVE в зависимостях — `R-SEC-DEP-*`
 
-`R-SEC-DEP-1` **OWASP Dependency-Check** обязателен. Сканирует все runtime/test-зависимости против NIST NVD. Запускается на каждом PR и nightly (для подхвата новых CVE без изменений в коде).
+`R-SEC-DEP-1` **OWASP Dependency-Check** обязателен. Сканирует все runtime/test-зависимости против NIST NVD. По `R-SEC-2` запускается на merge в `main` + nightly + release-tag (не на каждом PR — слишком медленно). Локально не запускается — нет тёплого NVD-кэша.
 
 ```gradle
 plugins {
