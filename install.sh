@@ -201,29 +201,28 @@ fi
 
 # Регистрация MCP в Claude Code для конкретного проекта (project scope).
 # Записывается в $PROJECT_DIR/.mcp.json — коммитится с проектом.
-if command -v claude >/dev/null 2>&1 \
-   && command -v mcp-language-server >/dev/null 2>&1 \
-   && command -v jdtls >/dev/null 2>&1; then
-  echo
-  echo "==> Регистрирую language-server как MCP для $PROJECT_DIR"
-  if [ -f "$PROJECT_DIR/.mcp.json" ] && grep -q '"language-server"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
-    echo "    ✓ MCP language-server уже зарегистрирован в .mcp.json"
+# Используем $MCP_LS_PATH (учитывает $GOBIN/$GOPATH/bin), а не только PATH —
+# go install часто кладёт бинарник вне PATH пользователя.
+JDTLS_PATH="$(command -v jdtls 2>/dev/null || true)"
+CLAUDE_BIN="$(command -v claude 2>/dev/null || true)"
+
+echo
+echo "==> Регистрирую language-server как MCP для $PROJECT_DIR"
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "    ⚠ claude CLI не найден — пропускаю регистрацию. После установки Claude Code:"
+  echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- ${MCP_LS_PATH:-mcp-language-server} --workspace . --lsp ${JDTLS_PATH:-jdtls}"
+elif [ -z "$MCP_LS_PATH" ] || [ -z "$JDTLS_PATH" ]; then
+  echo "    ⚠ нет $([ -z "$MCP_LS_PATH" ] && echo "mcp-language-server")$([ -z "$MCP_LS_PATH" ] && [ -z "$JDTLS_PATH" ] && echo " и ")$([ -z "$JDTLS_PATH" ] && echo "jdtls") — пропускаю регистрацию"
+elif [ -f "$PROJECT_DIR/.mcp.json" ] && grep -q '"language-server"' "$PROJECT_DIR/.mcp.json" 2>/dev/null; then
+  echo "    ✓ MCP language-server уже зарегистрирован в .mcp.json"
+else
+  if (cd "$PROJECT_DIR" && "$CLAUDE_BIN" mcp add language-server --scope project \
+        -- "$MCP_LS_PATH" --workspace "$PROJECT_DIR" --lsp "$JDTLS_PATH") >/tmp/mcp-add.log 2>&1; then
+    echo "    ✓ MCP language-server зарегистрирован (project scope, .mcp.json)"
   else
-    (
-      cd "$PROJECT_DIR"
-      if claude mcp add language-server --scope project \
-           -- mcp-language-server --workspace "$PROJECT_DIR" --lsp jdtls 2>&1 | tail -3; then
-        echo "    ✓ MCP language-server зарегистрирован (project scope, .mcp.json)"
-      else
-        echo "    ⚠ claude mcp add упал — зарегистрируйте вручную:"
-        echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- mcp-language-server --workspace . --lsp jdtls"
-      fi
-    )
+    echo "    ⚠ claude mcp add упал — лог: /tmp/mcp-add.log. Зарегистрируйте вручную:"
+    echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- $MCP_LS_PATH --workspace . --lsp $JDTLS_PATH"
   fi
-elif ! command -v claude >/dev/null 2>&1; then
-  echo
-  echo "    ⚠ claude CLI не найден — пропускаю регистрацию MCP. Поставьте Claude Code и затем:"
-  echo "      cd $PROJECT_DIR && claude mcp add language-server --scope project -- mcp-language-server --workspace . --lsp jdtls"
 fi
 
 echo
