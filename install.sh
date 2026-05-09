@@ -225,6 +225,50 @@ else
   fi
 fi
 
+# GitLab MCP (zereight/mcp-gitlab) — личный токен. Читаем из env или
+# защищённого файла. Никогда не храним токен в этом скрипте — репо публичный.
+echo
+echo "==> Регистрирую GitLab MCP для $PROJECT_DIR"
+
+GITLAB_API_URL_DEFAULT="https://gitlab.mosmetro.tech/api/v4"
+GITLAB_API_URL="${GITLAB_API_URL:-$GITLAB_API_URL_DEFAULT}"
+GITLAB_TOKEN_FILE="${GITLAB_TOKEN_FILE:-$HOME/.config/usecase-pattern-skills/gitlab-token}"
+
+GITLAB_TOKEN=""
+if [ -n "${GITLAB_PERSONAL_ACCESS_TOKEN:-}" ]; then
+  GITLAB_TOKEN="$GITLAB_PERSONAL_ACCESS_TOKEN"
+elif [ -r "$GITLAB_TOKEN_FILE" ]; then
+  GITLAB_TOKEN="$(cat "$GITLAB_TOKEN_FILE")"
+fi
+
+if [ -z "$CLAUDE_BIN" ]; then
+  echo "    ⚠ claude CLI не найден — пропускаю регистрацию GitLab MCP"
+elif [ -z "$GITLAB_TOKEN" ]; then
+  echo "    ⚠ GitLab token не найден. Положите его в файл (read для пользователя):"
+  echo "      mkdir -p \"$(dirname "$GITLAB_TOKEN_FILE")\""
+  echo "      printf 'glpat-XXXXXXXX' > \"$GITLAB_TOKEN_FILE\" && chmod 600 \"$GITLAB_TOKEN_FILE\""
+  echo "    Или передайте через env:"
+  echo "      GITLAB_PERSONAL_ACCESS_TOKEN=glpat-XXXX ./install.sh $PROJECT_DIR"
+  echo "    Альтернативный API URL — переменная GITLAB_API_URL (по умолчанию $GITLAB_API_URL_DEFAULT)."
+elif ! command -v npx >/dev/null 2>&1; then
+  echo "    ⚠ npx не найден (нужен для @zereight/mcp-gitlab). Установите Node.js (brew install node)."
+else
+  # remove + add — идемпотентно (если уже зарегистрирован, чистим и ставим заново)
+  (
+    cd "$PROJECT_DIR"
+    "$CLAUDE_BIN" mcp remove gitlab >/dev/null 2>&1 || true
+    "$CLAUDE_BIN" mcp add gitlab \
+      -e "GITLAB_API_URL=$GITLAB_API_URL" \
+      -e "GITLAB_PERSONAL_ACCESS_TOKEN=$GITLAB_TOKEN" \
+      -- npx -y --registry https://registry.npmjs.org @zereight/mcp-gitlab
+  ) >/tmp/mcp-gitlab-add.log 2>&1
+  if [ $? -eq 0 ]; then
+    echo "    ✓ GitLab MCP зарегистрирован ($GITLAB_API_URL)"
+  else
+    echo "    ⚠ claude mcp add gitlab упал — лог: /tmp/mcp-gitlab-add.log"
+  fi
+fi
+
 echo
 echo "✓ Готово. $SKILL_COUNT скиллов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
 echo
