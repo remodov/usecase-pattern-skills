@@ -37,6 +37,7 @@
           ucp-pg-runtime-design                 (outbox-relay, task-queue, advisory-lock, optimistic-lock с @Retryable)
           ucp-validation-design                 (custom Jakarta-constraints, validation groups, cross-field-валидаторы)
           ucp-caching-design                    (Spring Cache + Redis: CacheManager, TTL, @Cacheable, invalidation)
+          ucp-kafka-design                      (Kafka producer/consumer: idempotent, outbox, retry-topic, eventId-dedup)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -50,6 +51,7 @@
    ucp-resilience-review                        (при ревью *-out-adapter/ — *ClientConfig, *ClientAdapter, application.yml resilience4j)
    ucp-validation-review                        (при ревью контроллеров, DTO, custom validators, @ConfigurationProperties)
    ucp-caching-review                           (при ревью CacheConfig, @Cacheable / @CacheEvict, application.yml cache-блок)
+   ucp-kafka-review                             (при ревью KafkaListener, KafkaConfig, application.yml kafka-блок, outbox-relay)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -73,6 +75,7 @@
 - `ucp-pg-runtime-design` ↔ `ucp-pg-runtime-review` (outbox-relay, task-queue, advisory-lock, optimistic-lock)
 - `ucp-validation-design` ↔ `ucp-validation-review` (Jakarta Validation: custom constraints, groups, cross-field, @ConfigurationProperties)
 - `ucp-caching-design` ↔ `ucp-caching-review` (Spring Cache + Redis: CacheManager, ключи, TTL, invalidation, паттерны, stampede)
+- `ucp-kafka-design` ↔ `ucp-kafka-review` (Kafka producer/consumer: idempotent, outbox publishing, retry-topic+DLQ, idempotent consumer, event design)
 - `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
@@ -537,6 +540,57 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-caching-design Money-кеш для UserBalance, TTL 30s, evict на каждой charge
 ```
 
+### `/ucp-kafka-review`
+
+Ревью работы с Kafka на соответствие Kafka Style Guide (`.claude/docs/kafka-style-guide.md`) — producer (idempotence, partition key), consumer (manual ack, idempotent dedup), outbox publishing, retry topic + DLQ, event design, security. Каждое нарушение цитируется кодом из подгрупп (`R-KFK-PROD-X1`, `R-KFK-OBX-X1` и т. д.).
+
+**Что проверяет:**
+- Producer: `enable.idempotence: true`, `acks: all`, partition key явный (aggregate id), `KafkaTemplate.send` НЕ из `@Transactional` с DB-операцией.
+- Consumer: уникальный `groupId` per-purpose, manual ack (`MANUAL_IMMEDIATE`), `auto-offset-reset: earliest` для critical, idempotent через `processed_event` таблицу, нет `Thread.sleep`, HTTP-вызовы под `@CircuitBreaker`.
+- Outbox publishing: domain events через outbox-relay, не `@TransactionalEventListener` напрямую; `outbox_event` с partial-индексом `WHERE published_at IS NULL`.
+- Retry topic + DLQ: `@RetryableTopic` с явным max-attempts, `@DltHandler`, retry только на transient (5xx/IOException), не на 4xx/runtime; alert на DLQ-size.
+- Event design: имя в past tense (`OrderConfirmed`, не `ConfirmOrder`), `eventId` UUID v7, версионированный `eventType.v1`, без PII в широковещательных топиках.
+- Конфигурация: `@Validated KafkaSettings`, `spring.json.trusted.packages` explicit (не `*`), `missing-topics-fatal: true`, env-substitution для `bootstrap-servers`.
+- Security: TLS/SASL для прода, ACL'ы per-сервис, PII через restricted-topic.
+- Observability: consumer lag alerts, OTel `traceparent` через headers.
+
+Связь с `PG-L-021` (outbox-relay через SKIP LOCKED), `AUTH-19` (money через Idempotency-Key + eventId двойная защита), `R-EVT-*` (DDD: domain events).
+
+**Использование:**
+
+```
+/ucp-kafka-review                                # ревью изменений из git diff
+/ucp-kafka-review src/main/java/.../OrderConfirmedListener.java
+/ucp-kafka-review src/main/resources/application.yml
+```
+
+### `/ucp-kafka-design`
+
+**Парный к `/ucp-kafka-review`.** Генерирует Kafka-обвязку под Kafka Style Guide:
+- `KafkaSettings` (`@ConfigurationProperties` + `@Validated`) с topics + retry-policy.
+- `application.yml` patch — producer/consumer/listener с правильными defaults (idempotent, manual-ack, trusted-packages explicit).
+- Event-record в `core/<bc>/domain/event/` — `record OrderConfirmedEvent` с `eventId` UUID v7, `eventType` версионированный, `aggregateType`/`aggregateId`, бизнес-полями.
+- Producer через outbox (домен) или direct (только для технических audit/metrics).
+- Consumer (`@KafkaListener` + `@RetryableTopic` + `@DltHandler`) с idempotent-dedup через `processed_event` таблицу.
+- DDL `processed_event` (Liquibase YAML).
+- Custom exception hierarchy (`RetryableException` / `NonRetryableException`).
+
+Решает по входным параметрам:
+- **Domain event** → outbox publishing (не direct send из `@Transactional`).
+- **Money / critical** → двойная защита (eventId + Idempotency-Key для downstream HTTP).
+- **Long-running consumer task** → выделить в task-queue вместо blocking listener.
+- **Topic name** — конвенция `<service>.<aggregate>.<event-name>`.
+
+Зависит от `ucp-pg-runtime-design` для outbox-relay реализации (отдельный сценарий) и `ucp-ddd-tactical-design` для domain events.
+
+**Использование:**
+
+```
+/ucp-kafka-design Producer для OrderConfirmedEvent через outbox
+/ucp-kafka-design Listener billing-service на orders.confirmed с retry-topic
+/ucp-kafka-design Event-driven flow для PaymentFailed → notification
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -792,6 +846,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-validation-design/  # генерация custom constraints, groups, cross-field
 ├── ucp-caching-review/     # ревью Spring Cache + Redis (R-CACHE-*)
 ├── ucp-caching-design/     # генерация CacheManager, @Cacheable, @CacheEvict, refresh-ahead
+├── ucp-kafka-review/       # ревью Kafka producer/consumer/outbox (R-KFK-*)
+├── ucp-kafka-design/       # генерация Producer/Listener/Event/processed_event с idempotent-dedup и retry-topic
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -809,6 +865,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
 ├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
 ├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
+├── kafka-style-guide.md             # Kafka Style Guide (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -819,7 +876,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability, Kafka.
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability.
 
 ## Лицензия
 
