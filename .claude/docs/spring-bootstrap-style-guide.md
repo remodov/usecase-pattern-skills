@@ -185,7 +185,66 @@ jooq {
 
 ---
 
-## 8. Quickstart-чеклист
+## 8. Security/SAST enforcement
+
+Полный набор security-инструментов и правил их использования — в `security-style-guide.md` (`R-SEC-*`). Здесь — enforcement-уровень: что обязано присутствовать в `build.gradle` и CI на старте сервиса.
+
+`BS-SEC-1` **Mandatory plugin set в `build.gradle`**. Сервис не считается готовым к деплою без всех пяти плагинов:
+
+```gradle
+plugins {
+    id 'net.ltgt.errorprone' version '4.1.0'        // R-SEC-SAST-1
+    id 'com.github.spotbugs' version '6.0.27'       // R-SEC-SAST-2 (FindSecBugs подтягивается через spotbugsPlugins)
+    id 'org.owasp.dependencycheck' version '11.1.0' // R-SEC-DEP-1
+}
+```
+
+Gitleaks и Trivy подключаются на уровне CI (отдельные actions/jobs), не gradle-плагинами — так корректнее, так как они сканируют артефакты вне Java-сборки.
+
+`BS-SEC-2` **`./gradlew check` обязан запускать SpotBugs и Dependency-Check.** Иначе security превращается в ручной скрипт «когда вспомнили»:
+
+```gradle
+tasks.named('check') {
+    dependsOn 'spotbugsMain', 'dependencyCheckAnalyze'
+}
+```
+
+Это значит — `./gradlew check` (типичный default-таргет CI) проваливается на security-finding. Без этой связки security-job можно обойти, забыв добавить отдельный шаг.
+
+`BS-SEC-3` **`failOnError`/`failBuildOnCVSS` обязаны быть включены.** Конфиг ниже не подлежит ослаблению без явного RFC-комментария:
+
+```gradle
+spotbugs {
+    ignoreFailures = false
+    excludeFilter = file('config/spotbugs-exclude.xml')   // создаётся, даже если пустой
+}
+dependencyCheck {
+    failBuildOnCVSS = 7.0                                 // HIGH/CRITICAL → break
+    suppressionFile = 'config/dependency-check-suppressions.xml'
+}
+```
+
+`BS-SEC-4` **Suppression-файлы коммитятся в репо**, даже пустые (`config/spotbugs-exclude.xml`, `config/dependency-check-suppressions.xml`). Иначе при первом suppression PR разработчик создаёт файл с одним исключением, а ревьюер не видит контекста (история файла начинается «с нуля»).
+
+`BS-SEC-5` **CI security-job параллелен тестам, не последовательный.** `R-SEC-2` — без параллельности security-стадия удлиняет PR-feedback-loop с 5 до 10 минут, что приводит к попыткам её отключения.
+
+`BS-SEC-6` **`NVD_API_KEY` обязателен в CI secrets.** Без ключа `dependencyCheckAnalyze` упрётся в rate-limit NVD и будет валиться через раз. Получается на nvd.nist.gov бесплатно за 5 минут.
+
+`BS-SEC-7` **Dockerfile и k8s-манифесты подчиняются `R-SEC-IMG-*`.** Из bootstrap-перспективы критичные требования: non-root user (`USER 1000:1000`), base image с digest-pin (не `:latest`), `HEALTHCHECK`. Trivy в CI с `severity: HIGH,CRITICAL exit-code: 1` — без него нет cycle-замыкания.
+
+`BS-SEC-8` **`.gitleaks.toml` и pre-commit hook**. Ловит секреты до того, как они уйдут в push. CI-step gitleaks страховочный — pre-commit главный.
+
+`BS-SEC-X1` ❌ **`spotbugs { ignoreFailures = true }`** или эквивалентное «отключим, чтобы зелёная сборка». Security превращается в дашборд-без-действий — нарушает `R-SEC-1`. Если поломанные SpotBugs-findings блокируют всю команду — добавляй конкретные suppressions с обоснованием в `config/spotbugs-exclude.xml`, не глобально отключай инструмент.
+
+`BS-SEC-X2` ❌ **Подавление Dependency-Check через `failBuildOnCVSS = 11`** (фейк-thresholds). Если CVE требует обхода — добавляй suppression с `until=` и `<notes>` в `dependency-check-suppressions.xml`, не повышай порог.
+
+`BS-SEC-X3` ❌ **Security-job в CI с `continue-on-error: true`**. Эквивалент пункту `BS-SEC-X1` на уровне CI — все findings игнорируются, никто не видит fail. Если стадия flaky — фиксируй причину flakyness, не маскируй.
+
+При любом подозрении, что security-настройка ослаблена — запусти `ucp-security-review` для аудита.
+
+---
+
+## 9. Quickstart-чеклист
 
 Когда сервис **не стартует**, проходим по этому списку перед глубоким копанием:
 
