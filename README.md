@@ -39,6 +39,9 @@
           ucp-caching-design                    (Spring Cache + Redis: CacheManager, TTL, @Cacheable, invalidation)
           ucp-kafka-design                      (Kafka producer/consumer: idempotent, outbox, retry-topic, eventId-dedup)
           ucp-observability-design              (logging JSON + Micrometer + OTel + Actuator + MDC + TaskDecorator)
+          ucp-cqrs-design                       (Command/Query маркеры, ViewRepository, read-model, sync через outbox)
+          ucp-hexagonal-design                  (multi-module skeleton core/adapter/bootstrap + ArchUnit-тесты)
+          ucp-distributed-design                (saga, idempotency, compensation, без 2PC/JTA)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -54,6 +57,9 @@
    ucp-caching-review                           (при ревью CacheConfig, @Cacheable / @CacheEvict, application.yml cache-блок)
    ucp-kafka-review                             (при ревью KafkaListener, KafkaConfig, application.yml kafka-блок, outbox-relay)
    ucp-observability-review                     (при ревью logback-spring.xml, MdcFilter, MetricsConfig, application.yml management.*)
+   ucp-cqrs-review                              (при ревью Command/Query handler-классов, ViewRepository, read-model, outbox-sync)
+   ucp-hexagonal-review                         (при ревью multi-module gradle, core/adapter направления зависимостей, ArchUnit)
+   ucp-distributed-review                       (при ревью saga, idempotency, compensation, multi-datasource configs)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -79,6 +85,9 @@
 - `ucp-caching-design` ↔ `ucp-caching-review` (Spring Cache + Redis: CacheManager, ключи, TTL, invalidation, паттерны, stampede)
 - `ucp-kafka-design` ↔ `ucp-kafka-review` (Kafka producer/consumer: idempotent, outbox publishing, retry-topic+DLQ, idempotent consumer, event design)
 - `ucp-observability-design` ↔ `ucp-observability-review` (logging structured JSON + Micrometer metrics + OpenTelemetry tracing + Actuator health + MDC propagation + SLO)
+- `ucp-cqrs-design` ↔ `ucp-cqrs-review` (Command/Query разделение, ViewRepository, read-model, sync через outbox)
+- `ucp-hexagonal-design` ↔ `ucp-hexagonal-review` (multi-module gradle layout, core без Spring/JOOQ, ports в core, ArchUnit-тесты)
+- `ucp-distributed-design` ↔ `ucp-distributed-review` (saga orchestration/choreography, idempotency, compensation, запрет 2PC/JTA)
 - `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
@@ -903,6 +912,12 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-kafka-design/       # генерация Producer/Listener/Event/processed_event с idempotent-dedup и retry-topic
 ├── ucp-observability-review/  # ревью logging/metrics/tracing/health/MDC (R-OBS-*)
 ├── ucp-observability-design/  # генерация Logback + Micrometer + OTel + Actuator + MdcFilter + TaskDecorator
+├── ucp-cqrs-review/        # ревью CQRS-разделения (R-CQRS-*)
+├── ucp-cqrs-design/        # генерация Command/Query + ViewRepository + read-model + sync
+├── ucp-hexagonal-review/   # ревью Hexagonal multi-module layout (R-HEX-*)
+├── ucp-hexagonal-design/   # генерация multi-module skeleton + ArchUnit-тесты
+├── ucp-distributed-review/ # ревью distributed patterns (R-DIST-*)
+├── ucp-distributed-design/ # генерация saga + idempotency-инфра + compensation
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -922,6 +937,9 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
 ├── kafka-style-guide.md             # Kafka Style Guide (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
 ├── observability-style-guide.md     # Observability Style Guide (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
+├── cqrs-style-guide.md              # CQRS Style Guide (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
+├── hexagonal-style-guide.md         # Hexagonal Style Guide (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
+├── distributed-patterns-style-guide.md  # Distributed Patterns Style Guide (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -932,7 +950,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns.
+Все основные style guides покрыты. Дальнейшее расширение — по конкретным запросам команды.
 
 ## Лицензия
 
