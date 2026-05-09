@@ -53,7 +53,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        version = "0.1.0-SNAPSHOT"
        repositories {
            mavenCentral()
-           maven("https://gitlab.mosmetro.tech/api/v4/groups/...") // если внутренняя репозиторий
+           // maven("<your-internal-maven-repo>") // если есть внутренний Maven
        }
    }
 
