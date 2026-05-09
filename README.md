@@ -38,6 +38,7 @@
           ucp-validation-design                 (custom Jakarta-constraints, validation groups, cross-field-валидаторы)
           ucp-caching-design                    (Spring Cache + Redis: CacheManager, TTL, @Cacheable, invalidation)
           ucp-kafka-design                      (Kafka producer/consumer: idempotent, outbox, retry-topic, eventId-dedup)
+          ucp-observability-design              (logging JSON + Micrometer + OTel + Actuator + MDC + TaskDecorator)
           ucp-test-design                       (тесты на UC + BR)
    superpowers:test-driven-development          (TDD-дисциплина по ходу)
    superpowers:subagent-driven-development      (параллельно независимые шаги)
@@ -52,6 +53,7 @@
    ucp-validation-review                        (при ревью контроллеров, DTO, custom validators, @ConfigurationProperties)
    ucp-caching-review                           (при ревью CacheConfig, @Cacheable / @CacheEvict, application.yml cache-блок)
    ucp-kafka-review                             (при ревью KafkaListener, KafkaConfig, application.yml kafka-блок, outbox-relay)
+   ucp-observability-review                     (при ревью logback-spring.xml, MdcFilter, MetricsConfig, application.yml management.*)
    ucp-pg-explain-review                        (если есть тормозящие запросы / новые индексы)
    ucp-pg-runtime-review                        (при ревью @Transactional / outbox / bulk-операций / locks / pool / isolation)
    ucp-pg-migration-review  ← ОБЯЗАТЕЛЬНО на каждый PR с миграцией (lock-safety, expand-contract)
@@ -76,6 +78,7 @@
 - `ucp-validation-design` ↔ `ucp-validation-review` (Jakarta Validation: custom constraints, groups, cross-field, @ConfigurationProperties)
 - `ucp-caching-design` ↔ `ucp-caching-review` (Spring Cache + Redis: CacheManager, ключи, TTL, invalidation, паттерны, stampede)
 - `ucp-kafka-design` ↔ `ucp-kafka-review` (Kafka producer/consumer: idempotent, outbox publishing, retry-topic+DLQ, idempotent consumer, event design)
+- `ucp-observability-design` ↔ `ucp-observability-review` (logging structured JSON + Micrometer metrics + OpenTelemetry tracing + Actuator health + MDC propagation + SLO)
 - `ucp-bootstrap-design`, `ucp-test-design`, `ucp-java-style-review`, `ucp-pg-explain-review` — без пары
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
@@ -591,6 +594,56 @@ ucp-spec-design  →  спека в docs/spec/
 /ucp-kafka-design Event-driven flow для PaymentFailed → notification
 ```
 
+### `/ucp-observability-review`
+
+Ревью наблюдаемости на соответствие Observability Style Guide (`.claude/docs/observability-style-guide.md`) — structured logging с MDC, Micrometer-метрики, OpenTelemetry tracing, Actuator health, context propagation, SLO. Каждое нарушение цитируется кодом из подгрупп (`R-OBS-LOG-X1`, `R-OBS-CTX-X1` и т. д.).
+
+**Что проверяет:**
+- Logging: JSON в проде, `@Slf4j` через Lombok, `{}`-placeholders (не string-concat), правильные log-уровни, MDC fields в каждой записи, **PII запрещены** (см. `AUTH-16`), нет `System.out`/`printStackTrace`, ERROR с stack trace.
+- Metrics: Micrometer + Prometheus registry; стандартизованные dimensions (service/env/version) через `management.metrics.tags`; RED/USE auto; custom business metrics через MeterRegistry; **низкая cardinality tags** (не user_id/request_id — Prometheus OOM).
+- Tracing: OTel автоинструментация; `traceparent` propagation; manual spans с try-finally; span attributes без PII; **sampling 1-10%** (не 100% в проде); `traceId` в MDC.
+- Health: separate liveness/readiness; custom HealthIndicator с TTL; нет business-state; **liveness не зависит от внешних** (иначе K8s restart loop).
+- Config: отдельный management port; exposure explicit list (не `*`); не exposed `/actuator/env` без auth.
+- Context: MdcFilter с **обязательным `MDC.clear()` в finally** (без него — leaked context cross-request); TaskDecorator для `@Async` (иначе traces разрываются).
+- SLO: defined для critical endpoints; multi-window burn-rate alerts; error budget; alerts с runbook'ами.
+
+Связь с `R-RES-OBS-*` (Resilience metrics), `R-CACHE-OBS-*` (Cache hit rate), `R-KFK-OBS-*` (Kafka lag), `AUTH-16` (PII), `R-HDR-4` (traceparent).
+
+**Использование:**
+
+```
+/ucp-observability-review                       # ревью изменений из git diff
+/ucp-observability-review src/main/java/.../MdcFilter.java
+/ucp-observability-review src/main/resources/logback-spring.xml
+/ucp-observability-review src/main/resources/application.yml
+```
+
+### `/ucp-observability-design`
+
+**Парный к `/ucp-observability-review`.** Генерирует observability-инфраструктуру под Observability Style Guide:
+- `logback-spring.xml` с двумя профилями (text dev / JSON prod через `LogstashEncoder`).
+- `application.yml` patch — `management.*` (отдельный port, explicit exposure, стандартизованные tags, liveness/readiness probes), `otel.*` (sampling 10%, OTLP endpoint), `logging.*`.
+- `MdcFilter` (Spring `@Component` + `OncePerRequestFilter`) с `MDC.clear()` в `finally`.
+- `UserIdMdcFilter` (если есть Spring Security) — populates `userId` после JWT.
+- `AsyncConfig` с `TaskDecorator` для MDC propagation в `@Async` / `CompletableFuture`.
+- Custom business metrics через MeterRegistry (если требуются — Counter/Timer/DistributionSummary).
+- `git-commit-id-plugin` + `springBoot.buildInfo()` для `/actuator/info`.
+- Зависимости: `spring-boot-starter-actuator`, `micrometer-registry-prometheus`, `opentelemetry-spring-boot-starter`, `opentelemetry-logback-mdc-1.0`, `logstash-logback-encoder`.
+
+Решает по входным параметрам:
+- **Tracing backend** (Jaeger/Tempo/Datadog) → `otel.exporter.otlp.endpoint`.
+- **Logging backend** (Loki/ELK/Datadog) → `LogstashEncoder` (универсальный) или `EcsEncoder` (Elastic).
+- **Sampling rate** — 10% дефолт; для money/critical — выше.
+- **Custom business metrics** — нужны или нет.
+
+**Использование:**
+
+```
+/ucp-observability-design Настрой observability в order-service
+/ucp-observability-design Только MdcFilter и TaskDecorator (logging уже есть)
+/ucp-observability-design Backend: Loki + Tempo + Prometheus, sampling 5%
+```
+
 ### `/ucp-resilience-design`
 
 **Парный к `/ucp-integration-design` для existing-кода.** Добавляет Resilience4j-обвязку к **уже существующему** out-adapter, который сейчас защищается ad-hoc (только timeouts + try/catch). Миграционный скилл — превращает «защита из try-catch» в стандарт `R-RES-*`.
@@ -848,6 +901,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-caching-design/     # генерация CacheManager, @Cacheable, @CacheEvict, refresh-ahead
 ├── ucp-kafka-review/       # ревью Kafka producer/consumer/outbox (R-KFK-*)
 ├── ucp-kafka-design/       # генерация Producer/Listener/Event/processed_event с idempotent-dedup и retry-topic
+├── ucp-observability-review/  # ревью logging/metrics/tracing/health/MDC (R-OBS-*)
+├── ucp-observability-design/  # генерация Logback + Micrometer + OTel + Actuator + MdcFilter + TaskDecorator
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
 ├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
@@ -866,6 +921,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
 ├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
 ├── kafka-style-guide.md             # Kafka Style Guide (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
+├── observability-style-guide.md     # Observability Style Guide (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
 ├── test-strategy.md                 # стратегия тестов
 └── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
 ```
@@ -876,7 +932,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-В планах — скиллы для CQRS, Hexagonal, Distributed Patterns, Observability.
+В планах — скиллы для CQRS, Hexagonal, Distributed Patterns.
 
 ## Лицензия
 
