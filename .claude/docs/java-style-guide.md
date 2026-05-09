@@ -573,3 +573,71 @@ Lombok поверх records запрещён (`JS-6.4`). Если структу
 | Lombok | `JS-6.1`–`JS-6.7` |
 | Комментарии | `JS-7.1`–`JS-7.5` |
 | Java 21+ фичи | `JS-8.1`–`JS-8.7` (применимо если проект на Java 21+) |
+| Enforcement через Checkstyle | `JS-CS-1`–`JS-CS-5`, антипаттерны `JS-CS-X1`–`JS-CS-X3` |
+
+---
+
+## 9. Enforcement через Checkstyle
+
+Часть правил из этого гайда (нейминг, импорты, отступы) механически проверяема — выносим её в Checkstyle, чтобы не тратить ревью на «forgot Test-suffix» или «звёздный импорт». Семантические правила (Lombok-defaults, комментарии, Java 21+ фичи) остаются для скилла `ucp-java-style-review`. Checkstyle и AI-скилл — дополняющие, не альтернативные.
+
+`JS-CS-1` **Checkstyle обязателен** на всех Java-сервисах. Подключается через стандартный `checkstyle` gradle plugin с командным конфигом `config/checkstyle/checkstyle.xml`. Конфиг живёт в репо сервиса (не как submodule, не как зависимость) — иначе Checkstyle становится «чёрным ящиком», и каждое его срабатывание превращается в спор без возможности проверить.
+
+```gradle
+plugins {
+    id 'checkstyle'
+}
+checkstyle {
+    toolVersion = '10.20.2'
+    configFile = file('config/checkstyle/checkstyle.xml')
+    configProperties = [ 'baseDir': rootDir ]
+    maxWarnings = 0
+    ignoreFailures = false
+}
+tasks.withType(Checkstyle).configureEach {
+    reports {
+        xml.required = true
+        html.required = true
+        sarif.required = true     // публикуется в GitHub Code Scanning, как SpotBugs (R-SEC-FIND-3)
+    }
+}
+```
+
+`JS-CS-2` **Checkstyle покрывает только механические правила**:
+- именование (`JS-2.1`–`JS-2.8`) через `TypeName`/`MethodName`/`PackageName`/`ConstantName`,
+- импорты (`JS-3.1`/`JS-3.2`) через `AvoidStarImport`/`UnusedImports`/`CustomImportOrder`,
+- отступы (`JS-5.1`–`JS-5.3`) через `Indentation`/`LineLength`,
+- whitespace через `WhitespaceAround`/`EmptyLineSeparator`.
+
+Для имени тестов (`JS-2.6.1` — `*Test.java` в `src/test/java`) — `Regexp`-модуль с pattern `.*Test\\.java`.
+
+Семантические правила (`JS-6.*` Lombok-defaults, `JS-7.*` комментарии, `JS-8.*` Java 21+ фичи) **в Checkstyle не выносим** — они требуют контекста и применяются скиллом `ucp-java-style-review`. Не пытайтесь натянуть их на Checkstyle через regex — false positive утопят сигнал.
+
+`JS-CS-3` **`maxWarnings = 0` + `ignoreFailures = false`** — обязательно. Если хочется временно ослабить правило — добавь suppression в `config/checkstyle/checkstyle-suppressions.xml` с обязательным комментарием `<!-- justify: ... до: YYYY-MM-DD -->` (по аналогии с `R-SEC-SAST-4`).
+
+```xml
+<?xml version="1.0"?>
+<!DOCTYPE suppressions PUBLIC
+    "-//Checkstyle//DTD SuppressionFilter Configuration 1.2//EN"
+    "https://checkstyle.org/dtds/suppressions_1_2.dtd">
+<suppressions>
+    <!-- justify: legacy package с auto-generated классами; рефакторинг до 2026-09-01 -->
+    <suppress files=".*[/\\]generated[/\\].*" checks="."/>
+</suppressions>
+```
+
+`JS-CS-4` **Checkstyle привязан к `check`**, не к `checkSecurity` (`BS-SEC-2`). Это lint-уровень, не security — должен прогоняться на каждом локальном `./gradlew check` и в любом CI-job, где идут тесты:
+
+```gradle
+tasks.named('check') {
+    dependsOn 'checkstyleMain', 'checkstyleTest'
+}
+```
+
+`JS-CS-5` **Конфиг `config/checkstyle/checkstyle.xml`** базируется на Sun/Google checks, ослаблен под наши конвенции (например, `LineLength: max=120`, разрешён `_` в именах test-методов per `JS-2.6.1`). Полный шаблон — `config/checkstyle/checkstyle.xml.template`, поставляется через `ucp-bootstrap-design` при создании нового сервиса.
+
+`JS-CS-X1` ❌ **`@SuppressWarnings("checkstyle:...")`** в коде без комментария-justify (≥ 30 символов). Можно только в крайних случаях с обоснованием — иначе подавляется глобально, на ревью не разглядишь.
+
+`JS-CS-X2` ❌ **Удаление правил из `checkstyle.xml`** «потому что мешают». Если правило реально устарело — обсуждается командой, обновляется конфиг для всех сервисов сразу. Локальное удаление приводит к расхождению conventions между сервисами.
+
+`JS-CS-X3` ❌ **Использование Checkstyle для семантических проверок** (regex-правила «все public-методы возвращают `Optional`», подсчёт строк в методе для cyclomatic complexity и т.п.). Это регрессия в сторону «ad-hoc регулярки в xml», которые никто не сможет читать через год. Семантика — `ucp-java-style-review` или отдельный AI-скилл.
