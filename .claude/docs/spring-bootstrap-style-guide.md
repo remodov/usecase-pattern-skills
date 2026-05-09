@@ -185,6 +185,24 @@ jooq {
 
 ---
 
+## 7a. Lint enforcement (Checkstyle)
+
+`BS-LINT-1` **Checkstyle обязателен** в `build.gradle` (`JS-CS-1` из `java-style-guide.md`). Конфиг `config/checkstyle/checkstyle.xml` коммитится в репо. Шаблон поставляется при создании сервиса через `ucp-bootstrap-design`.
+
+`BS-LINT-2` **Привязан к default-таргету `check`** (`JS-CS-4`), не к `checkSecurity`. Локально `./gradlew check` падает на нарушении nеи́минга/импортов сразу — разработчик не уезжает с пустяковыми нарушениями в PR.
+
+```gradle
+tasks.named('check') {
+    dependsOn 'checkstyleMain', 'checkstyleTest'
+}
+```
+
+`BS-LINT-3` **`config/checkstyle/checkstyle-suppressions.xml`** коммитится даже пустым, по аналогии с `BS-SEC-4`. Иначе при первом suppression PR разработчик создаёт файл с одним исключением, а ревьюер не видит контекста.
+
+`BS-LINT-X1` ❌ Подключение Checkstyle с `ignoreFailures = true` или `maxWarnings > 0`. Эквивалент `BS-SEC-X1` для security: превращает lint в дашборд-без-действий, нарушает `JS-CS-3`.
+
+---
+
 ## 8. Security/SAST enforcement
 
 Полный набор security-инструментов и правил их использования — в `security-style-guide.md` (`R-SEC-*`). Здесь — enforcement-уровень: что обязано присутствовать в `build.gradle` и CI на старте сервиса.
