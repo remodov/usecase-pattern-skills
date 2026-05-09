@@ -201,15 +201,27 @@ plugins {
 
 Gitleaks и Trivy подключаются на уровне CI (отдельные actions/jobs), не gradle-плагинами — так корректнее, так как они сканируют артефакты вне Java-сборки.
 
-`BS-SEC-2` **`./gradlew check` обязан запускать SpotBugs и Dependency-Check.** Иначе security превращается в ручной скрипт «когда вспомнили»:
+`BS-SEC-2` **Разделение `check` / `checkSecurity` / `checkSupplyChain`** — ключевое для скорости локальной итерации (`R-SEC-2`). Обычный `./gradlew check` остаётся лёгким (тесты + Error Prone, ~30 сек), security-инструменты привязаны к отдельным task'ам:
 
 ```gradle
-tasks.named('check') {
-    dependsOn 'spotbugsMain', 'dependencyCheckAnalyze'
+// Лёгкое SAST — на каждом PR, опционально локально перед push.
+tasks.register('checkSecurity') {
+    group = 'verification'
+    description = 'SAST по коду: SpotBugs+FindSecBugs. На PR и опционально локально.'
+    dependsOn 'spotbugsMain'
+}
+
+// Тяжёлое — supply chain. Только на merge в main / release / nightly. Локально не запускается.
+tasks.register('checkSupplyChain') {
+    group = 'verification'
+    description = 'CVE в зависимостях. Только release/nightly — не на PR.'
+    dependsOn 'dependencyCheckAnalyze'
 }
 ```
 
-Это значит — `./gradlew check` (типичный default-таргет CI) проваливается на security-finding. Без этой связки security-job можно обойти, забыв добавить отдельный шаг.
+Локально разработчик запускает `./gradlew check` (быстро) либо `./gradlew checkSecurity` (опционально, 30–90 сек). `dependencyCheckAnalyze` не запускается на dev-машине — у неё нет тёплого NVD-кэша, прогон уйдёт в 5–10 минут впустую.
+
+В CI: `checkSecurity` параллельно тестам на каждом PR; `checkSupplyChain` — на merge в `main` + nightly + release-tag. PR-pipeline не вызывает `checkSupplyChain`.
 
 `BS-SEC-3` **`failOnError`/`failBuildOnCVSS` обязаны быть включены.** Конфиг ниже не подлежит ослаблению без явного RFC-комментария:
 
@@ -227,6 +239,10 @@ dependencyCheck {
 `BS-SEC-4` **Suppression-файлы коммитятся в репо**, даже пустые (`config/spotbugs-exclude.xml`, `config/dependency-check-suppressions.xml`). Иначе при первом suppression PR разработчик создаёт файл с одним исключением, а ревьюер не видит контекста (история файла начинается «с нуля»).
 
 `BS-SEC-5` **CI security-job параллелен тестам, не последовательный.** `R-SEC-2` — без параллельности security-стадия удлиняет PR-feedback-loop с 5 до 10 минут, что приводит к попыткам её отключения.
+
+`BS-SEC-5a` **`checkSupplyChain` вынесен в отдельный workflow** (`security-supply-chain.yml`) с триггерами `push: branches: [main]`, `schedule: cron: '0 3 * * *'` (nightly), и `release`. Не запускается на `pull_request`. Падение этого workflow создаёт issue с label `security`, но не блокирует merge feature-веток.
+
+`BS-SEC-5b` **Pre-commit hook** с Gitleaks — обязателен (`R-SEC-2`). Устанавливается через `pre-commit install` или `husky`, инструкция по установке в README. Без hook'а первый разработчик в команде закоммитит секрет → инцидент с rotation. Hook сканирует diff (0.5–2 сек), не historyю.
 
 `BS-SEC-6` **`NVD_API_KEY` обязателен в CI secrets.** Без ключа `dependencyCheckAnalyze` упрётся в rate-limit NVD и будет валиться через раз. Получается на nvd.nist.gov бесплатно за 5 минут.
 
