@@ -10,6 +10,10 @@
 # в указанный проект. Симлинки означают, что обновления в этом репо
 # автоматически прилетят в проект — без ручного re-копирования.
 #
+# Дополнительно — устанавливает Eclipse jdtls (Java LSP) на машину один раз,
+# чтобы Claude и IDE могли пользоваться структурным анализом Java
+# (find references, type hierarchy, refactoring). На macOS — через brew.
+#
 set -euo pipefail
 
 PROJECT_DIR="${1:-.}"
@@ -128,6 +132,34 @@ else
   printf '\n' >> "$CLAUDE_MD"
   cat "$CLAUDE_TEMPLATE" >> "$CLAUDE_MD"
   echo "    ✓ блок ucp-skills дописан в $CLAUDE_MD (существующий контент сохранён)"
+fi
+
+# jdtls — Eclipse Java Language Server. Устанавливается ОДИН РАЗ на машину
+# (не per project), поэтому проверка идемпотентная. Java-LSP даёт инструментам
+# (Claude через MCP-bridge, IntelliJ, VS Code) структурный анализ кода:
+# find references, type hierarchy, переименования с проверкой использований.
+echo
+echo "==> Проверяю Eclipse jdtls (Java LSP)"
+
+if command -v jdtls >/dev/null 2>&1; then
+  echo "    ✓ jdtls уже установлен: $(command -v jdtls)"
+elif [ "$(uname)" = "Darwin" ]; then
+  if command -v brew >/dev/null 2>&1; then
+    echo "    устанавливаю через Homebrew (brew install jdtls) ..."
+    if brew install jdtls >/tmp/jdtls-install.log 2>&1; then
+      echo "    ✓ jdtls установлен: $(command -v jdtls)"
+    else
+      echo "    ⚠ brew install jdtls упал — лог: /tmp/jdtls-install.log"
+      echo "      продолжаем без jdtls (скиллы работают, но без LSP-навигации)"
+    fi
+  else
+    echo "    ⚠ Homebrew не найден. Установите brew, затем: brew install jdtls"
+  fi
+else
+  echo "    ⚠ jdtls не установлен. На Linux:"
+  echo "      • Arch:    sudo pacman -S jdtls"
+  echo "      • Debian:  загрузите с https://download.eclipse.org/jdtls/snapshots/"
+  echo "      • Прочее:  https://github.com/eclipse-jdtls/eclipse.jdt.ls#installation"
 fi
 
 echo
