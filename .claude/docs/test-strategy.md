@@ -1,10 +1,18 @@
-# Test Strategy — интеграционные тесты сервиса
+# Test Strategy Style Guide
 
-Подход к интеграционным тестам в Java/Spring-сервисах. Каждое правило имеет код вида `TS-N` — скилл `ucp-test-design` цитирует эти коды в обзорах.
+Свод правил интеграционных и unit-тестов в Java/Spring-сервисах команды UCP. Каждое правило идентифицируется кодом `TS-N` — скилл `ucp-test-design` цитирует эти коды в выдаче и при review-обзорах.
 
 Базовый принцип (`TS-1`): **тест должен быть быстрым и детерминированным**. Если тест требует Kafka, Redis, нескольких контейнеров и `Awaitility` — это не интеграционный тест на бизнес-логику, а инфраструктурный smoke; их пишут отдельно и редко.
 
 Основан на реальном паттерне из CSMS (`PlatformBaseIntegrationTest`).
+
+Связанные стандарты:
+- `R-PATT-*` (Use Case Pattern) — каждый UseCase / Handler покрывается интеграционным тестом, AAA-структурой.
+- `R-AGG-*` (DDD tactical) — unit-тесты на инварианты агрегатов отдельно от integration.
+- `R-JOOQ-REPO-6` — каждый репозиторий покрыт интеграционным тестом против Testcontainers PostgreSQL, без mock'ов `DSLContext`.
+- `R-RES-OAS-*` (Resilience) — WireMock для outbound HTTP-стабов.
+- `R-KFK-CONS-*` (Kafka) — listener тесты с in-memory dispatcher или Testcontainers Kafka.
+- `AUTH-19` — Idempotency-Key тесты для money-операций.
 
 ---
 
