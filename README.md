@@ -814,10 +814,19 @@ cd ~/projects/claude-code-java
 
 # подключить все скиллы и style-guide-снапшоты в свой Java-проект:
 ./install.sh ~/my-java-project
+
+# или подмножество скиллов (меньше скилл-описаний в контексте каждой сессии):
+UCP_PROFILE=rest ./install.sh ~/my-java-project              # spec+pattern+api+auth+jooq+pg+validation+test+java-style
+UCP_PROFILE=data ./install.sh ~/my-java-project              # pg-*+jooq+caching+observability
+UCP_SKILLS='ucp-pattern-* ucp-api-* ucp-jooq-*' ./install.sh ~/my-java-project   # произвольный набор
 ```
 
 Скрипт создаёт симлинки на `.claude/skills/*` и `.claude/docs/*.md` — обновления
 в этом репо автоматически прилетят в проект, без ручного re-копирования.
+`UCP_PROFILE`/`UCP_SKILLS` опциональны; по умолчанию ставятся все скиллы. При
+повторном запуске с другим профилем лишние ucp-симлинки чистятся автоматически.
+Профили — `full` (по умолчанию), `rest`, `data`; `UCP_SKILLS` (список глобов)
+перекрывает профиль.
 
 После установки в проекте появятся:
 

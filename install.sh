@@ -11,10 +11,29 @@
 # автоматически прилетят в проект — без ручного re-копирования.
 # Дополнительно — регистрирует GitLab MCP, если есть токен.
 #
+# Профиль скиллов (опционально) — чтобы не тащить все ~45 ucp-* скиллов в проект,
+# которому нужна часть (меньше скилл-описаний в always-loaded контексте каждой
+# сессии):
+#   UCP_PROFILE=rest  ./install.sh ~/proj   # REST/UCP-сервис: spec+pattern+api+auth+jooq+pg+validation+test+java-style
+#   UCP_PROFILE=data  ./install.sh ~/proj   # data-heavy: pg-*+jooq+caching+observability+java-style
+#   UCP_PROFILE=full  ./install.sh ~/proj   # всё (по умолчанию)
+#   UCP_SKILLS='ucp-pattern-* ucp-api-* ucp-jooq-*'  ./install.sh ~/proj   # произвольный набор глобов
+# UCP_SKILLS перекрывает UCP_PROFILE. Реви-пары устанавливаются вместе со своими
+# design-скиллами автоматически (для glob 'ucp-api-*' попадут и design, и review).
+#
 set -euo pipefail
 
 PROJECT_DIR="${1:-.}"
 SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- профиль скиллов: резолвим в список glob-паттернов в $SKILL_GLOBS ---
+case "${UCP_PROFILE:-full}" in
+  full) PROFILE_GLOBS='*' ;;
+  rest) PROFILE_GLOBS='ucp-spec-* ucp-pattern-* ucp-api-* ucp-auth-* ucp-bootstrap-* ucp-jooq-* ucp-pg-* ucp-validation-* ucp-error-handling-* ucp-test-* ucp-java-style-*' ;;
+  data) PROFILE_GLOBS='ucp-pg-* ucp-jooq-* ucp-caching-* ucp-observability-* ucp-bootstrap-* ucp-java-style-*' ;;
+  *) echo "ERROR: неизвестный UCP_PROFILE='$UCP_PROFILE' (full|rest|data или используйте UCP_SKILLS)" >&2; exit 1 ;;
+esac
+SKILL_GLOBS="${UCP_SKILLS:-$PROFILE_GLOBS}"
 
 if [ ! -d "$PROJECT_DIR" ]; then
   echo "ERROR: $PROJECT_DIR не существует" >&2
@@ -30,15 +49,34 @@ fi
 
 mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents"
 
-# Skills — симлинк всех 12 (или сколько есть на момент установки) ucp-* скиллов.
-echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/"
-SKILL_COUNT=0
-for skill in "$SKILLS_DIR"/.claude/skills/*/; do
-  name="$(basename "$skill")"
-  ln -sfn "$skill" "$PROJECT_DIR/.claude/skills/$name"
-  SKILL_COUNT=$((SKILL_COUNT + 1))
-  echo "    ✓ $name"
+# Skills — симлинк ucp-* скиллов по выбранному профилю (по умолчанию — все).
+# Сначала чистим существующие ucp-* симлинки, указывающие в этот репо, — иначе
+# при смене профиля (full -> rest) останутся stale-симлинки на лишние скиллы.
+echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/ (профиль: ${UCP_SKILLS:+custom}${UCP_SKILLS:-${UCP_PROFILE:-full}})"
+for old in "$PROJECT_DIR"/.claude/skills/ucp-*; do
+  [ -L "$old" ] || continue
+  case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/skills/*) rm "$old" ;; esac
 done
+SKILL_COUNT=0
+_seen_skills=" "
+set -f                          # отключаем pathname-expansion: '*' в SKILL_GLOBS — это паттерн,
+_glob_patterns=( $SKILL_GLOBS ) #   а не маска для cwd; раскрываем его только против skills/
+set +f
+for glob in "${_glob_patterns[@]}"; do
+  for skill in "$SKILLS_DIR"/.claude/skills/$glob/; do
+    [ -d "$skill" ] || continue
+    name="$(basename "$skill")"
+    case "$_seen_skills" in *" $name "*) continue ;; esac
+    _seen_skills="$_seen_skills$name "
+    ln -sfn "$skill" "$PROJECT_DIR/.claude/skills/$name"
+    SKILL_COUNT=$((SKILL_COUNT + 1))
+    echo "    ✓ $name"
+  done
+done
+if [ "$SKILL_COUNT" -eq 0 ]; then
+  echo "ERROR: ни один скилл не подошёл под '$SKILL_GLOBS'" >&2
+  exit 1
+fi
 
 # Agents — кастомные субагенты Claude Code (например ucp-implementer:
 # Sonnet-исполнитель, который пишет код по плану от Opus).
@@ -211,9 +249,9 @@ echo "  • context7 (MCP) — актуальная документация б�
 echo "    (Spring Boot, jOOQ и т.п.), чтобы не протухала в спеке."
 echo "    claude mcp add context7 -- npx -y @upstash/context7-mcp"
 echo
-echo "Без них работают 11 скиллов из 12 без потерь."
-echo "ucp-spec-design без superpowers/context7 тоже работает — просто без"
-echo "TodoWrite-планирования и без проверки актуальности версий библиотек."
+echo "Почти все скиллы работают без внешних плагинов. ucp-spec-design без"
+echo "superpowers/context7 тоже работает — просто без TodoWrite-планирования"
+echo "и без проверки актуальности версий библиотек."
 echo
 echo "─────────────────────────────────────────────────────────────────────"
 echo "Дальше: запускайте скиллы из своего проекта — например /ucp-pattern-review"
