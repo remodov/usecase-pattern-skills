@@ -28,7 +28,7 @@ if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   exit 1
 fi
 
-mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs"
+mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents"
 
 # Skills — симлинк всех 12 (или сколько есть на момент установки) ucp-* скиллов.
 echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/"
@@ -39,6 +39,22 @@ for skill in "$SKILLS_DIR"/.claude/skills/*/; do
   SKILL_COUNT=$((SKILL_COUNT + 1))
   echo "    ✓ $name"
 done
+
+# Agents — кастомные субагенты Claude Code (например ucp-implementer:
+# Sonnet-исполнитель, который пишет код по плану от Opus).
+echo
+echo "==> Подключаю агентов из $SKILLS_DIR/.claude/agents/"
+AGENT_COUNT=0
+for agent in "$SKILLS_DIR"/.claude/agents/*.md; do
+  [ -e "$agent" ] || continue
+  name="$(basename "$agent")"
+  ln -sfn "$agent" "$PROJECT_DIR/.claude/agents/$name"
+  AGENT_COUNT=$((AGENT_COUNT + 1))
+  echo "    ✓ $name"
+done
+if [ "$AGENT_COUNT" -eq 0 ]; then
+  echo "    (агентов в репо пока нет)"
+fi
 
 # Cleanup: старые версии install.sh симлинковали style-guide-ы в <project>/docs/.
 # Это засоряло пользовательскую docs/ — теперь они переехали в .claude/docs/.
@@ -177,7 +193,7 @@ else
 fi
 
 echo
-echo "✓ Готово. $SKILL_COUNT скиллов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
+echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
 echo
 echo "Проверка:"
 echo "    ls -la $PROJECT_DIR/.claude/skills"
