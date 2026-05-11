@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/cqrs-style-guide.md`** — источник правил. Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (Tier-эволюция).
-- Парные: `usecase-pattern-style-guide.md` (`R-UC-*` маркеры), `ddd-tactical-style-guide.md` (`R-AGG-*`), `jooq-style-guide.md` (`R-JOOQ-VIEW-*`), `kafka-style-guide.md` (`R-KFK-OBX-*`).
+- **`.claude/docs/cqrs-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (Tier-эволюция).
+- Парные: `usecase-pattern-rules.md` (`R-UC-*` маркеры), `ddd-tactical-rules.md` (`R-AGG-*`), `jooq-rules.md` (`R-JOOQ-VIEW-*`), `kafka-rules.md` (`R-KFK-OBX-*`).
 
 ## Инструкции
 
-1. **Прочти** `.claude/docs/cqrs-style-guide.md`. Цитируй коды конкретно (`R-CQRS-CMD-X1`, `R-CQRS-RM-X2`).
+1. **Прочти** `.claude/docs/cqrs-rules.md`. Цитируй коды конкретно (`R-CQRS-CMD-X1`, `R-CQRS-RM-X2`).
 
 2. **Определи объект ревью.** Если пользователь назвал — бери. Иначе:
    - `git diff` на handlers (`*CommandHandler*`, `*QueryHandler*`), `*ViewRepository*`, `*ReadModel*`, `*Summary.java`, `*Projection*`.

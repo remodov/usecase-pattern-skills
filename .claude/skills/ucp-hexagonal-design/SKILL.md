@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/hexagonal-style-guide.md` (`R-HEX-*`). Опционально — `usecase-pattern-style-guide.md` (`R-LAY-*`), `spring-bootstrap-style-guide.md` (`BS-*`).
+1. **Прочитай** `.claude/docs/hexagonal-rules.md` (`R-HEX-*`). Опционально — `usecase-pattern-rules.md` (`R-LAY-*`), `spring-bootstrap-style-guide.md` (`BS-*`).
 
 2. **Уточни параметры:**
    - **Service name** — `<service>` (`order-service`, `notification-service`).

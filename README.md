@@ -935,23 +935,42 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
 .claude/docs/
-├── rest-api-rules.md                # REST API — индекс правил (рабочий вход скиллов; ~3× компактнее полного)
-├── rest-api-style-guide.md          # REST API Style Guide — полная версия (R-*-*), читается точечно по разделу
-├── usecase-pattern-style-guide.md   # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
-├── ddd-tactical-style-guide.md      # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*)
-├── usecase-spec-template.md         # шаблон Use Case спецификации
-├── java-style-guide.md              # Java Style Guide (JS-*)
-├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
-├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
-├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
-├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
-├── kafka-style-guide.md             # Kafka Style Guide (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
-├── observability-style-guide.md     # Observability Style Guide (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
-├── cqrs-style-guide.md              # CQRS Style Guide (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
-├── hexagonal-style-guide.md         # Hexagonal Style Guide (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
-├── distributed-patterns-style-guide.md  # Distributed Patterns Style Guide (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
-├── test-strategy.md                 # стратегия тестов
-└── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
+#
+# У 12 крупных гайдов рядом лежит `<name>-rules.md` — компактный индекс правил
+# (код + формулировка, по разделам, без code-сниппетов и под-пунктов). Это
+# рабочий вход скиллов: review цитирует код в findings, design сверяется по
+# чек-листу. Полный `<name>-style-guide.md` остаётся для on-demand чтения
+# конкретного раздела (примеры, обоснование). Скиллы читают `*-rules.md`, а не
+# полный гайд. Индекс ~30–65% размера полного.
+#
+# с индексом (rules.md + style-guide.md):
+├── rest-api-{rules,style-guide}.md          # REST API (R-URL-*/MTH-*/RSP-*/ERR-*/OAS-*/...)
+├── usecase-pattern-{rules,style-guide}.md   # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
+├── ddd-tactical-{rules,style-guide}.md      # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*, R-EVT-*)
+├── jooq-{rules,style-guide}.md              # jOOQ (R-JOOQ-CFG-*/REPO-*/MS-*/FLT-*/...)
+├── resilience-{rules,style-guide}.md        # Resilience (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
+├── validation-{rules,style-guide}.md        # Validation (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
+├── caching-{rules,style-guide}.md           # Caching (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
+├── kafka-{rules,style-guide}.md             # Kafka (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
+├── observability-{rules,style-guide}.md     # Observability (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
+├── cqrs-{rules,style-guide}.md              # CQRS (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
+├── hexagonal-{rules,style-guide}.md         # Hexagonal (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
+├── distributed-patterns-{rules,style-guide}.md  # Distributed Patterns (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
+# пока только полный гайд (индекс — TODO; другой формат правил):
+├── java-style-guide.md              # Java Style Guide (JS-*, JS-CS-*)
+├── spring-bootstrap-style-guide.md  # Spring Boot bootstrap (BS-*, BS-SEC-*)
+├── error-handling-style-guide.md    # Error Handling (R-ERR-HIER-*/WHERE-*/MAP-*/...)
+├── graceful-shutdown-style-guide.md # Graceful Shutdown (R-SHUT-CFG-*/HTTP-*/KFK-*/...)
+├── security-style-guide.md          # Security enforcement (R-SEC-SAST-*/IMG-*/DEP-*/...)
+├── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
+├── pg-types-style-guide.md          # PostgreSQL типы (PG-T-*)
+├── pg-naming-style-guide.md         # PostgreSQL нейминг (PG-N-*)
+├── pg-indexes-style-guide.md        # PostgreSQL индексы / план (PG-I-*, PG-E-*)
+├── pg-partitioning-style-guide.md   # PostgreSQL партиционирование (PG-P-*)
+├── pg-migrations-style-guide.md     # PostgreSQL миграции expand-contract (PG-M-*)
+├── pg-runtime-style-guide.md        # PostgreSQL runtime (PG-W-*/V-*/L-*/CP-*/IS-*)
+├── test-strategy.md                 # стратегия тестов (TS-*)
+└── usecase-spec-template.md         # шаблон Use Case спецификации (не реестр правил — не индексируется)
 ```
 
 ## Связанные библиотеки

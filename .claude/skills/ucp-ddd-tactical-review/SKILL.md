@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/ddd-tactical-style-guide.md` в корне проекта. Это единственный источник правды — у каждого правила есть код (`R-ENT-1`, `R-AGG-X3` и т.п.). Цитируй коды в замечаниях.
+1. **Прочитай style guide** из `.claude/docs/ddd-tactical-rules.md` в корне проекта. Это единственный источник правды — у каждого правила есть код (`R-ENT-1`, `R-AGG-X3` и т.п.). Цитируй коды в замечаниях.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - Используй `git diff` (working tree, staged, last commit), чтобы найти изменённые Java-файлы в доменных пакетах.

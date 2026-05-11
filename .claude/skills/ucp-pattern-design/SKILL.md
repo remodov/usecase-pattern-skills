@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` и считай каждое правило `R-*` обязательным. На Уровне 3+ дополнительно прочитай `.claude/docs/ddd-tactical-style-guide.md`. Если в дизайне есть DDL новой таблицы или колонки — также прочитай `.claude/docs/pg-types-style-guide.md` и применяй правила `PG-T-NNN` к выбору типов (`bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `Instant`/`OffsetDateTime` на Java-стороне для `timestamptz`).
+1. **Прочитай style guide** из `.claude/docs/usecase-pattern-rules.md` и считай каждое правило `R-*` обязательным. На Уровне 3+ дополнительно прочитай `.claude/docs/ddd-tactical-rules.md`. Если в дизайне есть DDL новой таблицы или колонки — также прочитай `.claude/docs/pg-types-style-guide.md` и применяй правила `PG-T-NNN` к выбору типов (`bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `Instant`/`OffsetDateTime` на Java-стороне для `timestamptz`).
 
 2. **Подтверди наличие библиотеки.** Проверь `build.gradle` / `pom.xml` на `ru.mosmetro:usecase-pattern-starter`. Если нет — попроси пользователя добавить (и предложи сниппет зависимости) — не выдумывай локальные копии `UseCase` / `UseCaseHandler` / `UseCaseDispatcher`.
 
@@ -37,7 +37,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - **`<Operation>UseCaseHandler`** — `@Component` + `@RequiredArgsConstructor`, реализует `UseCaseHandler<MyUseCase, R>`, возвращает `MyUseCase.class` из `useCaseType()`, имеет `@Transactional` (или `readOnly = true`). Поля — `private final`, без явного конструктора. Логика живёт здесь.
    - **Controller** — `@RestController class XController implements <Tag>Api` (style guide §12.2 — интерфейс генерируется openapi-generator-ом из `src/main/resources/openapi/<service>.openapi.yaml`). Методы — `@Override` интерфейсных, дополнительно навешиваются `@PreAuthorize`. Тело метода: маппинг request DTO → UseCase, `dispatcher.dispatch(...)`, обёртка в `ResponseEntity`. Никакого `@RequestMapping` на классе, никаких ручных request/response DTO в `jsonbean/`. Если openapi-generator не подключён — это повод вызвать `ucp-bootstrap-design`, а не писать ручной контроллер.
    - **Mapper** (если нужен новый маппинг) — **MapStruct-интерфейс обязателен** (`R-LAY-3`): `@Mapper(componentModel = "spring")` + `default`-методы внутри интерфейса для нетривиальных конверсий. Ручной `@Component`-маппер — только при stateful / DI-зависимом маппинге, что не покрывается MapStruct.
-   - **(Уровень 3+)** **Доменные части** — только если операция реально требует нового состояния агрегата, value object'а или события. Следуй `ddd-tactical-style-guide.md`. Если операция чисто read — предпочитай Read Model и пропускай агрегат.
+   - **(Уровень 3+)** **Доменные части** — только если операция реально требует нового состояния агрегата, value object'а или события. Следуй `ddd-tactical-rules.md`. Если операция чисто read — предпочитай Read Model и пропускай агрегат.
    - **(Уровень 4)** Раскладка файлов: `core/<bc>/usecase/...`, `core/<bc>/port/...`, `adapter/in/rest/...`, `adapter/out/<storage>/...`. Домен живёт в `core/<bc>/domain/...`.
 
 6. **Самопроверка перед выдачей.** Пройди эти проверки (style guide §12):

@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/distributed-patterns-style-guide.md` (`R-DIST-*`). Опционально — `kafka-style-guide.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `auth-patterns-style-guide.md` (`AUTH-19`).
+1. **Прочитай** `.claude/docs/distributed-patterns-rules.md` (`R-DIST-*`). Опционально — `kafka-rules.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `auth-patterns-style-guide.md` (`AUTH-19`).
 
 2. **Уточни параметры:**
    - **Тип паттерна**: saga / только idempotency-обвязка / inbox.

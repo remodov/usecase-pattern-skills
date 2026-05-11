@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/caching-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-CACHE-WHERE-*` (где), `R-CACHE-CFG-*` (конфигурация), `R-CACHE-KEY-*` (ключи), `R-CACHE-TTL-*` (TTL), `R-CACHE-INV-*` (invalidation), `R-CACHE-PATTERN-*` (паттерны), `R-CACHE-STAMP-*` (stampede), `R-CACHE-OBS-*` (observability).
-- Парные документы: `resilience-style-guide.md` (`R-RES-FB-1` — fallback из cache), `auth-patterns-style-guide.md` (`AUTH-16` — PII в кеше), `validation-style-guide.md` (`R-VLD-CFG-*` — `@ConfigurationProperties` для cache-настроек).
+- **`.claude/docs/caching-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-CACHE-WHERE-*` (где), `R-CACHE-CFG-*` (конфигурация), `R-CACHE-KEY-*` (ключи), `R-CACHE-TTL-*` (TTL), `R-CACHE-INV-*` (invalidation), `R-CACHE-PATTERN-*` (паттерны), `R-CACHE-STAMP-*` (stampede), `R-CACHE-OBS-*` (observability).
+- Парные документы: `resilience-rules.md` (`R-RES-FB-1` — fallback из cache), `auth-patterns-style-guide.md` (`AUTH-16` — PII в кеше), `validation-rules.md` (`R-VLD-CFG-*` — `@ConfigurationProperties` для cache-настроек).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/caching-style-guide.md`. Цитируй конкретные коды (`R-CACHE-WHERE-X2`, `R-CACHE-CFG-X1`).
+1. **Прочти индекс правил** `.claude/docs/caching-rules.md`. Цитируй конкретные коды (`R-CACHE-WHERE-X2`, `R-CACHE-CFG-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*CacheConfig*`, `*CacheManager*`, `application*.yml` с `cache:` или `spring.cache.*` блоком.

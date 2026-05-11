@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/graceful-shutdown-style-guide.md`** — источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-SHUT-CFG-*` (JVM/Spring конфиг), `R-SHUT-HTTP-*` (HTTP drain), `R-SHUT-KFK-*` (Kafka), `R-SHUT-DB-*` (БД/HikariCP), `R-SHUT-SCHED-*` (Scheduled/Async/outbox), `R-SHUT-K8S-*` (k8s манифесты), `R-SHUT-IDEM-*` (идемпотентность in-flight), `R-SHUT-OBS-*` (бюджет/метрики).
-- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency), `resilience-style-guide.md` (`R-RES-RE-X1`, `R-RES-ASYNC-*`), `spring-bootstrap-style-guide.md` (`BS-13` Kafka startup, `BS-15` ExternalEventPublisher).
+- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency), `resilience-rules.md` (`R-RES-RE-X1`, `R-RES-ASYNC-*`), `spring-bootstrap-style-guide.md` (`BS-13` Kafka startup, `BS-15` ExternalEventPublisher).
 
 ## Инструкции
 

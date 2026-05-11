@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/usecase-pattern-style-guide.md` в корне проекта. У каждого правила есть код (`R-UC-1`, `R-HND-X2` и т.п.) — цитируй коды в замечаниях. Если в diff есть DDL (`*.sql`, Liquibase changeset) или новые миграции — отдельно вызови `ucp-pg-schema-review` для проверки типов колонок (правила `PG-T-NNN`).
+1. **Прочитай style guide** из `.claude/docs/usecase-pattern-rules.md` в корне проекта. У каждого правила есть код (`R-UC-1`, `R-HND-X2` и т.п.) — цитируй коды в замечаниях. Если в diff есть DDL (`*.sql`, Liquibase changeset) или новые миграции — отдельно вызови `ucp-pg-schema-review` для проверки типов колонок (правила `PG-T-NNN`).
 
 2. **Определи уровень внедрения** осмотрев проект (style guide §2):
    - Найди `core/<bc>/` + `adapter/in/`, `adapter/out/` → **Уровень 4 (Hexagonal)**.
@@ -18,7 +18,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
    - Найди маркеры `UseCaseCommand` / `UseCaseQuery` → **Уровень 2 (CQRS)**.
    - Иначе → **Уровень 1 (базовый)**.
 
-   Назови определённый уровень в начале отчёта. Применяй правила, перечисленные для этого уровня в §2 style guide. На Уровне 3+ дополнительно загрузи `.claude/docs/ddd-tactical-style-guide.md` и применяй его правила к доменному коду.
+   Назови определённый уровень в начале отчёта. Применяй правила, перечисленные для этого уровня в §2 style guide. На Уровне 3+ дополнительно загрузи `.claude/docs/ddd-tactical-rules.md` и применяй его правила к доменному коду.
 
 3. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - Используй `git diff` (working tree, staged, last commit), чтобы найти изменённые Java-файлы.

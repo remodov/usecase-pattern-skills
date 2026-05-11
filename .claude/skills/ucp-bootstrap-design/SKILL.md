@@ -20,7 +20,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/spring-bootstrap-style-guide.md`. У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 4 дополнительно прочитай `usecase-pattern-style-guide.md` для раскладки модулей.
+1. **Прочитай style guide** из `.claude/docs/spring-bootstrap-style-guide.md`. У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 4 дополнительно прочитай `usecase-pattern-rules.md` для раскладки модулей.
 
 2. **Диагностируй: это починка или с нуля.** Для починки сначала запусти и прочитай реальную ошибку:
    ```bash

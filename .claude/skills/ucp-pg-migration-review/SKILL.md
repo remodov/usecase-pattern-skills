@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-migrations-style-guide.md`** — единственный источник правил. Кодами `PG-M-NNN`.
+- **`.claude/docs/pg-migrations-style-guide.md`** — источник правил. Кодами `PG-M-NNN`.
 
 ## Инструкции
 

@@ -12,7 +12,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/resilience-style-guide.md` (главный, правила `R-RES-*`) и `.claude/docs/auth-patterns-style-guide.md` (`AUTH-19` для retry-решения).
+1. **Прочитай** `.claude/docs/resilience-rules.md` (главный, правила `R-RES-*`) и `.claude/docs/auth-patterns-style-guide.md` (`AUTH-19` для retry-решения).
 
 2. **Идентифицируй существующий out-adapter:**
    - `git diff` или путь от пользователя.
@@ -69,7 +69,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
      ```java
      // TODO R-RES-ASYNC-1: sync-polling блокирует worker-threads.
      //   Перевести в task-queue: создать <X>PollingTask + scheduler @Scheduled(5s).
-     //   См. resilience-style-guide.md §11. Координирует ucp-pattern-design.
+     //   См. resilience-rules.md §11. Координирует ucp-pattern-design.
      ```
    - В выводе — отдельный пункт «**Требует доработки в `core/`:** перевод polling в task-queue». Возможно отдельный PR.
 

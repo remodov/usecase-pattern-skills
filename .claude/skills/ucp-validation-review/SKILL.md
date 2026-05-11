@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/validation-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-VLD-WHERE-*` (где валидируем), `R-VLD-STD-*` (стандартные constraints), `R-VLD-CC-*` (custom constraints), `R-VLD-GRP-*` (groups), `R-VLD-XF-*` (cross-field), `R-VLD-OAS-*` (OpenAPI generator), `R-VLD-CFG-*` (config), `R-VLD-MSG-*` (сообщения).
-- Парные документы: `rest-api-rules.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `auth-patterns-style-guide.md` (`AUTH-19` — Idempotency-Key валидация), `ddd-tactical-style-guide.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
+- **`.claude/docs/validation-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-VLD-WHERE-*` (где валидируем), `R-VLD-STD-*` (стандартные constraints), `R-VLD-CC-*` (custom constraints), `R-VLD-GRP-*` (groups), `R-VLD-XF-*` (cross-field), `R-VLD-OAS-*` (OpenAPI generator), `R-VLD-CFG-*` (config), `R-VLD-MSG-*` (сообщения).
+- Парные документы: `rest-api-rules.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `auth-patterns-style-guide.md` (`AUTH-19` — Idempotency-Key валидация), `ddd-tactical-rules.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/validation-style-guide.md`. Цитируй конкретные коды правил (`R-VLD-WHERE-1`, `R-VLD-OAS-X1`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/validation-rules.md`. Цитируй конкретные коды правил (`R-VLD-WHERE-1`, `R-VLD-OAS-X1`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые контроллеры (`*-in-adapter/`), DTO (`*Request`, `*Response`), `*ConfigurationProperties`/`*Settings`, кастомные validators (`common/validation/`, `core/<bc>/validation/`), OpenAPI YAML (`*.openapi.yaml`).

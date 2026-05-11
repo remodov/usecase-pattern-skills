@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/jooq-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-JOOQ-CFG-*` (codegen), `R-JOOQ-REPO-*` (репозиторий), `R-JOOQ-CTX-*` (DSLContext), `R-JOOQ-QRY-*` (запросы), `R-JOOQ-MS-*` (multiset), `R-JOOQ-FLT-*` (filter-builders), `R-JOOQ-MAP-*` (mapper), `R-JOOQ-PAG-*` (пагинация), `R-JOOQ-LCK-*` (locks), `R-JOOQ-TX-*` (транзакции), `R-JOOQ-VIEW-*` (view-репо).
+- **`.claude/docs/jooq-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-JOOQ-CFG-*` (codegen), `R-JOOQ-REPO-*` (репозиторий), `R-JOOQ-CTX-*` (DSLContext), `R-JOOQ-QRY-*` (запросы), `R-JOOQ-MS-*` (multiset), `R-JOOQ-FLT-*` (filter-builders), `R-JOOQ-MAP-*` (mapper), `R-JOOQ-PAG-*` (пагинация), `R-JOOQ-LCK-*` (locks), `R-JOOQ-TX-*` (транзакции), `R-JOOQ-VIEW-*` (view-репо).
 - Парные документы: `pg-runtime-style-guide.md` (PG-L-040/041 для locks), `spring-bootstrap-style-guide.md` (BS-17/18/19/20 для «только jOOQ + generated»).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/jooq-style-guide.md`. Цитируй конкретные коды правил в каждой находке (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`, не «нарушение раздела 5»).
+1. **Прочти индекс правил** `.claude/docs/jooq-rules.md`. Цитируй конкретные коды правил в каждой находке (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`, не «нарушение раздела 5»).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в модуле `persistence/`.

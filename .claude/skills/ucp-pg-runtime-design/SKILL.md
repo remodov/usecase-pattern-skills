@@ -20,7 +20,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 1. **Прочитай:**
    - `.claude/docs/pg-runtime-style-guide.md` — главный (правила `PG-W-*`, `PG-L-*`).
    - `.claude/docs/pg-types-style-guide.md` — типы под `PG-T-*` (для DDL outbox-таблицы).
-   - `.claude/docs/jooq-style-guide.md` — `R-JOOQ-LCK-1`, `R-JOOQ-MS-3` (для запросов SKIP LOCKED).
+   - `.claude/docs/jooq-rules.md` — `R-JOOQ-LCK-1`, `R-JOOQ-MS-3` (для запросов SKIP LOCKED).
 
 2. **Уточни сценарий.** Один из:
    - `outbox` — outbox-relay для доменных событий.

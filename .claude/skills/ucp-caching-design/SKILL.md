@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/caching-style-guide.md` (правила `R-CACHE-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` для PII), `validation-style-guide.md` (`R-VLD-CFG-*` для config).
+1. **Прочитай** `.claude/docs/caching-rules.md` (правила `R-CACHE-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` для PII), `validation-rules.md` (`R-VLD-CFG-*` для config).
 
 2. **Уточни параметры:**
    - **Что кешируем** — конкретный read-метод. Имя cache (slug-style: `user-profiles`, `currencies`, `feature-flags`).

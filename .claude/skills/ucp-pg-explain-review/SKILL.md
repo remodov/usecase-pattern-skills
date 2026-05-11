@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-indexes-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Коды `PG-I-NNN` (индексы) и `PG-E-NNN` (план/runtime).
+- **`.claude/docs/pg-indexes-style-guide.md`** в проекте (или из `claude-code-java`) — источник правил. Коды `PG-I-NNN` (индексы) и `PG-E-NNN` (план/runtime).
 
 ## Инструкции
 

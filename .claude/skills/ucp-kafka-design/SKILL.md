@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/kafka-style-guide.md` (`R-KFK-*`). Опционально — `pg-runtime-style-guide.md` (для outbox), `auth-patterns-style-guide.md` (`AUTH-19` для money), `ddd-tactical-style-guide.md` (`R-EVT-*`).
+1. **Прочитай** `.claude/docs/kafka-rules.md` (`R-KFK-*`). Опционально — `pg-runtime-style-guide.md` (для outbox), `auth-patterns-style-guide.md` (`AUTH-19` для money), `ddd-tactical-rules.md` (`R-EVT-*`).
 
 2. **Уточни сценарий:**
    - **Producer-only** — сервис публикует events, других сервисов потребители.

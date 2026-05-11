@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-runtime-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
+- **`.claude/docs/pg-runtime-style-guide.md`** в проекте (или из `claude-code-java`) — источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
 
 ## Инструкции
 

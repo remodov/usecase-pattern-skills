@@ -16,7 +16,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/pg-types-style-guide.md`. Цитируй коды `PG-T-NNN` в каждой находке.
+1. **Прочти индекс правил** `.claude/docs/pg-types-style-guide.md`. Цитируй коды `PG-T-NNN` в каждой находке.
 
 2. **Определи область ревью.** Если пользователь указал файл — ревью этого файла. Иначе — `git diff` против main / develop, ищи изменения в:
    - `db/changelog/**/*.{xml,sql,yml,json}` (Liquibase)

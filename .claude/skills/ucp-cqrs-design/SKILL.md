@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/cqrs-style-guide.md` (`R-CQRS-*`). Опционально — `usecase-pattern-style-guide.md` (`R-UC-*`), `jooq-style-guide.md` (`R-JOOQ-VIEW-*`), `kafka-style-guide.md` (`R-KFK-OBX-*`).
+1. **Прочитай** `.claude/docs/cqrs-rules.md` (`R-CQRS-*`). Опционально — `usecase-pattern-rules.md` (`R-UC-*`), `jooq-rules.md` (`R-JOOQ-VIEW-*`), `kafka-rules.md` (`R-KFK-OBX-*`).
 
 2. **Уточни параметры:**
    - **Aggregate** — имя (`Order`), есть ли write-handlers (`<X>CommandHandler`), есть ли уже `<X>Repository`.

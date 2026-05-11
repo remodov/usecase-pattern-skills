@@ -13,7 +13,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 1. **Прочитай style guide'ы:**
    - `.claude/docs/pg-types-style-guide.md` — выбор типов колонок (`PG-T-*`).
    - `.claude/docs/pg-naming-style-guide.md` — naming convention (`PG-N-*`).
-   - `.claude/docs/ddd-tactical-style-guide.md` — для понимания Aggregate Root, Entity, VO.
+   - `.claude/docs/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, VO.
    - `.claude/docs/pg-migrations-style-guide.md` `PG-M-*` — лёгкая часть (для нового агрегата это просто `CREATE TABLE`, без expand-contract).
 
 2. **Уточни параметры:**

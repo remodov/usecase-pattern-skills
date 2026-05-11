@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Bash(git di
 
 ## Зависимости
 
-- **`.claude/docs/test-strategy.md`** в проекте (или из `claude-code-java`) — единственный источник правил. У каждого правила есть код `TS-N`.
+- **`.claude/docs/test-strategy.md`** в проекте (или из `claude-code-java`) — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). У каждого правила есть код `TS-N`.
 - **`.claude/docs/usecase-spec-template.md`** — если есть спека сервиса, тестовые сценарии берутся оттуда (UC-1, UC-2, …, BR-001, BR-002, …).
 
 ## Инструкции

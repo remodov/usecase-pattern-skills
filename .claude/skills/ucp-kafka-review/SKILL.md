@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/kafka-style-guide.md`** — единственный источник правил. Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
-- Парные документы: `pg-runtime-style-guide.md` (`PG-L-021` — outbox-relay через SKIP LOCKED), `auth-patterns-style-guide.md` (`AUTH-19` — money-операции через Idempotency-Key), `resilience-style-guide.md` (CB вокруг HTTP-вызовов из listener), `ddd-tactical-style-guide.md` (`R-EVT-*` — domain events как payload).
+- **`.claude/docs/kafka-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
+- Парные документы: `pg-runtime-style-guide.md` (`PG-L-021` — outbox-relay через SKIP LOCKED), `auth-patterns-style-guide.md` (`AUTH-19` — money-операции через Idempotency-Key), `resilience-rules.md` (CB вокруг HTTP-вызовов из listener), `ddd-tactical-rules.md` (`R-EVT-*` — domain events как payload).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/kafka-style-guide.md`. Цитируй конкретные коды (`R-KFK-PROD-X1`, `R-KFK-OBX-X1`).
+1. **Прочти индекс правил** `.claude/docs/kafka-rules.md`. Цитируй конкретные коды (`R-KFK-PROD-X1`, `R-KFK-OBX-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*KafkaListener*`, `*KafkaConfig*`, `*KafkaTemplate*`, `*OutboxRelay*`, `*OutboxPublisher*`.

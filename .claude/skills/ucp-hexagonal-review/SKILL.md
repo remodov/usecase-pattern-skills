@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/hexagonal-style-guide.md`** — источник правил. Подгруппы: `R-HEX-WHEN-*` (когда), `R-HEX-MOD-*` (модули), `R-HEX-CORE-*` (core), `R-HEX-PORT-*` (ports), `R-HEX-AIN-*` (adapters in), `R-HEX-AOUT-*` (adapters out), `R-HEX-BOOT-*` (bootstrap), `R-HEX-TEST-*` (архитектурные тесты).
-- Парные: `usecase-pattern-style-guide.md` (`R-LAY-*` — Уровень 4), `ddd-tactical-style-guide.md` (`R-AGG-*` для core), `jooq-style-guide.md` (`R-JOOQ-REPO-*`), `rest-api-rules.md` (`R-OAS-*` для in-adapter).
+- **`.claude/docs/hexagonal-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-HEX-WHEN-*` (когда), `R-HEX-MOD-*` (модули), `R-HEX-CORE-*` (core), `R-HEX-PORT-*` (ports), `R-HEX-AIN-*` (adapters in), `R-HEX-AOUT-*` (adapters out), `R-HEX-BOOT-*` (bootstrap), `R-HEX-TEST-*` (архитектурные тесты).
+- Парные: `usecase-pattern-rules.md` (`R-LAY-*` — Уровень 4), `ddd-tactical-rules.md` (`R-AGG-*` для core), `jooq-rules.md` (`R-JOOQ-REPO-*`), `rest-api-rules.md` (`R-OAS-*` для in-adapter).
 
 ## Инструкции
 
-1. **Прочти** `.claude/docs/hexagonal-style-guide.md`. Цитируй коды (`R-HEX-CORE-X1`, `R-HEX-PORT-X2`).
+1. **Прочти** `.claude/docs/hexagonal-rules.md`. Цитируй коды (`R-HEX-CORE-X1`, `R-HEX-PORT-X2`).
 
 2. **Определи объект ревью.** Если пользователь назвал — бери. Иначе:
    - `git diff` на любые файлы в `core/`, `*-in-adapter/`, `*-out-adapter/`, `bootstrap/`.

@@ -10,12 +10,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/observability-style-guide.md`** — единственный источник правил. Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
-- Парные: `auth-patterns-style-guide.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `rest-api-rules.md` (`R-HDR-4` — traceparent), `resilience-style-guide.md` (`R-RES-OBS-*` — CB metrics), `caching-style-guide.md` (`R-CACHE-OBS-*`), `kafka-style-guide.md` (`R-KFK-OBS-*` — consumer lag).
+- **`.claude/docs/observability-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
+- Парные: `auth-patterns-style-guide.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `rest-api-rules.md` (`R-HDR-4` — traceparent), `resilience-rules.md` (`R-RES-OBS-*` — CB metrics), `caching-rules.md` (`R-CACHE-OBS-*`), `kafka-rules.md` (`R-KFK-OBS-*` — consumer lag).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/observability-style-guide.md`. Цитируй конкретные коды (`R-OBS-LOG-X1`, `R-OBS-CTX-X1`).
+1. **Прочти индекс правил** `.claude/docs/observability-rules.md`. Цитируй конкретные коды (`R-OBS-LOG-X1`, `R-OBS-CTX-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*Logback*`, `logback*.xml`, `*MetricsConfig*`, `*OtelConfig*`, `*HealthIndicator*`, `*MdcFilter*`.

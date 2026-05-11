@@ -10,13 +10,13 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 
 ## Зависимости
 
-- **`.claude/docs/security-style-guide.md`** — источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-SEC-SAST-*` (SpotBugs/FindSecBugs/Error Prone), `R-SEC-DEP-*` (CVE в зависимостях), `R-SEC-SECRET-*` (секреты), `R-SEC-IMG-*` (контейнеры), `R-SEC-CRYPTO-*` (криптография), `R-SEC-FIND-*` (реакция на findings).
+- **`.claude/docs/security-style-guide.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-SEC-SAST-*` (SpotBugs/FindSecBugs/Error Prone), `R-SEC-DEP-*` (CVE в зависимостях), `R-SEC-SECRET-*` (секреты), `R-SEC-IMG-*` (контейнеры), `R-SEC-CRYPTO-*` (криптография), `R-SEC-FIND-*` (реакция на findings).
 - **`.claude/docs/spring-bootstrap-style-guide.md`** — `BS-SEC-*` для enforcement (наличие плагинов в build.gradle, CI-степы).
-- Парные документы: `auth-patterns-style-guide.md` (для контекста авторизации), `observability-style-guide.md` (PII в логах — отдельный гайд, не дублируем).
+- Парные документы: `auth-patterns-style-guide.md` (для контекста авторизации), `observability-rules.md` (PII в логах — отдельный гайд, не дублируем).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/security-style-guide.md` и `BS-SEC-*` секцию из `spring-bootstrap-style-guide.md`. Цитируй конкретные коды (`R-SEC-DEP-X1`, `BS-SEC-3`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/security-style-guide.md` и `BS-SEC-*` секцию из `spring-bootstrap-style-guide.md`. Цитируй конкретные коды (`R-SEC-DEP-X1`, `BS-SEC-3`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе скоп по умолчанию:
    - `build.gradle` / `build.gradle.kts` / `settings.gradle*` — наличие плагинов и dependencies (`R-SEC-SAST-1/2`, `R-SEC-DEP-1`).
