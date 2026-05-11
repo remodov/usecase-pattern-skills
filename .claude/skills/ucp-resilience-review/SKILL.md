@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/resilience-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-RES-WHERE-*` (где какая защита), `R-RES-ISO-*` (per-system isolation), `R-RES-TO-*` (timeouts), `R-RES-CB-*` (circuit breaker), `R-RES-RE-*` (retry), `R-RES-BH-*` (bulkhead), `R-RES-FB-*` (fallback), `R-RES-CFG-*` (конфигурация), `R-RES-OAS-*` (связка с OpenAPI generator), `R-RES-HC-*` (health checks), `R-RES-ASYNC-*` (async и polling), `R-RES-OBS-*` (observability).
-- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency-зависимого retry), `rest-api-style-guide.md` (`R-OAS-*` для OpenAPI-first).
+- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency-зависимого retry), `rest-api-rules.md` (`R-OAS-*` для OpenAPI-first).
 
 ## Инструкции
 

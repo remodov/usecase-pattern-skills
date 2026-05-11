@@ -14,7 +14,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 1. **Прочитай**:
    - `.claude/docs/error-handling-style-guide.md` — главный документ, правила `R-ERR-*`.
-   - `.claude/docs/rest-api-style-guide.md` — для REST mapping (`R-API-ERR-*`).
+   - `.claude/docs/rest-api-rules.md` — для REST mapping (`R-API-ERR-*`).
    - `.claude/docs/resilience-style-guide.md` — `R-RES-RE-*`/`R-RES-FB-*` для retry-семантики.
    - `.claude/docs/auth-patterns-style-guide.md` — `AUTH-19` для idempotency, `AUTH-18` для PII в response.
    - `.claude/docs/observability-style-guide.md` — `R-OBS-LOG-*`/`R-OBS-MDC-*` для logging.

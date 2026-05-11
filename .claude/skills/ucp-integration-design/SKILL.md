@@ -13,7 +13,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 1. **Прочитай style guide'ы** в порядке:
    - `.claude/docs/resilience-style-guide.md` — главный (правила `R-RES-*`).
    - `.claude/docs/auth-patterns-style-guide.md` — `AUTH-19` для решения по retry.
-   - `.claude/docs/rest-api-style-guide.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
+   - `.claude/docs/rest-api-rules.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
    - `.claude/docs/spring-bootstrap-style-guide.md` — `BS-*` для gradle multi-module setup.
    - `.claude/docs/usecase-pattern-style-guide.md` — на Уровне 4 для размещения port в `core/<bc>/port/out/`.
 

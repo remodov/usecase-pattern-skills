@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/observability-style-guide.md` (`R-OBS-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` PII), `rest-api-style-guide.md` (`R-HDR-4` traceparent), `validation-style-guide.md` (`R-VLD-CFG-*`).
+1. **Прочитай** `.claude/docs/observability-style-guide.md` (`R-OBS-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` PII), `rest-api-rules.md` (`R-HDR-4` traceparent), `validation-style-guide.md` (`R-VLD-CFG-*`).
 
 2. **Уточни параметры:**
    - **Сервис** — имя для `service` tag (`order-service`).

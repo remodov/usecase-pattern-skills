@@ -935,7 +935,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
 .claude/docs/
-├── rest-api-style-guide.md          # REST API Style Guide (R-*-*)
+├── rest-api-rules.md                # REST API — индекс правил (рабочий вход скиллов; ~3× компактнее полного)
+├── rest-api-style-guide.md          # REST API Style Guide — полная версия (R-*-*), читается точечно по разделу
 ├── usecase-pattern-style-guide.md   # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
 ├── ddd-tactical-style-guide.md      # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*)
 ├── usecase-spec-template.md         # шаблон Use Case спецификации

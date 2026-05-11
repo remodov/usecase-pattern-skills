@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/validation-style-guide.md` — главный (`R-VLD-*`). Опционально `.claude/docs/rest-api-style-guide.md` `R-ERR-5`/`R-ERR-6` для понимания, как ошибка попадёт в violations.
+1. **Прочитай** `.claude/docs/validation-style-guide.md` — главный (`R-VLD-*`). Опционально `.claude/docs/rest-api-rules.md` `R-ERR-5`/`R-ERR-6` для понимания, как ошибка попадёт в violations.
 
 2. **Уточни тип constraint:**
    - **Field-level custom** (`@RussianPhone`, `@VatNumber`) — валидирует одно поле по нестандартному формату.

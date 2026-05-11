@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/distributed-patterns-style-guide.md`** — источник правил. Подгруппы: `R-DIST-WHEN-*` (когда применять), `R-DIST-SAGA-*` (saga), `R-DIST-IDEM-*` (idempotency), `R-DIST-EC-*` (eventual consistency), `R-DIST-OBX-*` (outbox/inbox), `R-DIST-COMP-*` (compensation), `R-DIST-TX-*` (запрет 2PC).
-- Парные: `kafka-style-guide.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `cqrs-style-guide.md` (`R-CQRS-SYNC-*`), `auth-patterns-style-guide.md` (`AUTH-19` Idempotency-Key), `rest-api-style-guide.md` (`R-HDR-3` Idempotency-Key header).
+- Парные: `kafka-style-guide.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `cqrs-style-guide.md` (`R-CQRS-SYNC-*`), `auth-patterns-style-guide.md` (`AUTH-19` Idempotency-Key), `rest-api-rules.md` (`R-HDR-3` Idempotency-Key header).
 
 ## Инструкции
 

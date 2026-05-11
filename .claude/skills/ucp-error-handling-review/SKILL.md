@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/error-handling-style-guide.md`** — источник правил. Подгруппы: `R-ERR-HIER-*` (иерархия), `R-ERR-WHERE-*` (где throw/catch), `R-ERR-MAP-*` (ProblemDetails), `R-ERR-LOG-*` (logging), `R-ERR-RETRY-*` (retry-семантика), `R-ERR-RESULT-*` (Result vs Exception), `R-ERR-OBS-*` (observability).
-- Парные документы: `rest-api-style-guide.md` (`R-API-ERR-*`), `validation-style-guide.md` (`R-VLD-*`), `resilience-style-guide.md` (`R-RES-RE-*`/`R-RES-FB-*`), `auth-patterns-style-guide.md` (`AUTH-18`/`AUTH-19`), `observability-style-guide.md` (`R-OBS-LOG-*`).
+- Парные документы: `rest-api-rules.md` (`R-API-ERR-*`), `validation-style-guide.md` (`R-VLD-*`), `resilience-style-guide.md` (`R-RES-RE-*`/`R-RES-FB-*`), `auth-patterns-style-guide.md` (`AUTH-18`/`AUTH-19`), `observability-style-guide.md` (`R-OBS-LOG-*`).
 
 ## Инструкции
 

@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/validation-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-VLD-WHERE-*` (где валидируем), `R-VLD-STD-*` (стандартные constraints), `R-VLD-CC-*` (custom constraints), `R-VLD-GRP-*` (groups), `R-VLD-XF-*` (cross-field), `R-VLD-OAS-*` (OpenAPI generator), `R-VLD-CFG-*` (config), `R-VLD-MSG-*` (сообщения).
-- Парные документы: `rest-api-style-guide.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `auth-patterns-style-guide.md` (`AUTH-19` — Idempotency-Key валидация), `ddd-tactical-style-guide.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
+- Парные документы: `rest-api-rules.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `auth-patterns-style-guide.md` (`AUTH-19` — Idempotency-Key валидация), `ddd-tactical-style-guide.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
 
 ## Инструкции
 

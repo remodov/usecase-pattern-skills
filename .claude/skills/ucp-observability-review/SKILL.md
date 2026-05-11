@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/observability-style-guide.md`** — единственный источник правил. Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
-- Парные: `auth-patterns-style-guide.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `rest-api-style-guide.md` (`R-HDR-4` — traceparent), `resilience-style-guide.md` (`R-RES-OBS-*` — CB metrics), `caching-style-guide.md` (`R-CACHE-OBS-*`), `kafka-style-guide.md` (`R-KFK-OBS-*` — consumer lag).
+- Парные: `auth-patterns-style-guide.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `rest-api-rules.md` (`R-HDR-4` — traceparent), `resilience-style-guide.md` (`R-RES-OBS-*` — CB metrics), `caching-style-guide.md` (`R-CACHE-OBS-*`), `kafka-style-guide.md` (`R-KFK-OBS-*` — consumer lag).
 
 ## Инструкции
 
