@@ -1,6 +1,6 @@
 ---
 name: ucp-spec-design
-description: Написать Use Case спецификацию для нового или существующего сервиса из бизнес-описания, по командному универсальному шаблону спеки (Tier A / B / C). Применяется при старте нового сервиса, онбординге существующего модуля или формализации того, что команда делала неформально.
+description: Написать Use Case спецификацию для нового или существующего сервиса из бизнес-описания, по командному универсальному шаблону спеки (Tier A / B / C). Применяется при старте нового сервиса или формализации того, что команда делала неформально. Для онбординга существующего сервиса из кода (без бизнес-брифа) — соседний скилл `ucp-spec-tier-0`, который генерирует as-is снимок.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(superpowers:*) Bash(mcp__plugin_context7_context7__*)
 ---
 
@@ -25,6 +25,8 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
    - **Tier A** — существующий слоёный сервис, Controller → Service → Repository, без библиотеки `usecase-pattern`.
    - **Tier B** — сервис использует `usecase-pattern` (UseCase + Handler ± CQRS-маркеры); UCP-уровни 1–2.
    - **Tier C** — полный DDD / Hexagonal: агрегаты, доменные события, ports/adapters; UCP-уровни 3–4.
+
+   Этот скилл **не пишет Tier 0** — для as-is снимка существующего сервиса из кода без бизнес-брифа применяется соседний скилл `ucp-spec-tier-0`. Если вход — только репо без бизнес-описания, остановись и предложи пользователю переключиться на `ucp-spec-tier-0`.
 
    Осмотри проект на признаки (Java-импорты `ru.mosmetro.usecase.*`, наличие `core/` + `adapter/`, `Aggregate*`, `Entity<ID>`). Если по-прежнему непонятно — **спроси у пользователя**, какой Tier он хочет, прежде чем писать.
 
@@ -102,6 +104,8 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
      - `<Query>.md` → `type: query` + `query`, `actor`, `returns`, `read-model`.
      - `<edge>.md` → `type: integration` + `integration-type`, `source`, `target`, `direction`, `protocol`, `sync`, `description`, `auth`, `payload[]`, `status`, `idempotency`, `sla`, `ddd-pattern[]`.
 
+   **Литерал `not-declared`.** Все обязательные поля frontmatter заполняются всегда. Если после уточнений у пользователя данных для поля нет (например, нет SLA для `sla:` на §16, нет ABAC-условия), пишется литерал `not-declared` — не пустая строка, не пропуск ключа. Это инвариант spec-as-code: downstream-скиллы парсят `not-declared` как явный gap и не падают. Литерал чаще встречается на Tier 0 (генерируется `ucp-spec-tier-0`), но действует и здесь.
+
    **Консолидированный `<service>.md` не создаётся.** Если потребителю (бизнес-ревью, ingestion в другую AI-сессию) нужен один файл — собирается ad-hoc через `cat`-конкатенацию и не коммитится.
 
    **Landing раздела с per-item папкой** содержит H1-заголовок + 1–2 строки общего описания. Список карточек получается из листинга папки (любой файловый менеджер / IDE / `ls` справляются), специальных индексов в landing'е не нужно. Пример:
@@ -172,6 +176,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
    - Каталог ошибок (§13) совпадает со всеми упоминаниями ошибок в командах и use-cases (через `errors:` во frontmatter команд).
    - Разделы, которые не применимы, имеют явную однострочную пометку, не молчаливое опущение.
    - Frontmatter валиден: на каждой per-item-карточке есть свой `type:` (`error` / `command` / `event` / `aggregate` / `query` / `integration`); на каждом landing-файле секции есть `type: context-section`.
+   - Все обязательные поля frontmatter заполнены — отсутствующие данные явно помечены литералом `not-declared`, не пустыми строками и не пропуском ключа.
    - Wikilinks ссылаются на существующие имена файлов (никаких опечаток в `[[ChargeStarted]]`).
    - В `docs/spec/` нет консолидированного `<service>.md` — если он есть, удалить.
 
