@@ -23,17 +23,70 @@
 #
 set -euo pipefail
 
+# --- helpers ---
+
+# manage_block <target_path> <begin_marker> <end_marker> <block_content>
+# Идемпотентно управляет marker-managed-блоком в текстовом файле:
+#   - target отсутствует → создаём файл с блоком как единственным содержимым;
+#   - target есть, маркеров нет → дописываем блок в конец (с разделителем);
+#   - маркеры есть → in-place заменяем содержимое между маркерами (включая
+#     сами маркеры), остальной контент файла сохраняется без изменений.
+# Контент блока ($4) передаётся строкой (heredoc / $(cat file)), а не путём.
+# Через awk-ENVIRON, чтобы избежать интерпретации escape-последовательностей
+# в значениях, передаваемых через awk -v.
+manage_block() {
+  local target="$1"
+  local begin="$2"
+  local end="$3"
+  local block="$4"
+
+  if [ ! -f "$target" ]; then
+    printf '%s\n' "$block" > "$target"
+    echo "    ✓ создан $target с блоком"
+    return
+  fi
+
+  if grep -qF -- "$begin" "$target"; then
+    local tmp
+    tmp="$(mktemp)"
+    BLOCK="$block" awk -v begin="$begin" -v end="$end" '
+      index($0, begin) && !replaced {
+        print ENVIRON["BLOCK"]
+        replaced = 1
+        in_block = 1
+        next
+      }
+      in_block {
+        if (index($0, end)) in_block = 0
+        next
+      }
+      { print }
+    ' "$target" > "$tmp"
+    mv "$tmp" "$target"
+    echo "    ✓ обновлён блок в $target (контент вне маркеров сохранён)"
+  else
+    printf '\n%s\n' "$block" >> "$target"
+    echo "    ✓ блок дописан в $target (существующий контент сохранён)"
+  fi
+}
+
 PROJECT_DIR="${1:-.}"
 SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# --- профиль скиллов: резолвим в список glob-паттернов в $SKILL_GLOBS ---
-case "${UCP_PROFILE:-full}" in
-  full) PROFILE_GLOBS='*' ;;
-  rest) PROFILE_GLOBS='ucp-spec-* ucp-pattern-* ucp-api-* ucp-auth-* ucp-bootstrap-* ucp-jooq-* ucp-pg-* ucp-validation-* ucp-error-handling-* ucp-test-* ucp-java-style-*' ;;
-  data) PROFILE_GLOBS='ucp-pg-* ucp-jooq-* ucp-caching-* ucp-observability-* ucp-bootstrap-* ucp-java-style-*' ;;
-  *) echo "ERROR: неизвестный UCP_PROFILE='$UCP_PROFILE' (full|rest|data или используйте UCP_SKILLS)" >&2; exit 1 ;;
-esac
-SKILL_GLOBS="${UCP_SKILLS:-$PROFILE_GLOBS}"
+# --- профиль скиллов: резолвим UCP_PROFILE/UCP_SKILLS в список glob-паттернов ---
+# UCP_SKILLS, если задан, перекрывает UCP_PROFILE.
+if [ -n "${UCP_SKILLS:-}" ]; then
+  SKILL_GLOBS="$UCP_SKILLS"
+  SKILL_PROFILE_LABEL="custom: $UCP_SKILLS"
+else
+  case "${UCP_PROFILE:-full}" in
+    full) SKILL_GLOBS='*' ;;
+    rest) SKILL_GLOBS='ucp-spec-* ucp-pattern-* ucp-api-* ucp-auth-* ucp-bootstrap-* ucp-jooq-* ucp-pg-* ucp-validation-* ucp-error-handling-* ucp-test-* ucp-java-style-*' ;;
+    data) SKILL_GLOBS='ucp-pg-* ucp-jooq-* ucp-caching-* ucp-observability-* ucp-bootstrap-* ucp-java-style-*' ;;
+    *) echo "ERROR: неизвестный UCP_PROFILE='$UCP_PROFILE' (full|rest|data или используйте UCP_SKILLS)" >&2; exit 1 ;;
+  esac
+  SKILL_PROFILE_LABEL="${UCP_PROFILE:-full}"
+fi
 
 if [ ! -d "$PROJECT_DIR" ]; then
   echo "ERROR: $PROJECT_DIR не существует" >&2
@@ -52,16 +105,16 @@ mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR
 # Skills — симлинк ucp-* скиллов по выбранному профилю (по умолчанию — все).
 # Сначала чистим существующие ucp-* симлинки, указывающие в этот репо, — иначе
 # при смене профиля (full -> rest) останутся stale-симлинки на лишние скиллы.
-echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/ (профиль: ${UCP_SKILLS:+custom}${UCP_SKILLS:-${UCP_PROFILE:-full}})"
+echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/ (профиль: $SKILL_PROFILE_LABEL)"
 for old in "$PROJECT_DIR"/.claude/skills/ucp-*; do
   [ -L "$old" ] || continue
   case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/skills/*) rm "$old" ;; esac
 done
 SKILL_COUNT=0
 _seen_skills=" "
-set -f                          # отключаем pathname-expansion: '*' в SKILL_GLOBS — это паттерн,
-_glob_patterns=( $SKILL_GLOBS ) #   а не маска для cwd; раскрываем его только против skills/
-set +f
+# read -ra сплитит по IFS (whitespace) без glob-expansion против cwd:
+# `*` в SKILL_GLOBS — это паттерн для skills/, не маска для текущей директории.
+read -ra _glob_patterns <<< "$SKILL_GLOBS"
 for glob in "${_glob_patterns[@]}"; do
   for skill in "$SKILLS_DIR"/.claude/skills/$glob/; do
     [ -d "$skill" ] || continue
@@ -152,38 +205,33 @@ if [ ! -f "$CLAUDE_TEMPLATE" ]; then
   exit 1
 fi
 
-if [ ! -f "$CLAUDE_MD" ]; then
-  cp "$CLAUDE_TEMPLATE" "$CLAUDE_MD"
-  echo "    ✓ создан $CLAUDE_MD с блоком ucp-skills"
-elif grep -qF "$BEGIN_MARKER" "$CLAUDE_MD"; then
-  TMP="$(mktemp)"
-  awk -v begin="$BEGIN_MARKER" -v end="$END_MARKER" -v block_file="$CLAUDE_TEMPLATE" '
-    BEGIN {
-      while ((getline line < block_file) > 0) {
-        block = block (block_loaded ? "\n" : "") line
-        block_loaded = 1
-      }
-      close(block_file)
-    }
-    index($0, begin) && !replaced {
-      print block
-      replaced = 1
-      in_block = 1
-      next
-    }
-    in_block {
-      if (index($0, end)) in_block = 0
-      next
-    }
-    { print }
-  ' "$CLAUDE_MD" > "$TMP"
-  mv "$TMP" "$CLAUDE_MD"
-  echo "    ✓ обновлён блок ucp-skills в $CLAUDE_MD (контент вне маркеров сохранён)"
-else
-  printf '\n' >> "$CLAUDE_MD"
-  cat "$CLAUDE_TEMPLATE" >> "$CLAUDE_MD"
-  echo "    ✓ блок ucp-skills дописан в $CLAUDE_MD (существующий контент сохранён)"
-fi
+CLAUDE_BLOCK_CONTENT="$(cat "$CLAUDE_TEMPLATE")"
+manage_block "$CLAUDE_MD" "$BEGIN_MARKER" "$END_MARKER" "$CLAUDE_BLOCK_CONTENT"
+
+# .gitignore — managed-блок. install.sh раскладывает в $PROJECT_DIR/.claude/
+# симлинки на скиллы, агентов и style-guide-снапшоты. В git-репо проекта они
+# появляются как untracked и засоряют статус. Управляемый блок исключает их
+# из git, не трогая остальной .gitignore проекта.
+echo
+echo "==> Управляю блоком ucp-skills в $PROJECT_DIR/.gitignore"
+
+GITIGNORE_BEGIN_MARKER="# BEGIN ucp-skills (managed by claude-code-java/install.sh)"
+GITIGNORE_END_MARKER="# END ucp-skills"
+GITIGNORE_BLOCK="$(cat <<'EOF'
+# BEGIN ucp-skills (managed by claude-code-java/install.sh)
+# Папки .claude/docs/ и .claude/agents/ принадлежат install.sh целиком —
+# свои файлы туда не клади (.claude/skills/ остаётся открытым для custom-скиллов).
+.claude/skills/ucp-*
+.claude/docs/
+.claude/agents/
+# END ucp-skills
+EOF
+)"
+
+manage_block "$PROJECT_DIR/.gitignore" \
+  "$GITIGNORE_BEGIN_MARKER" \
+  "$GITIGNORE_END_MARKER" \
+  "$GITIGNORE_BLOCK"
 
 # GitLab MCP (zereight/mcp-gitlab) — личный токен. Читаем из env или
 # защищённого файла. Никогда не храним токен в этом скрипте — репо публичный.
@@ -214,16 +262,17 @@ elif [ -z "$GITLAB_TOKEN" ]; then
 elif ! command -v npx >/dev/null 2>&1; then
   echo "    ⚠ npx не найден (нужен для @zereight/mcp-gitlab). Установите Node.js (brew install node)."
 else
-  # remove + add — идемпотентно (если уже зарегистрирован, чистим и ставим заново)
-  (
+  # remove + add — идемпотентно (если уже зарегистрирован, чистим и ставим заново).
+  # if (...) — чтобы set -e в subshell не убивал внешний скрипт при падении
+  # claude mcp add, а else-ветка с warn-сообщением была достижимой.
+  if (
     cd "$PROJECT_DIR"
     "$CLAUDE_BIN" mcp remove gitlab >/dev/null 2>&1 || true
     "$CLAUDE_BIN" mcp add gitlab \
       -e "GITLAB_API_URL=$GITLAB_API_URL" \
       -e "GITLAB_PERSONAL_ACCESS_TOKEN=$GITLAB_TOKEN" \
       -- npx -y --registry https://registry.npmjs.org @zereight/mcp-gitlab
-  ) >/tmp/mcp-gitlab-add.log 2>&1
-  if [ $? -eq 0 ]; then
+  ) >/tmp/mcp-gitlab-add.log 2>&1; then
     echo "    ✓ GitLab MCP зарегистрирован ($GITLAB_API_URL)"
   else
     echo "    ⚠ claude mcp add gitlab упал — лог: /tmp/mcp-gitlab-add.log"
