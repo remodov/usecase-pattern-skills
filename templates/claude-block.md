@@ -20,18 +20,20 @@
 
 ### Спецификация
 
-Если в проекте есть `docs/spec/` — это источник правды по сервису. Точка входа —
-landing с frontmatter `type: service`, обычно `docs/spec/00-<service>/<service>.md`.
+Если в проекте есть `docs/spec/` — это источник правды по сервису (формат — Use Case
+спецификация Bounded Context). Точка входа — корневой файл контекста
+`docs/spec/<service>-spec.md` (секции уровня контекста); секции уровня агрегата — в
+`docs/spec/aggregates/<aggregate>.md` (одноагрегатный сервис — всё в корневом файле).
 
-**Читай spec-landing в начале сессии, не в конце** — позднее чтение churn-ит
+**Читай корневой файл в начале сессии, не в конце** — позднее чтение churn-ит
 prompt-кэш и удорожает каждый ход; раннее чтение оседает в тёплом префиксе.
-Опционально: `@docs/spec/00-<svc>/<svc>.md` **снаружи** managed-блока авто-грузит
-landing в каждый контекст (не для тяжёлых спек — раздувает always-loaded).
+Опционально: `@docs/spec/<service>-spec.md` **снаружи** managed-блока авто-грузит
+корень в каждый контекст (не для тяжёлых спек — раздувает always-loaded).
 
-Wikilinks `[[Name]]` (`[[CreateProduct]]`, `[[PRODUCT_NOT_FOUND]]`,
-`[[06-<svc>-rules#BR-008]]`) резолвятся `find docs/spec -name "Name.md"`. Per-item
-карточки имеют типизированный frontmatter (`type: command|event|error|query|aggregate|integration`)
-— это машиночитаемый контракт, ему можно доверять.
+Ссылки между разделами — по именам/якорям (`[Жизненный цикл](#2-жизненный-цикл)`);
+машинная идентичность чанков — минимальный frontmatter (`context`, `aggregate`).
+Техника (схема БД, стек, топики) — только в разделе «Техническая реализация»; домен —
+во всех остальных разделах.
 
 ### Кодогенерация и ревью — через скиллы
 
@@ -42,12 +44,14 @@ Wikilinks `[[Name]]` (`[[CreateProduct]]`, `[[PRODUCT_NOT_FOUND]]`,
 | Тип работы | Скилл |
 |---|---|
 | Написать спеку по бизнес-описанию | `/ucp-spec-design` |
+| As-is спека из кода (онбординг) | `/ucp-spec-tier-0` |
+| Ревью спеки (design-критик) | `/ucp-spec-review` |
 | UseCase + Handler + Controller + маппер | `/ucp-pattern-design` |
 | OpenAPI + DTO + контроллер из карточки команды | `/ucp-api-design` |
 | Spring Security + OAuth2 + ABAC + audit | `/ucp-auth-design` |
-| Spring Boot bootstrap, Liquibase, jOOQ, профили | `/ucp-bootstrap-design` |
+| Spring Boot bootstrap, Liquibase, jOOQ, профили (+ корневой CLAUDE.md) | `/ucp-bootstrap-design` |
 | Aggregate + VO + Domain Event + Repository (Tier C) | `/ucp-ddd-tactical-design` |
-| Интеграционные / unit тесты по `15-*-acceptance.md` | `/ucp-test-design` |
+| Тесты по разделу «Критерии приёмки» | `/ucp-test-design` |
 | Ревью UseCase / Handler / Controller | `/ucp-pattern-review` |
 | Ревью REST-контракта | `/ucp-api-review` |
 | Ревью DDD-кода | `/ucp-ddd-tactical-review` |
@@ -111,7 +115,7 @@ style-guide. **`Agent` / `Task`-форк под ucp-скилл запрещён*
 | Ситуация | Параллельно? |
 |---|---|
 | Тесты + линт + build одновременно | да |
-| Fan-out однотипных правок (заполнить `severity` в 30 карточках) | да |
+| Fan-out однотипных правок (одинаковая замена в 30 файлах) | да |
 | N ucp-ревью на одном PR | **нет** — последовательно через `Skill` |
 | Сгенерировать N агрегатов/команд/событий из спеки | нет |
 | Цепочка `ucp-spec-design` → `ucp-pattern-design` → `ucp-test-design` | нет |
