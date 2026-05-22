@@ -11,9 +11,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ## Инструкции
 
 1. **Прочитай style guide'ы** в порядке:
-   - `.claude/docs/jooq-style-guide.md` — главный (правила `R-JOOQ-*`).
-   - `.claude/docs/ddd-tactical-style-guide.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
-   - `.claude/docs/usecase-pattern-style-guide.md` §2 — для Уровня 4 (`core/` ↔ `persistence/`).
+   - `.claude/docs/jooq-rules.md` — главный (правила `R-JOOQ-*`).
+   - `.claude/docs/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
+   - `.claude/docs/usecase-pattern-rules.md` §2 — для Уровня 3 (`core/` ↔ `persistence/`).
    - `.claude/docs/pg-runtime-style-guide.md` `PG-L-040`/`PG-L-041` — для locking-синтаксиса (FOR UPDATE / SKIP LOCKED).
 
 2. **Подтверди наличие зависимостей.** Проверь `bootstrap/build.gradle.kts` на:

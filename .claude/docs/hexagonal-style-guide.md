@@ -2,12 +2,12 @@
 
 Свод правил применения Hexagonal Architecture (ports & adapters) в Java/Spring-сервисах команды UCP. Каждое правило идентифицируется кодом (`R-HEX-CORE-1`, `R-HEX-PORT-X1`) — скилл `ucp-hexagonal-review` цитирует эти коды в findings.
 
-Hexagonal-уровень в UCP — **Уровень 4** (см. `R-LAY-*` в `usecase-pattern-style-guide.md`). Этот гайд **углубляет**: что ложится в `core/`, что в `adapter/in/*` и `adapter/out/*`, какие зависимости разрешены, как описывать ports, как работает dependency inversion, как тестировать.
+Hexagonal — часть **Уровня 3** (DDD + Hexagonal) в UCP (см. `R-LAY-*` в `usecase-pattern-style-guide.md`). Этот гайд **углубляет**: что ложится в `core/`, что в `adapter/in/*` и `adapter/out/*`, какие зависимости разрешены, как описывать ports, как работает dependency inversion, как тестировать.
 
 Не покрывает: DDD-агрегаты как часть core/ (это `R-AGG-*`), UseCase Pattern (`R-UC-*`), persistence (`R-JOOQ-*`), специфику адаптеров (REST в `R-OAS-*`, Kafka в `R-KFK-*`).
 
 Связанные стандарты:
-- `R-LAY-*` (Use Case Pattern §2 уровни внедрения) — Уровень 4 = Hexagonal.
+- `R-LAY-*` (Use Case Pattern §2 уровни внедрения) — Уровень 3 включает Hexagonal.
 - `R-AGG-*` / `R-ENT-*` / `R-VO-*` (DDD tactical) — наполнение domain-слоя в `core/`.
 - Библиотека [`hexagonal-architecture`](https://github.com/remodov/hexagonal-architecture) — наша OSS-имплементация маркеров `@CoreComponent`, `@AdapterIn`, `@AdapterOut` и архитектурных тестов.
 
@@ -33,7 +33,7 @@ Hexagonal — паттерн, добавляющий ceremony. Применяе�
 
 ### 1.1 Обязательно
 
-- **R-HEX-WHEN-1.** Hexagonal обязателен на **Tier C** (DDD-сервисы) и **Tier D** (event-sourced / CQRS+). Tier A/B — overkill.
+- **R-HEX-WHEN-1.** Hexagonal — часть **Уровня 3** (DDD + Hexagonal: агрегаты, ports/adapters, ArchUnit). На Уровне 1–2 — overkill.
 
 - **R-HEX-WHEN-2.** Признаки, что **пора** переходить:
   - Сервис интегрируется с 2+ внешними системами (БД + платежи + Kafka).
@@ -50,7 +50,7 @@ Hexagonal — паттерн, добавляющий ceremony. Применяе�
 
 ### 1.2 Запрещено
 
-- **R-HEX-WHEN-X1.** **Hexagonal как cargo-cult** — все сервисы под него причёсаны независимо от сложности. Tier A-сервис из 3 endpoints в hexagonal-раскладке = ceremony без выгоды.
+- **R-HEX-WHEN-X1.** **Hexagonal как cargo-cult** — все сервисы под него причёсаны независимо от сложности. Сервис Уровня 1 из 3 endpoints в hexagonal-раскладке = ceremony без выгоды.
 
 - **R-HEX-WHEN-X2.** **Частичный Hexagonal** — `core/` есть, но `adapter/in/*` смешан с REST-controller'ами + бизнес-логикой. Либо полный Hexagonal, либо ничего.
 
@@ -361,7 +361,7 @@ ArchUnit — обязательный механизм enforcement правил 
 
 | Антипаттерн | Правило | Корректно |
 |---|---|---|
-| Hexagonal как cargo-cult на Tier A | `R-HEX-WHEN-X1` | Hexagonal с Tier C+ |
+| Hexagonal как cargo-cult на Уровне 1 | `R-HEX-WHEN-X1` | Hexagonal как часть Уровня 3 |
 | Частичный Hexagonal | `R-HEX-WHEN-X2` | полный или ничего |
 | Один gradle-модуль с папками core/adapter | `R-HEX-MOD-X1` | multi-module gradle |
 | `core/` зависит от persistence/ | `R-HEX-MOD-X2` | bootstrap → core ← adapters |

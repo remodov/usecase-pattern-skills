@@ -1,7 +1,7 @@
 # Use Case Pattern — Style Guide
 
 Правила применения **Use Case Pattern** в Java-сервисах с библиотекой
-[`ru.vikulinva:usecase-pattern`](https://github.com/remodov/usecase-pattern)
+[`ru.vikulinva:usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern)
 (пакеты `ru.vikulinva.usecase` и `ru.vikulinva.usecase.cqrs`).
 
 Этот документ — единственный источник правды для скиллов
@@ -27,20 +27,17 @@ findings.
 
 ## 2. Уровни внедрения
 
-Use Case Pattern имеет четыре уровня. Скилл должен определить уровень
-проекта и применять правила, соответствующие уровню. Уровень узнаётся по:
+Уровень зрелости — одна ось. Этот гайд применяется начиная с **Уровня 2** (сам Use Case Pattern). Скилл определяет уровень проекта и применяет соответствующие правила. Уровень узнаётся по:
 
-- наличию пакета `domain/` с `Entity`/`AggregateRoot` → Уровень 3+;
-- наличию `core/` + `adapter/` со строгим направлением зависимостей → Уровень 4;
-- использованию `UseCaseCommand`/`UseCaseQuery` → Уровень 2+;
-- иначе → Уровень 1.
+- наличию пакета `domain/` с `Entity`/`AggregateRoot` и/или `core/` + `adapter/` со строгим направлением зависимостей → Уровень 3 (DDD + Hexagonal);
+- использованию `usecase-pattern` (UseCase + Handler), без агрегатов и ports/adapters → Уровень 2; CQRS-маркеры `UseCaseCommand`/`UseCaseQuery` — опция этого уровня;
+- Controller → Service → Repository без `usecase-pattern` → Уровень 1 (Слоёный), этот гайд не применяется.
 
 | Уровень | Слои моделей | Обязательные правила |
 |---|---|---|
-| 1 — без CQRS | JsonBean → jOOQ Pojo | §3, §4, §5, §7 |
-| 2 — CQRS | JsonBean → UseCase(Command/Query) → Pojo/View | §3, §4, §5, §6, §7 |
-| 3 — DDD | JsonBean → UseCase → Domain → Pojo | §3, §4, §5, §6, §7 + DDD-style-guide |
-| 4 — Hexagonal | core/ + adapter/in/out | всё выше + §8 |
+| 1 — Слоёный (без `usecase-pattern`) | JsonBean → jOOQ Pojo | этот гайд не применяется |
+| 2 — Use Case Pattern (CQRS — опция) | JsonBean → UseCase(Command/Query) → Pojo/View | §3, §4, §5, §6 (опция CQRS), §7 |
+| 3 — DDD + Hexagonal | JsonBean → UseCase → Domain → Pojo; core/ + adapter/in/out | §3, §4, §5, §6, §7 + DDD-style-guide + §8 |
 
 ---
 
@@ -54,8 +51,8 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 - **R-UC-3.** Имя выражает бизнес-операцию: `CreateOrderUseCase`,
   `FindOrderByIdUseCase`. Один UseCase = одна операция.
 - **R-UC-4.** Параметр `R` — это тип результата, который контроллер вернёт
-  клиенту: на Уровне 1–2 это обычно `JsonBean` или `UseCaseEmptyResult`,
-  на Уровне 3+ — JsonBean или специальный read-DTO.
+  клиенту: на Уровне 2 это обычно `JsonBean` или `UseCaseEmptyResult`,
+  на Уровне 3 — JsonBean или специальный read-DTO.
 
 ### 3.2 Запрещено
 
@@ -77,7 +74,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 - **R-HND-2.** Помечен `@Component` (или эквивалентом для DI), чтобы
   Spring Boot starter подхватил его автоматически.
 - **R-HND-3.** На handler команды — `@Transactional`. На handler запроса —
-  `@Transactional(readOnly = true)` (на Уровне 2+).
+  `@Transactional(readOnly = true)` (на Уровне 2 и выше).
 - **R-HND-4.** Один Handler — один UseCase. Не делать «универсальных»
   handler-ов на несколько UseCase.
 - **R-HND-5.** Все внешние зависимости (репозитории, мапперы,
@@ -122,7 +119,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 
 ---
 
-## 6. CQRS (Уровень 2+)
+## 6. CQRS (опция Уровня 2)
 
 ### 6.1 Обязательно
 
@@ -153,8 +150,8 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 
 ### 7.1 Универсальные правила
 
-- **R-LAY-1.** На входе UseCase — только `JsonBean` (Уровень 1–2) или
-  явные DTO/VO (Уровень 3+). Не передавать сразу `Pojo` БД в UseCase.
+- **R-LAY-1.** На входе UseCase — только `JsonBean` (Уровень 2) или
+  явные DTO/VO (Уровень 3). Не передавать сразу `Pojo` БД в UseCase.
 - **R-LAY-2.** На выходе UseCase — только `JsonBean` или явный read-DTO,
   никогда — `Pojo` БД напрямую.
 - **R-LAY-3.** Маппинг между слоями — **default: MapStruct**:
@@ -181,7 +178,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 
 ---
 
-## 8. Hexagonal (Уровень 4)
+## 8. Hexagonal (часть Уровня 3)
 
 ### 8.1 Обязательно
 
@@ -194,7 +191,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
   `core/<bc>/port/`. Реализация — в `adapter/out/...`.
 - **R-HEX-4.** Один UseCase может вызываться из нескольких входных
   адаптеров (REST, Kafka-listener, scheduler). Это нормальная цель
-  Уровня 4 — **не дублировать** Handler.
+  Уровня 3 — **не дублировать** Handler.
 
 ### 8.2 Запрещено
 
@@ -228,7 +225,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 - **R-TX-2.** Один UseCase = одна транзакция. Если нужна Saga — это
   оркестратор в Handler, а каждый шаг — отдельный UseCase или вызов
   внешнего сервиса с Outbox.
-- **R-TX-3.** Публикация доменных событий (Уровень 3+) — через
+- **R-TX-3.** Публикация доменных событий (Уровень 3) — через
   `DomainEventPublisher` после `repository.save(...)`. После публикации
   `clearDomainEvents()` (см. ddd-tactical-style-guide.md).
 
@@ -236,7 +233,7 @@ Use Case Pattern имеет четыре уровня. Скилл должен �
 
 ## 11. Структура пакетов (опорная)
 
-### Уровни 1–2
+### Уровни 1–2 (плоская раскладка)
 
 ```
 <root>/
@@ -274,7 +271,7 @@ adapter/
   out/postgres/JooqOrderRepository.java
 ```
 
-### Уровень 4
+### Уровень 3 (Hexagonal-раскладка)
 
 `core/` строго отделено от `adapter/*`, зависимости только внутрь.
 
@@ -282,7 +279,7 @@ adapter/
 
 ## 12. Проектные конвенции (default-ы для генерации)
 
-Когда скиллы (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`, `ucp-test-design`) собирают новый сервис на Tier C / UCP Level 4 — берут эти решения по умолчанию. Команда может явно отступить, но обязана зафиксировать причину.
+Когда скиллы (`ucp-pattern-design`, `ucp-ddd-tactical-design`, `ucp-api-design`, `ucp-test-design`) собирают новый сервис на Уровне 3 (DDD + Hexagonal) — берут эти решения по умолчанию. Команда может явно отступить, но обязана зафиксировать причину.
 
 ### 12.0 Сборка и persistence-стек (default)
 
@@ -306,7 +303,7 @@ adapter/
 
 ### 12.1 Gradle multi-module с самого старта
 
-Для Tier C / UCP Level 4 проект **сразу** разделяется на модули (один модуль на каждый порт/адаптер), чтобы ArchUnit-правила работали с первого коммита:
+Для Уровня 3 (DDD + Hexagonal) проект **сразу** разделяется на модули (один модуль на каждый порт/адаптер), чтобы ArchUnit-правила работали с первого коммита:
 
 ```
 <service>/
@@ -321,7 +318,7 @@ adapter/
 
 Зависимости направлены внутрь: `bootstrap → adapter-* → core`. Adapter-модули **не зависят друг от друга** (горизонтально). `core` не зависит ни от чего, кроме `usecase-pattern-core`, `ddd-building-blocks`, `hexagonal-architecture-core` и стандартной Java.
 
-Tier B (UCP Levels 1–2) может оставаться single-module — multi-module не оправдан без Hexagonal.
+Уровень 2 (Use Case Pattern) может оставаться single-module — multi-module не оправдан без Hexagonal.
 
 ### 12.2 OpenAPI-first
 
@@ -377,9 +374,9 @@ Synchronous, только Postgres + WireMock, `@MockitoBean DateTimeService/Uui
 2. Каждый Handler — `@Component`, реализует useCaseType, помечен
    `@Transactional` (или readOnly).
 3. Контроллер ходит только через `UseCaseDispatcher`.
-4. CQRS-маркеры (на Уровне 2+) проставлены: команды → `UseCaseCommand`,
+4. CQRS-маркеры (опция Уровня 2) проставлены: команды → `UseCaseCommand`,
    запросы → `UseCaseQuery`.
 5. Слои моделей не смешаны. JsonBean ≠ Pojo ≠ Domain.
 6. На Уровне 3 — соблюдены правила DDD-style-guide.
-7. На Уровне 4 — `core/` не импортирует Spring/jOOQ/REST/Kafka.
+7. На Уровне 3 — `core/` не импортирует Spring/jOOQ/REST/Kafka.
 8. Step-ы используются только при реальном переиспользовании.

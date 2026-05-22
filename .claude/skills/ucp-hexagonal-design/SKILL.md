@@ -1,6 +1,6 @@
 ---
 name: ucp-hexagonal-design
-description: Сгенерировать или ре-структурировать сервис под Hexagonal Architecture — multi-module gradle skeleton (core/persistence/*-in-adapter/*-out-adapter/bootstrap), settings.gradle.kts с include-ами, build.gradle.kts для каждого модуля с правильными dependencies (core без Spring/JOOQ, adapters → core), placeholder-классы (Application.java в bootstrap, package-info.java в core/<bc>/{aggregate,port}, ArchUnit base test). Решает: какой Tier (применять Hexagonal с Tier C+, иначе skip), какие in-adapter модули нужны (user/admin/kafka), какие out-adapter модули (persistence + per-system: payment/notification/storage), композиция bootstrap. Применяется при старте нового Tier C-сервиса либо при upgrade existing Tier B → Tier C. Триггеры: «hexagonal layout для нового сервиса», «реструктурируй под core/adapter».
+description: Сгенерировать или ре-структурировать сервис под Hexagonal Architecture — multi-module gradle skeleton (core/persistence/*-in-adapter/*-out-adapter/bootstrap), settings.gradle.kts с include-ами, build.gradle.kts для каждого модуля с правильными dependencies (core без Spring/JOOQ, adapters → core), placeholder-классы (Application.java в bootstrap, package-info.java в core/<bc>/{aggregate,port}, ArchUnit base test). Решает: применять ли Hexagonal (часть Уровня 3 — DDD + Hexagonal; на Уровне 1–2 skip), какие in-adapter модули нужны (user/admin/kafka), какие out-adapter модули (persistence + per-system: payment/notification/storage), композиция bootstrap. Применяется при старте нового сервиса Уровня 3 либо при upgrade существующего сервиса Уровня 2 → Уровень 3. Триггеры: «hexagonal layout для нового сервиса», «реструктурируй под core/adapter».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,11 +10,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/hexagonal-style-guide.md` (`R-HEX-*`). Опционально — `usecase-pattern-style-guide.md` (`R-LAY-*`), `spring-bootstrap-style-guide.md` (`BS-*`).
+1. **Прочитай** `.claude/docs/hexagonal-rules.md` (`R-HEX-*`). Опционально — `usecase-pattern-rules.md` (`R-LAY-*`), `spring-bootstrap-style-guide.md` (`BS-*`).
 
 2. **Уточни параметры:**
    - **Service name** — `<service>` (`order-service`, `notification-service`).
-   - **Tier** — должен быть **C+** (Hexagonal на Tier A/B = overkill, см. `R-HEX-WHEN-X1`). Если C/C+ не подтверждён — отказ генерировать с suggestion перейти на UCP L1-2.
+   - **Уровень зрелости** — должен быть **3** (Hexagonal — часть Уровня 3 «DDD + Hexagonal»; на Уровне 1–2 = overkill, см. `R-HEX-WHEN-X1`). Если Уровень 3 не подтверждён — отказ генерировать с suggestion остаться на Уровне 1–2.
    - **Bounded contexts** — список (для small-сервиса часто 1 BC; для модульного монолита 2-3+). Влияет на пакетную раскладку core/<bc>/.
    - **Inbound** — какие нужны: REST user, REST admin, Kafka consumer, scheduler, CLI?
    - **Outbound** — какие внешние системы: PG (всегда), payment (`sber`, `yandex-pay`), SMS (`twilio`), file-storage (`s3`), Kafka producer?
@@ -53,7 +53,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        version = "0.1.0-SNAPSHOT"
        repositories {
            mavenCentral()
-           // maven("<your-internal-maven-repo>") // если есть внутренний Maven
+           maven("https://gitlab.mosmetro.tech/api/v4/groups/...") // если внутренняя репозиторий
        }
    }
 
@@ -254,9 +254,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    testImplementation("com.tngtech.archunit:archunit-junit5:1.2.1")
    ```
 
-   ### 3.5. Patch для existing Tier B → Tier C upgrade
+   ### 3.5. Patch для upgrade существующего сервиса Уровень 2 → Уровень 3
 
-   Если сервис уже существует на Tier B (один gradle-модуль), миграция — отдельный план:
+   Если сервис уже существует на Уровне 2 (один gradle-модуль), миграция — отдельный план:
    - Шаг 1: создать `core/` модуль + переместить туда domain + UseCase.
    - Шаг 2: создать `persistence/` модуль + переместить JOOQ-репозитории.
    - Шаг 3: разделить REST в `*-in-adapter/`.
@@ -274,7 +274,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Placeholder package-info для domain и port.
 
 5. **Структура вывода:**
-   1. **Решения** — Tier, список модулей (in-adapters / out-adapters), bounded contexts.
+   1. **Решения** — уровень зрелости, список модулей (in-adapters / out-adapters), bounded contexts.
    2. **Дерево модулей** — `tree`-style.
    3. **Каждый файл — отдельный code block** с путём.
    4. **Для upgrade existing-сервиса** — пошаговый migration plan с `git mv`.
