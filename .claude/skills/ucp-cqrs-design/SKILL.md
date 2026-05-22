@@ -1,6 +1,6 @@
 ---
 name: ucp-cqrs-design
-description: Сгенерировать CQRS-разделение для агрегата под CQRS Style Guide — Command + CommandHandler пара (через UseCaseCommand маркер, FOR UPDATE load aggregate, outbox event), Query + QueryHandler пара (через UseCaseQuery маркер, ViewRepository, read-DTO record), <X>ViewRepository интерфейс в core/ и Jooq<X>ViewRepository в persistence/, read-model schema (Liquibase changeset для денормализованной таблицы), read-side consumer (KafkaListener с idempotent dedup), bootstrap-задача для rebuild read-model из write-side. Решает: какой Tier (B lightweight маркеры или C+ full split с отдельной read-таблицей), синхронизация (sync через outbox+Kafka, не TX UPDATE), eventual consistency декларация в OpenAPI. Применяется при добавлении нового read-flow к existing-агрегату или при росте read-нагрузки. Триггеры: «нужна read-проекция для X», «CQRS для агрегата Y», «отдельная read-model».
+description: Сгенерировать CQRS-разделение для агрегата под CQRS Style Guide — Command + CommandHandler пара (через UseCaseCommand маркер, FOR UPDATE load aggregate, outbox event), Query + QueryHandler пара (через UseCaseQuery маркер, ViewRepository, read-DTO record), <X>ViewRepository интерфейс в core/ и Jooq<X>ViewRepository в persistence/, read-model schema (Liquibase changeset для денормализованной таблицы), read-side consumer (KafkaListener с idempotent dedup), bootstrap-задача для rebuild read-model из write-side. Решает: какой вариант CQRS (lightweight маркеры на Уровне 2 или full split с отдельной read-таблицей на Уровне 3), синхронизация (sync через outbox+Kafka, не TX UPDATE), eventual consistency декларация в OpenAPI. Применяется при добавлении нового read-flow к existing-агрегату или при росте read-нагрузки. Триггеры: «нужна read-проекция для X», «CQRS для агрегата Y», «отдельная read-model».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -15,16 +15,16 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 2. **Уточни параметры:**
    - **Aggregate** — имя (`Order`), есть ли write-handlers (`<X>CommandHandler`), есть ли уже `<X>Repository`.
    - **Read-сценарий** — что читаем (один объект, список с фильтрацией, summary, отчёт), форма read-DTO (`OrderSummary` vs `OrderListItem` vs `OrderReport`).
-   - **Tier**:
-     - Tier B (lightweight) — read через тот же `<X>Repository.findById(id, NO_LOCK)`, read-DTO просто как маппинг.
-     - Tier C (split) — отдельный `<X>ViewRepository` в core/ + `Jooq<X>ViewRepository` в persistence/, та же БД но разные методы.
-     - Tier C+ (event-driven) — отдельная read-таблица `<x>_summary` (DDL changeset), sync через outbox+Kafka, read-side consumer.
-   - **Read-нагрузка** — оценить read:write ratio. Если ≥ 10:1 — Tier C+ оправдан; иначе — Tier C.
+   - **Вариант CQRS** (CQRS — опция Уровня 2, а её глубина растёт с уровнем зрелости):
+     - lightweight (Уровень 2) — read через тот же `<X>Repository.findById(id, NO_LOCK)`, read-DTO просто как маппинг.
+     - split (Уровень 3) — отдельный `<X>ViewRepository` в core/ + `Jooq<X>ViewRepository` в persistence/, та же БД но разные методы.
+     - event-driven (Уровень 3) — отдельная read-таблица `<x>_summary` (DDL changeset), sync через outbox+Kafka, read-side consumer.
+   - **Read-нагрузка** — оценить read:write ratio. Если ≥ 10:1 — event-driven оправдан; иначе — split.
    - **RYW** (read-your-writes) — критично или нет? Если да — sticky session или sync-wait в command-handler.
 
-3. **Произведи код** в зависимости от Tier'а.
+3. **Произведи код** в зависимости от выбранного варианта CQRS.
 
-   ### 3.1. Tier B — lightweight (read через тот же repository)
+   ### 3.1. lightweight (Уровень 2) — read через тот же repository
 
    ```java
    // core/<bc>/usecase/query/GetOrderSummaryQuery.java
@@ -71,9 +71,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   ### 3.2. Tier C — split (отдельный ViewRepository)
+   ### 3.2. split (Уровень 3) — отдельный ViewRepository
 
-   В дополнение к Tier B:
+   В дополнение к варианту lightweight:
 
    ```java
    // core/<bc>/domain/repository/OrderViewRepository.java
@@ -103,9 +103,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   ### 3.3. Tier C+ — event-driven (отдельная read-таблица + sync)
+   ### 3.3. event-driven (Уровень 3) — отдельная read-таблица + sync
 
-   В дополнение к Tier C:
+   В дополнение к варианту split:
 
    #### 3.3.1. Read-model DDL (Liquibase)
    ```yaml
@@ -204,21 +204,21 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Query — `record implements UseCaseQuery<R>`.
    - QueryHandler — `@Transactional(readOnly = true)`.
    - Read-DTO — record, не агрегат.
-   - Tier C+: read-model DDL + consumer + bootstrap-задача все вместе (нельзя только одно).
+   - event-driven: read-model DDL + consumer + bootstrap-задача все вместе (нельзя только одно).
    - Sync через outbox/Kafka, не sync UPDATE в TX.
    - Idempotent consumer (`processed_event`).
    - OpenAPI description упоминает eventual consistency.
 
 5. **Структура вывода:**
-   1. **Решения** — Tier (B/C/C+), почему. Read-model location (та же БД / Redis / новая таблица).
-   2. **Дерево новых файлов** — Query/Handler/DTO; ViewRepository (Tier C+); DDL + Consumer + RebuildJob (Tier C+).
+   1. **Решения** — вариант CQRS (lightweight / split / event-driven), почему. Read-model location (та же БД / Redis / новая таблица).
+   2. **Дерево новых файлов** — Query/Handler/DTO; ViewRepository (split); DDL + Consumer + RebuildJob (event-driven).
    3. **Каждый файл — отдельный code block** с путём.
    4. **Patch для existing файлов** — application.yml (Kafka topic configs если C+), OpenAPI YAML.
    5. **Заметки по реализации:**
       - Команды: `./gradlew compileJava`, `liquibaseUpdate` если C+.
       - **TODO для пользователя:** запустить `OrderSummaryRebuildJob` при первом deploy (admin endpoint или migration script); создать Kafka topic; настроить алерты на consumer lag.
-      - Если Tier C — сначала `ucp-jooq-design` для `Jooq<X>ViewRepository`.
-      - Если Tier C+ — сначала `ucp-pg-schema-design` для `<x>_summary` DDL + `ucp-kafka-design` для consumer.
+      - Если split — сначала `ucp-jooq-design` для `Jooq<X>ViewRepository`.
+      - Если event-driven — сначала `ucp-pg-schema-design` для `<x>_summary` DDL + `ucp-kafka-design` для consumer.
    6. **Финальный шаг:** «после генерации запусти `ucp-cqrs-review` для верификации».
 
 ## Что НЕ делает

@@ -11,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Зависимости
 
 - **`.claude/docs/hexagonal-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-HEX-WHEN-*` (когда), `R-HEX-MOD-*` (модули), `R-HEX-CORE-*` (core), `R-HEX-PORT-*` (ports), `R-HEX-AIN-*` (adapters in), `R-HEX-AOUT-*` (adapters out), `R-HEX-BOOT-*` (bootstrap), `R-HEX-TEST-*` (архитектурные тесты).
-- Парные: `usecase-pattern-rules.md` (`R-LAY-*` — Уровень 4), `ddd-tactical-rules.md` (`R-AGG-*` для core), `jooq-rules.md` (`R-JOOQ-REPO-*`), `rest-api-rules.md` (`R-OAS-*` для in-adapter).
+- Парные: `usecase-pattern-rules.md` (`R-LAY-*` — Уровень 3), `ddd-tactical-rules.md` (`R-AGG-*` для core), `jooq-rules.md` (`R-JOOQ-REPO-*`), `rest-api-rules.md` (`R-OAS-*` для in-adapter).
 
 ## Инструкции
 
@@ -24,7 +24,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `<App>Application.java` и `@Configuration`-классы в bootstrap.
 
 3. **Прогон по подгруппам:**
-   - **`R-HEX-WHEN-*`** — Tier C+ оправдан, Tier A/B — overkill. Признаки готовности: 2+ внешних систем, агрегаты, 3+ типа input.
+   - **`R-HEX-WHEN-*`** — Уровень 3 оправдан (Hexagonal — часть Уровня 3), Уровень 1–2 — overkill. Признаки готовности: 2+ внешних систем, агрегаты, 3+ типа input.
    - **`R-HEX-MOD-*`** — multi-module, core/ единственный без Spring, per-system out-adapters, per-purpose in-adapters, bootstrap composition root.
    - **`R-HEX-CORE-*`** — core зависит ТОЛЬКО от JDK + Lombok + ddd-building-blocks + usecase-pattern + jakarta.validation API; rich domain methods не anemic; generated POJO не используется как domain.
    - **`R-HEX-PORT-*`** — port-interfaces в core/<bc>/port/out/; сигнатуры с domain-типами; `<X>PortException` базовый в core, конкретные в adapters; UseCase = inbound port.

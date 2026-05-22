@@ -1,6 +1,6 @@
 ---
 name: ucp-cqrs-review
-description: Ревью CQRS-разделения — когда применён (Tier-aware), command-side (запись через aggregate, FOR UPDATE, outbox), query-side (через ViewRepository с read-DTO), read-model (отдельная таблица/Redis/ES, sync через события, не bidirectional, не source-of-truth), синхронизация через outbox+Kafka не sync UPDATE в TX, идемпотентность consumer, eventual consistency декларирована в API, антипаттерны (write в query handler, query грузит агрегат целиком, read-model с бизнес-логикой, sync через PG triggers). Применяется при ревью UseCase/Handler-классов с маркерами Command/Query, ViewRepository, read-DTO, outbox-publishers, read-side consumers. Опирается на коды R-CQRS-*.
+description: Ревью CQRS-разделения — когда применён (с учётом уровня зрелости), command-side (запись через aggregate, FOR UPDATE, outbox), query-side (через ViewRepository с read-DTO), read-model (отдельная таблица/Redis/ES, sync через события, не bidirectional, не source-of-truth), синхронизация через outbox+Kafka не sync UPDATE в TX, идемпотентность consumer, eventual consistency декларирована в API, антипаттерны (write в query handler, query грузит агрегат целиком, read-model с бизнес-логикой, sync через PG triggers). Применяется при ревью UseCase/Handler-классов с маркерами Command/Query, ViewRepository, read-DTO, outbox-publishers, read-side consumers. Опирается на коды R-CQRS-*.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,7 +10,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/cqrs-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (Tier-эволюция).
+- **`.claude/docs/cqrs-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (уровень и эволюция CQRS).
 - Парные: `usecase-pattern-rules.md` (`R-UC-*` маркеры), `ddd-tactical-rules.md` (`R-AGG-*`), `jooq-rules.md` (`R-JOOQ-VIEW-*`), `kafka-rules.md` (`R-KFK-OBX-*`).
 
 ## Инструкции
@@ -23,12 +23,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Outbox-event records и read-side consumer-listeners.
 
 3. **Прогон по подгруппам:**
-   - **`R-CQRS-WHEN-*`** — full CQRS только при явной read-нагрузке; lightweight (маркеры) обязателен на Tier B+; не разделять базы без причины.
+   - **`R-CQRS-WHEN-*`** — full CQRS только при явной read-нагрузке; lightweight (маркеры) обязателен на Уровне 2+ (CQRS — опция Уровня 2); не разделять базы без причины.
    - **`R-CQRS-CMD-*`** — Command — record + UseCaseCommand; меняет один агрегат; `@Transactional` RW; load aggregate с FOR UPDATE; сохраняет; outbox event; возвращает минимум (id/status), не read-DTO.
    - **`R-CQRS-QRY-*`** — Query — record + UseCaseQuery; `@Transactional(readOnly = true)`; через ViewRepository; возвращает read-DTO, не агрегат.
    - **`R-CQRS-RM-*`** — read-model в оптимальном месте; денормализована; обновляется через события; восстановима из write-side; без бизнес-логики; не source-of-truth; не bidirectional.
    - **`R-CQRS-SYNC-*`** — outbox + Kafka, не sync UPDATE в TX; idempotent consumer (`processed_event`); bootstrap-задача для rebuild; eventual consistency в OpenAPI description; read-your-writes когда критично.
-   - **`R-CQRS-TIER-*`** — Tier A без маркеров; Tier B lightweight маркеры; Tier C полный split с ViewRepository; Tier C+ event-driven read-model; эволюция в одну сторону.
+   - **`R-CQRS-TIER-*`** — Уровень 1 без маркеров; Уровень 2 lightweight маркеры; Уровень 3 полный split с ViewRepository; event-driven read-model; эволюция в одну сторону.
 
 4. **Ищи паттерны-нарушения:**
    - `Command*Handler` делает отдельный `SELECT` для чтения (не load-aggregate one-shot) — `R-CQRS-CMD-X1`.
@@ -43,7 +43,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - В command-handler синхронный `INSERT INTO <x>_summary` сразу после `repository.save(aggregate)` (не через outbox) — `R-CQRS-SYNC-X1`.
    - PG-триггер на write-таблицу обновляет read-таблицу — `R-CQRS-SYNC-X2`.
    - Event-record содержит generated POJO write-схемы (`OrdersPojo` в payload) — `R-CQRS-SYNC-X3`.
-   - Tier A проект с маркерами `UseCaseCommand`/`Query` без `@Transactional(readOnly = true)` enforcement — `R-CQRS-TIER-X1` (карго-культ).
+   - Проект Уровня 1 с маркерами `UseCaseCommand`/`Query` без `@Transactional(readOnly = true)` enforcement — `R-CQRS-TIER-X1` (карго-культ).
    - Один `<X>Repository` для read и write при наличии отдельной read-таблицы — `R-CQRS-TIER-X2`.
 
 5. **При ревью OpenAPI:**
@@ -65,7 +65,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
      - Eventual consistency не задекларирован в API.
    - **Замечание:**
      - Command возвращает больше необходимого (read-DTO).
-     - Tier A с маркерами без enforcement.
+     - Уровень 1 с маркерами без enforcement.
 
 ## Что не входит
 

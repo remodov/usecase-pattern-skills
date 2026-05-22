@@ -113,7 +113,7 @@ public Jackson2ObjectMapperBuilderCustomizer objectMapperCustomizer() {
 
 ## 7. Persistence — jOOQ и только generated классы
 
-`BS-17` **Persistence-слой во всех сервисах — только jOOQ.** Никаких альтернатив (JdbcTemplate, JPA/Hibernate, MyBatis, Spring Data JDBC), независимо от Tier'а сервиса. Это командное правило, оно перебивает любые tier-обоснования вида «для CRUD JdbcTemplate проще» или «JPA даёт быстрый старт». Подключаем `spring-boot-starter-jooq` + `nu.studer.jooq` plugin для кодогенерации.
+`BS-17` **Persistence-слой во всех сервисах — только jOOQ.** Никаких альтернатив (JdbcTemplate, JPA/Hibernate, MyBatis, Spring Data JDBC), независимо от уровня зрелости сервиса. Это командное правило, оно перебивает любые обоснования вида «для CRUD JdbcTemplate проще» или «JPA даёт быстрый старт». Подключаем `spring-boot-starter-jooq` + `nu.studer.jooq` plugin для кодогенерации.
 
 `BS-18` **Используем максимум сгенерённого кода: generated POJO, generated enum'ы, generated table-references.** Handcrafted POJO/entity, дублирующие строку БД, удаляются. Цель — меньше кода и один источник правды (Liquibase-схема → jOOQ codegen → Java).
 

@@ -20,7 +20,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/spring-bootstrap-style-guide.md`. У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 4 дополнительно прочитай `usecase-pattern-rules.md` для раскладки модулей.
+1. **Прочитай style guide** из `.claude/docs/spring-bootstrap-style-guide.md`. У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 3 дополнительно прочитай `usecase-pattern-rules.md` для раскладки модулей.
 
 2. **Диагностируй: это починка или с нуля.** Для починки сначала запусти и прочитай реальную ошибку:
    ```bash
@@ -65,7 +65,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 8. **Подключи миграции один раз, версионируй навсегда.** По `BS-10/BS-12`: `migrations/db/` в корне репозитория, модуль `adapter-out-postgres` (или `bootstrap`) подтягивает их через `srcDir(rootProject.file("migrations"))`. Последующие изменения схемы — в новые ChangeSet-файлы (`v-1.1`, `v-1.2`); никогда не редактируй применённые ChangeSet-ы — Liquibase отвергнет их при старте по checksum-несовпадению.
 
 9. **Persistence — только jOOQ, только сгенерированный.** По `BS-17/18/19/20`:
-   - **Никакого JdbcTemplate, JPA, MyBatis.** Это применимо на **каждом** Tier (A/B/C). Если видишь репозиторий на JdbcTemplate или JPA `@Entity` — это нарушение; перепиши на jOOQ DSL над сгенерированными таблицами.
+   - **Никакого JdbcTemplate, JPA, MyBatis.** Это применимо на **каждом** уровне зрелости (1/2/3). Если видишь репозиторий на JdbcTemplate или JPA `@Entity` — это нарушение; перепиши на jOOQ DSL над сгенерированными таблицами.
    - **Codegen-плагин**: `nu.studer.jooq` 10.x со стратегией PASCAL `_Pojo`. Codegen работает против **применённой** Liquibase-схемы в локальном Postgres — последовательность команд: `./gradlew update && ./gradlew generateJooq && ./gradlew test`. Добавь задачу `regenerate`, объединяющую обе.
    - **Используй сгенерированные POJO и enum-ы** (`<service>.generated.tables.pojos.*Pojo`, `<service>.generated.enums.*`) напрямую в репозиториях, сервисах, мапперах DTO контроллеров. Ручные классы `Notification` / `Channel` / `NotificationStatus`, дублирующие layout строки — удали.
    - **Колонки VARCHAR с фиксированными значениями → Postgres ENUM-типы.** Добавь отдельный ChangeSet `v-1.x/enum-types.yaml`, который создаёт enum и `ALTER`-ит колонку под него. Тогда jOOQ codegen сгенерирует Java-enum автоматически — никакого `forcedType`, никакого ручного enum.
@@ -151,7 +151,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
     | Ревью спеки | `/ucp-spec-review` |
     | UseCase + Handler + Controller + маппер | `/ucp-pattern-design` |
     | OpenAPI + DTO из карточки команды | `/ucp-api-design` |
-    | Aggregate + VO + Domain Event + Repository (Tier C) | `/ucp-ddd-tactical-design` |
+    | Aggregate + VO + Domain Event + Repository (Уровень 3) | `/ucp-ddd-tactical-design` |
     | Bootstrap (профили, jOOQ, Liquibase) | `/ucp-bootstrap-design` |
     | Тесты по разделу «Критерии приёмки» | `/ucp-test-design` |
     ```

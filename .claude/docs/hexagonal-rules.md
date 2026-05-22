@@ -8,11 +8,11 @@
 
 ## 1. Когда переходить на Hexagonal
 **MUST:**
-- **R-HEX-WHEN-1.** Hexagonal обязателен на **Tier C** (DDD-сервисы) и **Tier D** (event-sourced / CQRS+). Tier A/B — overkill.
+- **R-HEX-WHEN-1.** Hexagonal — часть **Уровня 3** (DDD + Hexagonal: агрегаты, ports/adapters, ArchUnit). На Уровне 1–2 — overkill.
 - **R-HEX-WHEN-2.** Признаки, что **пора** переходить:
 - **R-HEX-WHEN-3.** Признаки, что **рано** переходить:
 **MUST NOT:**
-- **R-HEX-WHEN-X1.** **Hexagonal как cargo-cult** — все сервисы под него причёсаны независимо от сложности. Tier A-сервис из 3 endpoints в hexagonal-раскладке = ceremony без выгоды.
+- **R-HEX-WHEN-X1.** **Hexagonal как cargo-cult** — все сервисы под него причёсаны независимо от сложности. Сервис Уровня 1 из 3 endpoints в hexagonal-раскладке = ceremony без выгоды.
 - **R-HEX-WHEN-X2.** **Частичный Hexagonal** — `core/` есть, но `adapter/in/*` смешан с REST-controller'ами + бизнес-логикой. Либо полный Hexagonal, либо ничего.
 
 ## 2. Структура модулей

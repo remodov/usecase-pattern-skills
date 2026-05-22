@@ -22,7 +22,7 @@ CQRS уже частично реализован в `usecase-pattern-style-guid
 3. [Query side — `R-CQRS-QRY-*`](#3-query-side)
 4. [Read-model — `R-CQRS-RM-*`](#4-read-model)
 5. [Синхронизация через события — `R-CQRS-SYNC-*`](#5-синхронизация-через-события)
-6. [Tier и эволюция — `R-CQRS-TIER-*`](#6-tier-и-эволюция)
+6. [Уровень и эволюция CQRS — `R-CQRS-TIER-*`](#6-уровень-и-эволюция-cqrs)
 7. [Антипаттерны — сводка `R-CQRS-*-X*`](#7-антипаттерны)
 
 ---
@@ -33,7 +33,7 @@ CQRS — паттерн, который добавляет сложность. �
 
 ### 1.1 Обязательно
 
-- **R-CQRS-WHEN-1.** **Lightweight CQRS на маркерах** (`UseCaseCommand` / `UseCaseQuery`) — обязателен на Tier B+. Это бесплатное разделение: один и тот же интерфейс, два маркера, разные `@Transactional`-свойства, разная валидация. Не требует отдельной read-БД.
+- **R-CQRS-WHEN-1.** **Lightweight CQRS на маркерах** (`UseCaseCommand` / `UseCaseQuery`) — обязателен на Уровне 2+. Это бесплатное разделение: один и тот же интерфейс, два маркера, разные `@Transactional`-свойства, разная валидация. Не требует отдельной read-БД. CQRS — опция Уровня 2 (Use Case Pattern), не отдельный уровень зрелости.
 
 - **R-CQRS-WHEN-2.** **Полный CQRS с разделением хранилищ** (write-DB + read-DB / search-engine / cache) оправдан при:
   - Read:write ratio ≥ 10:1 (типичный e-commerce frontend).
@@ -197,25 +197,25 @@ Read-model — данные, оптимизированные под чтени�
 
 ---
 
-## 6. Tier и эволюция
+## 6. Уровень и эволюция CQRS
 
 ### 6.1 Обязательно
 
-- **R-CQRS-TIER-1.** **Tier A** (классическая 3-tier): CQRS не применяется. UseCase + Handler без `Command`/`Query` маркеров.
+- **R-CQRS-TIER-1.** **Уровень 1** (Слоёный: Controller → Service → Repository): CQRS не применяется, UseCase-маркеров нет.
 
-- **R-CQRS-TIER-2.** **Tier B** (UCP L1-2): lightweight CQRS — маркеры `UseCaseCommand`/`UseCaseQuery` обязательны. Read и write через **один и тот же `<X>Repository`**, но read-методы через `SelectMode.NO_LOCK` + `@Transactional(readOnly = true)`.
+- **R-CQRS-TIER-2.** **Уровень 2** (Use Case Pattern): lightweight CQRS — опция уровня, маркеры `UseCaseCommand`/`UseCaseQuery` обязательны. Read и write через **один и тот же `<X>Repository`**, но read-методы через `SelectMode.NO_LOCK` + `@Transactional(readOnly = true)`.
 
-- **R-CQRS-TIER-3.** **Tier C** (UCP L3-4): полный split. Появляется `<X>ViewRepository` (см. `R-JOOQ-VIEW-1`) с read-DTO; write — через `<X>Repository` с агрегатом и `FOR UPDATE`.
+- **R-CQRS-TIER-3.** **Уровень 3** (DDD + Hexagonal): полный split. Появляется `<X>ViewRepository` (см. `R-JOOQ-VIEW-1`) с read-DTO; write — через `<X>Repository` с агрегатом и `FOR UPDATE`.
 
-- **R-CQRS-TIER-4.** **Tier C+ (event-driven)**: read-model в отдельной таблице/Redis/ElasticSearch, синхронизация через outbox + Kafka. Эволюция от Tier C по мере роста нагрузки.
+- **R-CQRS-TIER-4.** **Уровень 3, event-driven**: read-model в отдельной таблице/Redis/ElasticSearch, синхронизация через outbox + Kafka. Дальнейшая эволюция полного split по мере роста нагрузки.
 
-- **R-CQRS-TIER-5.** **Эволюция всегда в одну сторону**: A → B → C → C+. Возврат назад (от C+ к C) — крайне редкий и обычно говорит о неверной first-step decision.
+- **R-CQRS-TIER-5.** **Эволюция CQRS всегда в одну сторону**: маркеры (Уровень 2) → split с ViewRepository (Уровень 3) → event-driven read-model. Возврат назад — крайне редкий и обычно говорит о неверной first-step decision.
 
 ### 6.2 Запрещено
 
-- **R-CQRS-TIER-X1.** Tier A с CQRS-маркерами «потому что красиво». Маркеры без enforcement (transactional readOnly, отдельный repository) — карго-культ.
+- **R-CQRS-TIER-X1.** Уровень 1 с CQRS-маркерами «потому что красиво». Маркеры без enforcement (transactional readOnly, отдельный repository) — карго-культ.
 
-- **R-CQRS-TIER-X2.** Tier C+ с одним `<X>Repository` для read и write. Если есть отдельная read-инфраструктура (отдельная таблица), то и интерфейс отдельный.
+- **R-CQRS-TIER-X2.** Event-driven read-model с одним `<X>Repository` для read и write. Если есть отдельная read-инфраструктура (отдельная таблица), то и интерфейс отдельный.
 
 ---
 
@@ -237,7 +237,7 @@ Read-model — данные, оптимизированные под чтени�
 | Sync read-model в command-tx | `R-CQRS-SYNC-X1` | outbox + Kafka |
 | Sync через PG triggers | `R-CQRS-SYNC-X2` | outbox + consumer |
 | Schema-coupled events | `R-CQRS-SYNC-X3` | versioned event-records |
-| Tier A с CQRS-маркерами без enforcement | `R-CQRS-TIER-X1` | без маркеров |
-| Tier C+ с одним repository для R+W | `R-CQRS-TIER-X2` | отдельный ViewRepository |
+| Уровень 1 с CQRS-маркерами без enforcement | `R-CQRS-TIER-X1` | без маркеров |
+| Event-driven read-model с одним repository для R+W | `R-CQRS-TIER-X2` | отдельный ViewRepository |
 
 Финальная сводка: правил «Обязательно» — около 25, «Запрещено» — около 16.

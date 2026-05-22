@@ -15,7 +15,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - `.claude/docs/auth-patterns-style-guide.md` — `AUTH-19` для решения по retry.
    - `.claude/docs/rest-api-rules.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
    - `.claude/docs/spring-bootstrap-style-guide.md` — `BS-*` для gradle multi-module setup.
-   - `.claude/docs/usecase-pattern-rules.md` — на Уровне 4 для размещения port в `core/<bc>/port/out/`.
+   - `.claude/docs/usecase-pattern-rules.md` — на Уровне 3 для размещения port в `core/<bc>/port/out/`.
 
 2. **Уточни параметры интеграции** (один по одному, если пользователь не дал):
    - **Имя системы** (slug): `twilio`, `yandex-pay`, `sber`, `fns-receipt`. Имя = идентификатор для всех артефактов: модули `<system>-client-generator`, `<system>-out-adapter`, beans `@Bean("<system>RestClient")`, R4J instances `<system>`.
@@ -30,11 +30,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
      - **Non-money** → CB failure rate `50%` (default).
    - **Авторизация:** `none` (публичный API), `apiKey` (header `Authorization: <key>`), `bearer` (JWT/static), `oauth2-clientCredentials`, `mTLS`. См. `AUTH-13`/`AUTH-14`.
 
-3. **Определи Tier и Уровень проекта** (см. `usecase-pattern-rules.md` §2). Outbound-интеграции уместны на **Уровне 3+** (есть domain port в `core/`). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>UseCaseHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
+3. **Определи уровень зрелости проекта** (см. `usecase-pattern-rules.md` §2). Outbound-интеграции с domain port в `core/` уместны на **Уровне 3** (DDD + Hexagonal). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>UseCaseHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
 
 4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
 
-   ### 4.1. Doменный port (`core/`, Уровень 3+)
+   ### 4.1. Doменный port (`core/`, Уровень 3)
    ```
    core/src/main/java/<pkg>/domain/port/out/<system>/
      <System>Port.java           — interface с domain-методами
