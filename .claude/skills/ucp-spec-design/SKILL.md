@@ -24,7 +24,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
    - **Уровень 2 — Use Case Pattern** — `usecase-pattern` (UseCase + Handler); CQRS (`UseCaseCommand`/`UseCaseQuery` + Read Model) — опция этого уровня, не отдельный уровень.
    - **Уровень 3 — DDD + Hexagonal** — агрегаты, доменные события, ports/adapters (DDD и Hexagonal — один уровень).
 
-   Осмотри проект на признаки (`core/` + `adapter/`, `AggregateRoot`, `Entity<ID>`, импорты `usecase-pattern`). Если непонятно — **спроси**. Этот скилл **не делает as-is из кода**: если на входе только код без бизнес-брифа — остановись и предложи `ucp-spec-tier-0`.
+   Осмотри проект на признаки (`core/` + `adapter/`, `AggregateRoot`, `Entity<ID>`, импорты `usecase-pattern`). Если непонятно — **спроси**. Этот скилл проектирует **Уровни 1–3** от бизнес-брифа. **Уровень 0 (as-is) из кода — не этот скилл**: если на входе только код без бизнес-брифа, остановись и предложи `ucp-spec-tier-0`.
 
 3. **Раскладка файлов — всегда корень + `aggregates/`:**
    - корень `docs/spec/<service>-spec.md` — секции контекста;
