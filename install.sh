@@ -179,15 +179,6 @@ for doc in "$SKILLS_DIR"/.claude/docs/*.md; do
   echo "    ✓ $name"
 done
 
-# Obsidian vault bootstrap — конфигурация .obsidian/ для папки docs/spec/.
-# Делаем симлинк на бутстрап-директорию; ucp-spec-design при генерации
-# спеки скопирует её содержимое в docs/spec/.obsidian/.
-echo
-echo "==> Подключаю Obsidian-bootstrap в $PROJECT_DIR/.claude/docs/obsidian-vault-bootstrap"
-ln -sfn "$SKILLS_DIR/.claude/docs/obsidian-vault-bootstrap" \
-        "$PROJECT_DIR/.claude/docs/obsidian-vault-bootstrap"
-echo "    ✓ obsidian-vault-bootstrap (.obsidian/types.json + Dataview + Graph)"
-
 # CLAUDE.md — точка входа для Claude в проекте-потребителе. install.sh
 # управляет блоком между маркерами BEGIN ucp-skills / END ucp-skills:
 # создаёт файл, дописывает блок, либо in-place заменяет существующий блок.
