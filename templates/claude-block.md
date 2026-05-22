@@ -50,7 +50,7 @@ prompt-кэш и удорожает каждый ход; раннее чтени
 | OpenAPI + DTO + контроллер из карточки команды | `/ucp-api-design` |
 | Spring Security + OAuth2 + ABAC + audit | `/ucp-auth-design` |
 | Spring Boot bootstrap, Liquibase, jOOQ, профили (+ корневой CLAUDE.md) | `/ucp-bootstrap-design` |
-| Aggregate + VO + Domain Event + Repository (Tier C) | `/ucp-ddd-tactical-design` |
+| Aggregate + VO + Domain Event + Repository (Уровень 3) | `/ucp-ddd-tactical-design` |
 | Тесты по разделу «Критерии приёмки» | `/ucp-test-design` |
 | Ревью UseCase / Handler / Controller | `/ucp-pattern-review` |
 | Ревью REST-контракта | `/ucp-api-review` |
