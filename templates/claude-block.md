@@ -57,6 +57,8 @@ prompt-кэш и удорожает каждый ход; раннее чтени
 | Ревью DDD-кода | `/ucp-ddd-tactical-review` |
 | Ревью Java-стиля (что не ловит checkstyle) | `/ucp-java-style-review` |
 | Ревью авторизации | `/ucp-auth-review` |
+| Ревью тестов (структура, покрытие UC/BR, slow/flaky) | `/ucp-test-review` |
+| Ревью outbound-интеграции (структура, port, mapper) | `/ucp-integration-review` |
 
 (Полный список design↔review-пар — в README репо скиллов.) Style-guides — в
 `.claude/docs/*.md`. **Читай нужную секцию гайда, не весь файл**: гайды большие,

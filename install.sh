@@ -70,7 +70,40 @@ manage_block() {
   fi
 }
 
-PROJECT_DIR="${1:-.}"
+CHECK_MODE=false
+POSITIONAL=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --check)
+      CHECK_MODE=true
+      shift
+      ;;
+    -h|--help)
+      cat <<USAGE
+Использование: install.sh [--check] [PROJECT_DIR]
+
+Без флагов: устанавливает скиллы / docs / agents / hooks в PROJECT_DIR
+(симлинками), мерж settings.json, managed-блоки в CLAUDE.md и .gitignore.
+По умолчанию PROJECT_DIR = текущая директория.
+
+  --check       Диагностический режим. Ничего не меняет, только проверяет
+                состояние установки в PROJECT_DIR. Exit 0 если всё OK,
+                exit 1 если найдены проблемы.
+
+Переменные окружения:
+  UCP_PROFILE   full (по умолчанию) | rest | data — набор скиллов.
+  UCP_SKILLS    Глоб-паттерн поверх UCP_PROFILE (например 'ucp-pattern-* ucp-api-*').
+USAGE
+      exit 0
+      ;;
+    *)
+      POSITIONAL+=("$1")
+      shift
+      ;;
+  esac
+done
+
+PROJECT_DIR="${POSITIONAL[0]:-.}"
 SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- профиль скиллов: резолвим UCP_PROFILE/UCP_SKILLS в список glob-паттернов ---
@@ -98,6 +131,128 @@ PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
 if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   echo "ERROR: PROJECT_DIR совпадает с папкой репо. Передайте путь до своего проекта." >&2
   exit 1
+fi
+
+# --- --check: диагностика без модификаций ---
+if [ "$CHECK_MODE" = true ]; then
+  echo "==> Проверка установки UCP-скиллов в $PROJECT_DIR"
+  echo
+  PROBLEMS=0
+
+  check_dir() {
+    local dir="$1"
+    local label="$2"
+    if [ ! -d "$dir" ]; then
+      echo "  ✗ $label: директория $dir не существует"
+      PROBLEMS=$((PROBLEMS + 1))
+      return
+    fi
+    local broken=0
+    local count=0
+    while IFS= read -r -d '' link; do
+      count=$((count + 1))
+      if [ ! -e "$link" ]; then
+        echo "  ✗ broken symlink: $link → $(readlink "$link")"
+        broken=$((broken + 1))
+      fi
+    done < <(find "$dir" -maxdepth 1 -mindepth 1 -type l -print0 2>/dev/null)
+    if [ "$broken" -eq 0 ] && [ "$count" -gt 0 ]; then
+      echo "  ✓ $label: $count симлинков, всё на месте"
+    elif [ "$count" -eq 0 ]; then
+      echo "  ⚠ $label: пусто (ожидались симлинки из $SKILLS_DIR)"
+      PROBLEMS=$((PROBLEMS + 1))
+    else
+      echo "  ✗ $label: $broken из $count симлинков broken (см. список выше)"
+      PROBLEMS=$((PROBLEMS + broken))
+    fi
+  }
+
+  check_dir "$PROJECT_DIR/.claude/skills" "Skills (ucp-*)"
+  check_dir "$PROJECT_DIR/.claude/docs"   "Docs (style-guides)"
+  check_dir "$PROJECT_DIR/.claude/agents" "Agents"
+  check_dir "$PROJECT_DIR/.claude/hooks"  "Hooks"
+
+  # CLAUDE.md managed block
+  if [ -f "$PROJECT_DIR/CLAUDE.md" ] && grep -qF "<!-- BEGIN ucp-skills" "$PROJECT_DIR/CLAUDE.md"; then
+    echo "  ✓ CLAUDE.md: managed-блок ucp-skills присутствует"
+  else
+    echo "  ✗ CLAUDE.md: managed-блок ucp-skills отсутствует"
+    PROBLEMS=$((PROBLEMS + 1))
+  fi
+
+  # .gitignore managed block
+  if [ -f "$PROJECT_DIR/.gitignore" ] && grep -qF "# BEGIN ucp-skills" "$PROJECT_DIR/.gitignore"; then
+    echo "  ✓ .gitignore: managed-блок ucp-skills присутствует"
+  else
+    echo "  ✗ .gitignore: managed-блок ucp-skills отсутствует"
+    PROBLEMS=$((PROBLEMS + 1))
+  fi
+
+  # .claude/settings.json hooks
+  if [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
+    if command -v python3 >/dev/null 2>&1; then
+      hooks_status="$(PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
+import json, os, sys
+from pathlib import Path
+
+settings = Path(os.environ["PROJECT_DIR"]) / ".claude" / "settings.json"
+try:
+    data = json.loads(settings.read_text())
+except Exception as e:
+    print(f"PARSE_ERROR:{e}")
+    sys.exit(0)
+
+expected = {
+    "UserPromptSubmit": ".claude/hooks/ucp-trigger-detect.sh",
+    "SessionStart":     ".claude/hooks/ucp-session-check.sh",
+    "PostToolUse":      ".claude/hooks/ucp-post-skill-review.sh",
+}
+hooks = data.get("hooks", {})
+missing = []
+for event, cmd in expected.items():
+    groups = hooks.get(event, [])
+    found = any(
+        any(h.get("command") == cmd for h in group.get("hooks", []))
+        for group in groups
+    )
+    if not found:
+        missing.append(f"{event}:{cmd}")
+
+if missing:
+    print("MISSING:" + ",".join(missing))
+else:
+    print("OK")
+PY
+)"
+      case "$hooks_status" in
+        OK)
+          echo "  ✓ settings.json: все 3 хука зарегистрированы"
+          ;;
+        PARSE_ERROR:*)
+          echo "  ✗ settings.json: невалидный JSON — ${hooks_status#PARSE_ERROR:}"
+          PROBLEMS=$((PROBLEMS + 1))
+          ;;
+        MISSING:*)
+          echo "  ✗ settings.json: отсутствуют хуки — ${hooks_status#MISSING:}"
+          PROBLEMS=$((PROBLEMS + 1))
+          ;;
+      esac
+    else
+      echo "  ⚠ settings.json: python3 не найден, пропускаю проверку хуков"
+    fi
+  else
+    echo "  ✗ .claude/settings.json не существует — хуки не зарегистрированы"
+    PROBLEMS=$((PROBLEMS + 1))
+  fi
+
+  echo
+  if [ "$PROBLEMS" -eq 0 ]; then
+    echo "✓ Установка в порядке."
+    exit 0
+  else
+    echo "✗ Найдено $PROBLEMS проблем(ы). Запусти '$0' (без --check) чтобы починить."
+    exit 1
+  fi
 fi
 
 mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/hooks"
