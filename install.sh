@@ -100,7 +100,7 @@ if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   exit 1
 fi
 
-mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents"
+mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/hooks"
 
 # Skills — симлинк ucp-* скиллов по выбранному профилю (по умолчанию — все).
 # Сначала чистим существующие ucp-* симлинки, указывающие в этот репо, — иначе
@@ -145,6 +145,78 @@ for agent in "$SKILLS_DIR"/.claude/agents/*.md; do
 done
 if [ "$AGENT_COUNT" -eq 0 ]; then
   echo "    (агентов в репо пока нет)"
+fi
+
+# Hooks — детерминированные обработчики событий, которые Claude Code запускает
+# на стороне harness (не модель). Закрывают зазоры, где модель может проигнори-
+# ровать инструкцию из CLAUDE.md: триггер-детект цепочки UCP, проверка установки
+# на старте сессии, обязательное ревью DDL/миграций.
+echo
+echo "==> Подключаю хуки из $SKILLS_DIR/.claude/hooks/"
+HOOK_COUNT=0
+for hook in "$SKILLS_DIR"/.claude/hooks/*.sh; do
+  [ -e "$hook" ] || continue
+  name="$(basename "$hook")"
+  ln -sfn "$hook" "$PROJECT_DIR/.claude/hooks/$name"
+  HOOK_COUNT=$((HOOK_COUNT + 1))
+  echo "    ✓ $name"
+done
+if [ "$HOOK_COUNT" -eq 0 ]; then
+  echo "    (хуков в репо пока нет)"
+fi
+
+# Регистрация хуков в .claude/settings.json — managed через Python: читаем
+# существующий JSON (или создаём пустой), удаляем все entries, у которых command
+# указывает на наш .claude/hooks/ucp-*.sh (идемпотентность при reinstall),
+# добавляем актуальные. Пользовательские хуки не трогаем.
+if [ "$HOOK_COUNT" -gt 0 ]; then
+  echo
+  echo "==> Регистрирую хуки в $PROJECT_DIR/.claude/settings.json"
+  if ! command -v python3 >/dev/null 2>&1; then
+    echo "    ⚠ python3 не найден — пропускаю регистрацию (хуки симлинками есть, но не зарегистрированы)"
+  else
+    PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
+import json, os
+from pathlib import Path
+
+project = Path(os.environ["PROJECT_DIR"])
+settings = project / ".claude" / "settings.json"
+
+data = json.loads(settings.read_text()) if settings.exists() else {}
+data.setdefault("hooks", {})
+
+managed = {
+    "UserPromptSubmit": ".claude/hooks/ucp-trigger-detect.sh",
+    "SessionStart":     ".claude/hooks/ucp-session-check.sh",
+    "PostToolUse":      ".claude/hooks/ucp-post-skill-review.sh",
+}
+managed_paths = set(managed.values())
+
+# Идемпотентность: вычищаем старые managed-entries по командному пути,
+# потом добавляем актуальные. Пользовательские хуки не трогаем.
+for event in list(data["hooks"].keys()):
+    new_groups = []
+    for group in data["hooks"][event]:
+        new_hooks = [h for h in group.get("hooks", [])
+                     if h.get("command", "") not in managed_paths]
+        if new_hooks:
+            new_groups.append({**group, "hooks": new_hooks})
+    if new_groups:
+        data["hooks"][event] = new_groups
+    else:
+        del data["hooks"][event]
+
+for event, cmd in managed.items():
+    entry = {"hooks": [{"type": "command", "command": cmd}]}
+    if event == "PostToolUse":
+        entry["matcher"] = "Skill"
+    data["hooks"].setdefault(event, []).append(entry)
+
+settings.parent.mkdir(parents=True, exist_ok=True)
+settings.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+print(f"    ✓ зарегистрировано {len(managed)} хуков")
+PY
+  fi
 fi
 
 # Cleanup: старые версии install.sh симлинковали style-guide-ы в <project>/docs/.
@@ -210,11 +282,14 @@ GITIGNORE_BEGIN_MARKER="# BEGIN ucp-skills (managed by claude-code-java/install.
 GITIGNORE_END_MARKER="# END ucp-skills"
 GITIGNORE_BLOCK="$(cat <<'EOF'
 # BEGIN ucp-skills (managed by claude-code-java/install.sh)
-# Папки .claude/docs/ и .claude/agents/ принадлежат install.sh целиком —
-# свои файлы туда не клади (.claude/skills/ остаётся открытым для custom-скиллов).
+# Папки .claude/docs/, .claude/agents/, .claude/hooks/ принадлежат install.sh
+# целиком — свои файлы туда не клади (.claude/skills/ остаётся открытым для
+# custom-скиллов; .claude/settings.json пользовательский, install.sh только
+# управляет в нём блоком hooks через идемпотентный python-мерж).
 .claude/skills/ucp-*
 .claude/docs/
 .claude/agents/
+.claude/hooks/
 # END ucp-skills
 EOF
 )"
@@ -271,7 +346,7 @@ else
 fi
 
 echo
-echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
+echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов, $HOOK_COUNT хуков и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
 echo
 echo "Проверка:"
 echo "    ls -la $PROJECT_DIR/.claude/skills"

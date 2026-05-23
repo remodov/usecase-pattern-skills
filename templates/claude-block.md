@@ -80,6 +80,11 @@ prompt-кэш и удорожает каждый ход; раннее чтени
 
 **Если `ucp-*` скиллы не видны в available-skills** — сессия запущена не из директории сервиса. Немедленно скажи «перезапусти Claude из `/path/to/service`», не задавай вопросов про архитектуру и не изобретай структуру.
 
+`install.sh` ставит три hook'а в `.claude/settings.json`, которые делают эту логику детерминированной (срабатывают на стороне harness, до модели):
+- **UserPromptSubmit** (`ucp-trigger-detect.sh`) — детектит триггер-фразы и инжектит инструкцию запустить `/ucp-new-service`.
+- **SessionStart** (`ucp-session-check.sh`) — проверяет, что симлинки `ucp-*` не broken; если broken — инжектит warning с командой починки.
+- **PostToolUse** на `Skill` (`ucp-post-skill-review.sh`) — после `ucp-pg-schema-design` / `ucp-pg-migration-design` напоминает запустить парный review (для DDL/миграций ревью обязателен).
+
 ### Интеграция с superpowers
 
 Если задача планируется/исполняется через `superpowers:writing-plans` /
