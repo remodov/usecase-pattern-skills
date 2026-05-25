@@ -202,14 +202,15 @@ except Exception as e:
     print(f"PARSE_ERROR:{e}")
     sys.exit(0)
 
-expected = {
-    "UserPromptSubmit": ".claude/hooks/ucp-trigger-detect.sh",
-    "SessionStart":     ".claude/hooks/ucp-session-check.sh",
-    "PostToolUse":      ".claude/hooks/ucp-post-skill-review.sh",
-}
+expected = [
+    ("UserPromptSubmit", ".claude/hooks/ucp-trigger-detect.sh"),
+    ("UserPromptSubmit", ".claude/hooks/impl-task-detect.sh"),
+    ("SessionStart",     ".claude/hooks/ucp-session-check.sh"),
+    ("PostToolUse",      ".claude/hooks/ucp-post-skill-review.sh"),
+]
 hooks = data.get("hooks", {})
 missing = []
-for event, cmd in expected.items():
+for event, cmd in expected:
     groups = hooks.get(event, [])
     found = any(
         any(h.get("command") == cmd for h in group.get("hooks", []))
@@ -226,7 +227,7 @@ PY
 )"
       case "$hooks_status" in
         OK)
-          echo "  ✓ settings.json: все 3 хука зарегистрированы"
+          echo "  ✓ settings.json: все 4 хука зарегистрированы"
           ;;
         PARSE_ERROR:*)
           echo "  ✗ settings.json: невалидный JSON — ${hooks_status#PARSE_ERROR:}"
@@ -340,12 +341,13 @@ settings = project / ".claude" / "settings.json"
 data = json.loads(settings.read_text()) if settings.exists() else {}
 data.setdefault("hooks", {})
 
-managed = {
-    "UserPromptSubmit": ".claude/hooks/ucp-trigger-detect.sh",
-    "SessionStart":     ".claude/hooks/ucp-session-check.sh",
-    "PostToolUse":      ".claude/hooks/ucp-post-skill-review.sh",
-}
-managed_paths = set(managed.values())
+managed = [
+    ("UserPromptSubmit", ".claude/hooks/ucp-trigger-detect.sh", None),
+    ("UserPromptSubmit", ".claude/hooks/impl-task-detect.sh", None),
+    ("SessionStart",     ".claude/hooks/ucp-session-check.sh", None),
+    ("PostToolUse",      ".claude/hooks/ucp-post-skill-review.sh", "Skill"),
+]
+managed_paths = {p for _, p, _ in managed}
 
 # Идемпотентность: вычищаем старые managed-entries по командному пути,
 # потом добавляем актуальные. Пользовательские хуки не трогаем.
@@ -361,10 +363,10 @@ for event in list(data["hooks"].keys()):
     else:
         del data["hooks"][event]
 
-for event, cmd in managed.items():
+for event, cmd, matcher in managed:
     entry = {"hooks": [{"type": "command", "command": cmd}]}
-    if event == "PostToolUse":
-        entry["matcher"] = "Skill"
+    if matcher:
+        entry["matcher"] = matcher
     data["hooks"].setdefault(event, []).append(entry)
 
 settings.parent.mkdir(parents=True, exist_ok=True)
