@@ -1,6 +1,7 @@
 ---
 name: ucp-observability-review
-description: Ревью наблюдаемости — structured logging (JSON в проде, MDC с traceId/requestId/userId, нет PII в логах, @Slf4j через Lombok, {} placeholders), Micrometer-метрики (стандартные dimensions service/env/version, RED/USE, custom business metrics, низкая cardinality tags), OpenTelemetry tracing (auto-инструментация, traceparent propagation, sampling 1-10% + 100% errors, span attributes без PII), Actuator health-checks (separate liveness/readiness, custom HealthIndicator с TTL), config (отдельный management port, exposure explicit list), context propagation (MDC filter с finally clear, TaskDecorator для @Async), SLO + alerts (multi-window burn rate, error budget, runbooks). Опирается на коды R-OBS-*.
+description: Ревью наблюдаемости Java/Spring-сервиса (коды R-OBS-*) — structured logging с MDC без PII, Micrometer-метрики, OpenTelemetry tracing, Actuator health-checks, context propagation, SLO и alerts.
+when_to_use: Изменения в logback*.xml, MetricsConfig/OtelConfig/HealthIndicator/MdcFilter, management/logging-блоках application.yml.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/observability-style-guide.md`** — единственный источник правил. Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
-- Парные: `auth-patterns-style-guide.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `rest-api-style-guide.md` (`R-HDR-4` — traceparent), `resilience-style-guide.md` (`R-RES-OBS-*` — CB metrics), `caching-style-guide.md` (`R-CACHE-OBS-*`), `kafka-style-guide.md` (`R-KFK-OBS-*` — consumer lag).
+- **`.claude/docs/backend/observability/observability-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
+- Парные: `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `backend/rest-api/rest-api-rules.md` (`R-HDR-4` — traceparent), `backend/resilience/resilience-rules.md` (`R-RES-OBS-*` — CB metrics), `backend/caching/caching-rules.md` (`R-CACHE-OBS-*`), `backend/kafka/kafka-rules.md` (`R-KFK-OBS-*` — consumer lag).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/observability-style-guide.md`. Цитируй конкретные коды (`R-OBS-LOG-X1`, `R-OBS-CTX-X1`).
+1. **Прочти индекс правил** `.claude/docs/backend/observability/observability-rules.md`. Цитируй конкретные коды (`R-OBS-LOG-X1`, `R-OBS-CTX-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*Logback*`, `logback*.xml`, `*MetricsConfig*`, `*OtelConfig*`, `*HealthIndicator*`, `*MdcFilter*`.
@@ -68,7 +69,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `logging.level.root: INFO` в prod profile.
    - `management.endpoint.health.probes.enabled: true` для liveness/readiness.
 
-7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-*`).
+7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-*`).
 
 8. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично:**

@@ -1,6 +1,7 @@
 ---
 name: ucp-ddd-tactical-design
-description: Спроектировать или зашаблонить новую доменную модель (агрегат, сущности, value object'ы, события, репозиторий) по командному DDD Tactical Patterns Style Guide и с библиотекой ddd-building-blocks. Применяется при моделировании нового bounded context, добавлении агрегата или введении нового доменного события.
+description: Спроектировать доменную модель для Java (DDD Tactical Style Guide, коды R-AGG-*, R-VO-*, R-EVT-*, R-REP-*) с библиотекой ddd-building-blocks — агрегат, сущности, value object'ы, доменные события, репозиторий.
+when_to_use: Моделирование нового bounded context, добавление агрегата или доменного события. После ucp-spec-design, до ucp-pg-schema-design.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/ddd-tactical-style-guide.md`. Считай каждое правило `R-*` обязательным. Цитируй правила, на которые опираешься, **в design-обосновании ответа пользователю** — но **не в комментариях сгенерированного кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
+1. **Прочитай style guide** из `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md`. Считай каждое правило `R-*` обязательным. Цитируй правила, на которые опираешься, **в design-обосновании ответа пользователю** — но **не в комментариях сгенерированного кода** (`JS-7.3` в `backend/java/java-style/java-rules.md`). Никаких `// R-AGG-1`, `// R-VO-2` в исходниках; соответствие выражается через типы (`extends AggregateRoot<ID>`, `implements ValueObject`), имена и структуру.
 
 2. **Подтверди наличие библиотеки.** Проверь `build.gradle` / `pom.xml` на `ru.vikulinva:ddd-building-blocks`. Если нет — попроси пользователя добавить (предложи сниппет зависимости) — не выдумывай локальные копии `Entity` / `AggregateRoot` / `ValueObject`.
 

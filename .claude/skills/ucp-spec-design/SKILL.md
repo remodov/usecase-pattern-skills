@@ -1,12 +1,15 @@
 ---
 name: ucp-spec-design
-description: Написать Use Case спецификацию Bounded Context из бизнес-описания (уровень зрелости 1/2/3) в новом формате — один файл на контекст + по файлу на агрегат, домен без техники. Применяется при старте нового сервиса или формализации существующего. Для as-is снимка из кода без бизнес-брифа — соседний скилл `ucp-spec-tier-0`.
+lang: any
+track: any
+description: Написать Use Case спецификацию Bounded Context из бизнес-описания (уровень зрелости 1/2/3) — один файл на контекст + по файлу на агрегат, домен без техники. As-is снимок из кода — соседний ucp-spec-tier-0.
+when_to_use: Старт нового сервиса или формализация существующего; первый шаг цепочки ucp-new-service.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(superpowers:*) Bash(mcp__plugin_context7_context7__*)
 ---
 
 # Use Case спецификация — проектирование
 
-Ты пишешь Use Case спецификацию одного **Bounded Context** в доменных терминах. Формат описан в `.claude/docs/usecase-spec-template.md` — **прочитай его первым делом и следуй ему как обязательному**.
+Ты пишешь Use Case спецификацию одного **Bounded Context** в доменных терминах. Формат описан в `.claude/docs/shared/usecase-spec-template.md` — **прочитай его первым делом и следуй ему как обязательному**.
 
 ## Зависимости
 
@@ -17,7 +20,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(super
 
 ## Инструкции
 
-1. **Прочитай формат** из `.claude/docs/usecase-spec-template.md`. Не выдумывай свои секции, имена и порядок.
+1. **Прочитай формат** из `.claude/docs/shared/usecase-spec-template.md`. Не выдумывай свои секции, имена и порядок.
 
 2. **Определи уровень зрелости** (глубина секций; одна ось):
    - **Уровень 1 — Слоёный** — Controller → Service → Repository, без `usecase-pattern`, агрегатов нет.

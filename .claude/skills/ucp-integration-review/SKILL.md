@@ -1,6 +1,7 @@
 ---
 name: ucp-integration-review
-description: Ревью outbound-интеграции с внешней системой — структурные аспекты, которые не покрывает ucp-resilience-review. Проверяет split на client-generator + out-adapter модули, domain port в core/<bc>/port/out/<system>/ (Уровень 3), Command/Result records, ClientSettings как @ConfigurationProperties + @Validated record, ClientConfig с @EnableConfigurationProperties + per-system @Bean, полноту exception-hierarchy (PortException → Exception → ClientException/ServerException), Mapper между generated DTO и domain (MapStruct по умолчанию, R-LAY-3), отсутствие утечки generated DTO выше adapter-границы, gradle patch (settings.gradle.kts, bootstrap/build.gradle.kts). Вызывается на новом или существующем *-out-adapter / *-client-generator модуле. Опирается на коды R-RES-OAS-*, R-LAY-*, R-HEX-*, BS-*.
+description: Ревью структуры outbound-интеграции в Java/Spring (коды R-RES-OAS-*, R-LAY-*, R-HEX-*, BS-*) — split client-generator/out-adapter, port в core/, ClientSettings/ClientConfig, exception-hierarchy, Mapper generated DTO ↔ domain, gradle patch.
+when_to_use: Новый или изменённый *-out-adapter / *-client-generator модуль, port в core/**/port/out/, settings.gradle.kts.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 ---
 
@@ -10,10 +11,10 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 
 ## Зависимости
 
-- **`.claude/docs/resilience-rules.md`** — `R-RES-OAS-*` (Mapper, generated DTO не утекает, openapi-generator target), `R-RES-ISO-*` (per-system bean isolation).
-- **`.claude/docs/usecase-pattern-rules.md`** — `R-LAY-3` (MapStruct по умолчанию), `R-HEX-*` (порт в `core/<bc>/port/`, зависимости направлены внутрь).
-- **`.claude/docs/spring-bootstrap-style-guide.md`** — `BS-*` (gradle multi-module, openapi-generator setup).
-- **`.claude/docs/auth-patterns-style-guide.md`** — `AUTH-13`/`AUTH-14` (выбор схемы аутентификации), `AUTH-17` (секреты в Vault/SealedSecrets, не в `application.yml`).
+- **`.claude/docs/backend/resilience/resilience-rules.md`** — `R-RES-OAS-*` (Mapper, generated DTO не утекает, openapi-generator target), `R-RES-ISO-*` (per-system bean isolation).
+- **`.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md`** — `R-LAY-3` (MapStruct по умолчанию), `R-HEX-*` (порт в `core/<bc>/port/`, зависимости направлены внутрь).
+- **`.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md`** — `BS-*` (gradle multi-module, openapi-generator setup).
+- **`.claude/docs/backend/auth-patterns/auth-patterns-rules.md`** — `AUTH-13`/`AUTH-14` (выбор схемы аутентификации), `AUTH-17` (секреты в Vault/SealedSecrets, не в `application.yml`).
 
 ## Инструкции
 
@@ -114,7 +115,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
    - Generated пакет (`<pkg>.<system>.generated.*`) импортируется из `bootstrap/` или другого `-out-adapter` — `R-RES-OAS-X3` (утечка границ).
    - `setting.gradle.kts` упоминает только `out-adapter`, без `client-generator` — модуль не подключён, сборка может работать только из-за зависимостей в IDE.
 
-5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-RES-OAS-X3`, `R-HEX-X2`, `AUTH-17`).
+5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-RES-OAS-X3`, `R-HEX-X2`, `AUTH-17`).
 
 6. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — структурные нарушения, ведущие к утечке границ / невозможности заменить adapter:

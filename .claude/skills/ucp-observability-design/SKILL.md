@@ -1,6 +1,7 @@
 ---
 name: ucp-observability-design
-description: Сгенерировать observability-инфраструктуру под Observability Style Guide — Logback config с JSON для prod, Micrometer + Prometheus registry с стандартизованными tags, OpenTelemetry автоинструментация + sampling, Spring Boot Actuator с liveness/readiness и custom HealthIndicator, MdcFilter с requestId + TaskDecorator для @Async, application.yml блок management.* + otel.* + logging.*, опционально custom business metrics. Решает: где placement (filter MDC, JWT-after-auth для userId), как propagate context через async, какой sampling rate (1-10% дефолт), какой logback profile config (text dev / JSON prod), какие endpoints exposed (whitelist). Применяется при настройке observability в новом сервисе или upgrade existing. Триггеры: «настрой observability», «добавь метрики и tracing», «нужен structured logging», «MDC и traceId».
+description: Сгенерировать observability-инфраструктуру на Java/Spring (коды R-OBS-*) — Logback JSON для prod, Micrometer + Prometheus, OpenTelemetry tracing + sampling, Actuator liveness/readiness, MdcFilter + TaskDecorator для @Async.
+when_to_use: Триггеры — «настрой observability», «добавь метрики и tracing», «нужен structured logging». При новом сервисе или upgrade existing.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/observability-style-guide.md` (`R-OBS-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` PII), `rest-api-style-guide.md` (`R-HDR-4` traceparent), `validation-style-guide.md` (`R-VLD-CFG-*`).
+1. **Прочитай** `.claude/docs/backend/observability/observability-rules.md` (`R-OBS-*`). Опционально — `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` PII), `backend/rest-api/rest-api-rules.md` (`R-HDR-4` traceparent), `backend/validation/validation-rules.md` (`R-VLD-CFG-*`).
 
 2. **Уточни параметры:**
    - **Сервис** — имя для `service` tag (`order-service`).

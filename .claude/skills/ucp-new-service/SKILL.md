@@ -1,6 +1,9 @@
 ---
 name: ucp-new-service
-description: Оркестратор создания нового UCP-сервиса с нуля. Запускает полную цепочку скиллов в правильном порядке. Триггер-фразы — «сделай сервис», «пишем сервис», «новый сервис», «напиши сервис», «начнём сервис». Не пиши код от руки — вызывай downstream-скиллы.
+lang: any
+track: any
+description: Оркестратор создания нового UCP-сервиса с нуля — определяет уровень зрелости 1/2/3, собирает бизнес-описание и запускает цепочку скиллов (spec → ddd → bootstrap → pattern → auth → test). Не пишет код сам.
+when_to_use: Триггеры — «сделай сервис», «пишем сервис», «новый сервис», «напиши сервис», «начнём сервис». Запуск из директории сервиса.
 allowed-tools: Read Glob Grep Bash(find*) Skill(ucp-spec-design) Skill(ucp-ddd-tactical-design) Skill(ucp-bootstrap-design) Skill(ucp-pattern-design) Skill(ucp-auth-design) Skill(ucp-test-design) Skill(superpowers:*)
 ---
 

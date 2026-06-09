@@ -1,6 +1,7 @@
 ---
 name: ucp-distributed-review
-description: Ревью распределённых паттернов — saga (orchestration vs choreography, compensation для каждого шага, saga state в БД, sagaId сквозной), idempotency (processed_event/Idempotency-Key, dedup на receiver, двойная защита для money), eventual consistency (декларация в OpenAPI, RYW когда критично, bounded staleness SLO), outbox + опционально inbox, compensation (semantic state-change не DELETE, идемпотентен, audit trail, DLQ при failure), запрет 2PC/JTA/XA/ChainedTransactionManager. Применяется при ревью cross-service flows, sagas, idempotency-таблиц, multi-datasource конфигов. Опирается на коды R-DIST-*.
+description: Ревью распределённых паттернов на Java/Spring (коды R-DIST-*) — saga и compensation, idempotency на receiver, eventual consistency, outbox/inbox, запрет 2PC/JTA/XA/ChainedTransactionManager.
+when_to_use: Ревью cross-service flows, saga-классов, idempotency-таблиц, multi-datasource конфигов.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/distributed-patterns-style-guide.md`** — источник правил. Подгруппы: `R-DIST-WHEN-*` (когда применять), `R-DIST-SAGA-*` (saga), `R-DIST-IDEM-*` (idempotency), `R-DIST-EC-*` (eventual consistency), `R-DIST-OBX-*` (outbox/inbox), `R-DIST-COMP-*` (compensation), `R-DIST-TX-*` (запрет 2PC).
-- Парные: `kafka-style-guide.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `cqrs-style-guide.md` (`R-CQRS-SYNC-*`), `auth-patterns-style-guide.md` (`AUTH-19` Idempotency-Key), `rest-api-style-guide.md` (`R-HDR-3` Idempotency-Key header).
+- **`.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-DIST-WHEN-*` (когда применять), `R-DIST-SAGA-*` (saga), `R-DIST-IDEM-*` (idempotency), `R-DIST-EC-*` (eventual consistency), `R-DIST-OBX-*` (outbox/inbox), `R-DIST-COMP-*` (compensation), `R-DIST-TX-*` (запрет 2PC).
+- Парные: `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `backend/cqrs/cqrs-rules.md` (`R-CQRS-SYNC-*`), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` Idempotency-Key), `backend/rest-api/rest-api-rules.md` (`R-HDR-3` Idempotency-Key header).
 
 ## Инструкции
 
-1. **Прочти** `.claude/docs/distributed-patterns-style-guide.md`. Цитируй коды (`R-DIST-SAGA-X1`, `R-DIST-IDEM-X1`).
+1. **Прочти** `.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md`. Цитируй коды (`R-DIST-SAGA-X1`, `R-DIST-IDEM-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал — бери. Иначе:
    - `git diff` на `*Saga*`, `*Orchestrator*`, `*ProcessedEvent*`, `*Idempotency*`, `*Compensation*`.
@@ -57,7 +58,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - PRIMARY KEY на natural-key (`event_id` / `idempotency_key`) — UNIQUE constraint предотвращает дубли под race conditions.
    - TTL strategy (background-cleanup или partition+drop_old).
 
-7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md`.
+7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md`.
 
 8. **Доменные ориентиры серьёзности**:
    - **Критично:**

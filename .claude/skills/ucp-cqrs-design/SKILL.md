@@ -1,6 +1,7 @@
 ---
 name: ucp-cqrs-design
-description: Сгенерировать CQRS-разделение для агрегата под CQRS Style Guide — Command + CommandHandler пара (через UseCaseCommand маркер, FOR UPDATE load aggregate, outbox event), Query + QueryHandler пара (через UseCaseQuery маркер, ViewRepository, read-DTO record), <X>ViewRepository интерфейс в core/ и Jooq<X>ViewRepository в persistence/, read-model schema (Liquibase changeset для денормализованной таблицы), read-side consumer (KafkaListener с idempotent dedup), bootstrap-задача для rebuild read-model из write-side. Решает: какой вариант CQRS (lightweight маркеры на Уровне 2 или full split с отдельной read-таблицей на Уровне 3), синхронизация (sync через outbox+Kafka, не TX UPDATE), eventual consistency декларация в OpenAPI. Применяется при добавлении нового read-flow к existing-агрегату или при росте read-нагрузки. Триггеры: «нужна read-проекция для X», «CQRS для агрегата Y», «отдельная read-model».
+description: Сгенерировать CQRS-разделение для агрегата на Java/Spring (коды R-CQRS-*) — Command/Query пары с UseCase-маркерами, ViewRepository + Jooq-реализация, read-model schema и consumer, выбор варианта lightweight/split/event-driven.
+when_to_use: Триггеры — «нужна read-проекция для X», «CQRS для агрегата Y», «отдельная read-model». При новом read-flow или росте read-нагрузки.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/cqrs-rules.md` (`R-CQRS-*`). Опционально — `usecase-pattern-rules.md` (`R-UC-*`), `jooq-rules.md` (`R-JOOQ-VIEW-*`), `kafka-rules.md` (`R-KFK-OBX-*`).
+1. **Прочитай** `.claude/docs/backend/cqrs/cqrs-rules.md` (`R-CQRS-*`). Опционально — `backend/usecase-pattern/usecase-pattern-rules.md` (`R-UC-*`), `backend/java/jooq/jooq-rules.md` (`R-JOOQ-VIEW-*`), `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`).
 
 2. **Уточни параметры:**
    - **Aggregate** — имя (`Order`), есть ли write-handlers (`<X>CommandHandler`), есть ли уже `<X>Repository`.

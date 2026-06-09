@@ -1,6 +1,7 @@
 ---
 name: ucp-validation-design
-description: Сгенерировать кастомный constraint (annotation + ConstraintValidator), validation group или cross-field-валидатор по Validation Style Guide. Создаёт пары @<DomainTerm>/`<DomainTerm>Validator` для доменных правил типа RussianPhone, VatNumber, Iso8601Duration. Решает: куда положить — common/validation/ для общих или core/<bc>/validation/ для domain-specific; isValid(null) → true для композиции с @NotNull; имя без префикса Valid/Check; class-level constraint для cross-field. Применяется когда стандартных Jakarta-аннотаций недостаточно. Триггеры: «нужен constraint для X», «custom validator», «cross-field валидация для DTO», «validation group для Y».
+description: Сгенерировать кастомный Jakarta Validation constraint, validation group или cross-field-валидатор для Java/Spring (коды R-VLD-*) — пара @<DomainTerm> + Validator, размещение common/ vs core/<bc>/validation/, isValid(null)=true.
+when_to_use: Когда стандартных Jakarta-аннотаций недостаточно. Триггеры — «нужен constraint для X», «custom validator», «cross-field валидация», «validation group».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/validation-style-guide.md` — главный (`R-VLD-*`). Опционально `.claude/docs/rest-api-style-guide.md` `R-ERR-5`/`R-ERR-6` для понимания, как ошибка попадёт в violations.
+1. **Прочитай** `.claude/docs/backend/validation/validation-rules.md` — общий контракт (`R-VLD-*`) **и Java-реализацию** `.claude/docs/backend/validation/java/validation-style-guide.md` (Jakarta + OpenAPI-first — конкретика для Java-кода). Опционально `.claude/docs/backend/rest-api/rest-api-rules.md` `R-ERR-5`/`R-ERR-6` для понимания, как ошибка попадёт в violations.
 
 2. **Уточни тип constraint:**
    - **Field-level custom** (`@RussianPhone`, `@VatNumber`) — валидирует одно поле по нестандартному формату.

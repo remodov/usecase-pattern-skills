@@ -1,6 +1,9 @@
 ---
 name: ucp-spec-review
-description: Проверить Use Case спецификацию (или черновик Event Storming) на проблемы качества дизайна — согласованность Ubiquitous Language, границы Bounded Context, перегрузка инвариантами в агрегатах, отсутствующие акторы, владельцы команд и событий, покрытие зон отказа, владелец данных, покрытие критериями приёмки, чистота формата (домен без техники). AI как design-критик, не код-ревьюер. Парный к `ucp-spec-design`.
+lang: any
+track: any
+description: Ревью Use Case спецификации или черновика Event Storming как design-критик — согласованность Ubiquitous Language, границы Bounded Context, инварианты агрегатов, акторы и владельцы команд/событий, зоны отказа, критерии приёмки, домен без техники.
+when_to_use: После ucp-spec-design или ручных правок спеки — файлы docs/spec/*.md и docs/spec/aggregates/*.md.
 allowed-tools: Read Glob Grep Bash(git diff*) Agent
 ---
 
@@ -12,7 +15,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Agent
 
 ## Инструкции
 
-1. **Прочитай формат** из `.claude/docs/usecase-spec-template.md` — он источник правды по структуре (корень = контекст-секции + по файлу на домен-юнит в `aggregates/`, всегда отдельным), уровню зрелости и конвенциям. При проверке схемы БД (раздел «Техническая реализация» → «Схема БД») применяй `pg-types-style-guide.md` (`PG-T-NNN`): антипаттерны (`varchar(255)`, `timestamp` без TZ, `varchar(36)` для UUID, `float` для денег) — критичные находки.
+1. **Прочитай формат** из `.claude/docs/shared/usecase-spec-template.md` — он источник правды по структуре (корень = контекст-секции + по файлу на домен-юнит в `aggregates/`, всегда отдельным), уровню зрелости и конвенциям. При проверке схемы БД (раздел «Техническая реализация» → «Схема БД») применяй `backend/pg-types/pg-types-rules.md` (`PG-T-NNN`): антипаттерны (`varchar(255)`, `timestamp` без TZ, `varchar(36)` для UUID, `float` для денег) — критичные находки.
 
 2. **Найди спеку.** Если пользователь назвал файлы — ревьюй их. Иначе `Glob`: `docs/spec/*-spec.md` (корень) + `docs/spec/aggregates/*.md`. Возможны: сгенерированная спека, спека от руки в одном файле, черновик Event Storming.
 

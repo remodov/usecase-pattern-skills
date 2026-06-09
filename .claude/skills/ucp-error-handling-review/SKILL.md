@@ -1,21 +1,22 @@
 ---
 name: ucp-error-handling-review
-description: Ревью обработки ошибок в Spring Boot-сервисе по UCP — иерархия исключений (Domain/Validation/Integration/Technical), наличие GlobalExceptionHandler с per-type @ExceptionHandler, правильный mapping в ProblemDetails (RFC 9457), отсутствие try-catch в Domain/Handler/Aggregate, port-specific exceptions в out-adapter, retry-семантика по типу исключения, наблюдаемость (метрика app_errors_total + per-type WARN/ERROR-уровни). Опирается на коды R-ERR-*. Вызывается на ревью exception-классов, @RestControllerAdvice, out-adapter с try-catch, любого сервисного кода с catch (Exception e).
+description: Ревью обработки ошибок в Spring Boot-сервисе по UCP (коды R-ERR-*) — иерархия Domain/Validation/Integration/Technical, GlobalExceptionHandler, mapping в ProblemDetails (RFC 9457), retry-семантика, наблюдаемость.
+when_to_use: Ревью exception-классов, @RestControllerAdvice, out-adapter с try-catch, любого кода с catch (Exception e).
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью обработки ошибок
 
-Ты ревьюишь Spring Boot-сервис на соответствие `error-handling-style-guide.md` (`R-ERR-*`). Главные точки контроля: типизированная иерархия исключений, ровно три места catch, консистентный ProblemDetails-mapping, отсутствие силент-фейлов.
+Ты ревьюишь Spring Boot-сервис на соответствие `backend/error-handling/error-handling-rules.md` (`R-ERR-*`). Главные точки контроля: типизированная иерархия исключений, ровно три места catch, консистентный ProblemDetails-mapping, отсутствие силент-фейлов.
 
 ## Зависимости
 
-- **`.claude/docs/error-handling-style-guide.md`** — источник правил. Подгруппы: `R-ERR-HIER-*` (иерархия), `R-ERR-WHERE-*` (где throw/catch), `R-ERR-MAP-*` (ProblemDetails), `R-ERR-LOG-*` (logging), `R-ERR-RETRY-*` (retry-семантика), `R-ERR-RESULT-*` (Result vs Exception), `R-ERR-OBS-*` (observability).
-- Парные документы: `rest-api-style-guide.md` (`R-API-ERR-*`), `validation-style-guide.md` (`R-VLD-*`), `resilience-style-guide.md` (`R-RES-RE-*`/`R-RES-FB-*`), `auth-patterns-style-guide.md` (`AUTH-18`/`AUTH-19`), `observability-style-guide.md` (`R-OBS-LOG-*`).
+- **`.claude/docs/backend/error-handling/error-handling-rules.md`** — источник правил. Подгруппы: `R-ERR-HIER-*` (иерархия), `R-ERR-WHERE-*` (где throw/catch), `R-ERR-MAP-*` (ProblemDetails), `R-ERR-LOG-*` (logging), `R-ERR-RETRY-*` (retry-семантика), `R-ERR-RESULT-*` (Result vs Exception), `R-ERR-OBS-*` (observability).
+- Парные документы: `backend/rest-api/rest-api-rules.md` (`R-API-ERR-*`), `backend/validation/validation-rules.md` (`R-VLD-*`), `backend/resilience/resilience-rules.md` (`R-RES-RE-*`/`R-RES-FB-*`), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-18`/`AUTH-19`), `backend/observability/observability-rules.md` (`R-OBS-LOG-*`).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/error-handling-style-guide.md`. Цитируй конкретные коды (`R-ERR-WHERE-X1`, `R-ERR-HIER-X2`), не префикс.
+1. **Прочти style guide** из `.claude/docs/backend/error-handling/error-handling-rules.md`. Цитируй конкретные коды (`R-ERR-WHERE-X1`, `R-ERR-HIER-X2`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе скоп по умолчанию:
    - Любые `*Exception.java` — иерархия (`R-ERR-HIER-*`).
@@ -77,7 +78,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - REST-формат ProblemDetails → `R-API-ERR-*`.
    - Bean validation handler (`MethodArgumentNotValidException`) → `R-VLD-WHERE-1`.
 
-5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-ERR-WHERE-X1`, `R-ERR-MAP-X1`).
+5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-ERR-WHERE-X1`, `R-ERR-MAP-X1`).
 
 6. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — потеря сигнала или некорректный ответ клиенту:

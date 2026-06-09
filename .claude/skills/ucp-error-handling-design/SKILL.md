@@ -1,23 +1,24 @@
 ---
 name: ucp-error-handling-design
-description: Спроектировать единую обработку ошибок в Spring Boot-сервисе по UCP — иерархия исключений (DomainException / ValidationException / IntegrationException / TechnicalException), GlobalExceptionHandler через @RestControllerAdvice с mapping в ProblemDetails (RFC 9457), per-system port-исключения в out-adapter'ах, retry/no-retry семантика, наблюдаемость (метрика app_errors_total + spans). Применяется при старте сервиса или миграции «catch (Exception e) → log.error → return null»-кода. Триггеры — «настрой обработку ошибок», «добавь GlobalExceptionHandler», «сделай иерархию исключений».
+description: Спроектировать обработку ошибок в Spring Boot-сервисе по UCP (коды R-ERR-*) — иерархия Domain/Validation/Integration/Technical, GlobalExceptionHandler с ProblemDetails (RFC 9457), port-исключения в out-adapter, retry-семантика, наблюдаемость.
+when_to_use: Триггеры — «настрой обработку ошибок», «добавь GlobalExceptionHandler». При старте сервиса или миграции catch-log-return-null кода.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Проектирование обработки ошибок
 
-Ты создаёшь / расширяешь обработку ошибок в Spring Boot-сервисе согласно `error-handling-style-guide.md` (правила `R-ERR-*`). Цель — единая стратегия: типизированная иерархия, ровно три места catch (edge / out-adapter / резильянс-обёртка), консистентный ProblemDetails-mapping, наблюдаемость.
+Ты создаёшь / расширяешь обработку ошибок в Spring Boot-сервисе согласно `backend/error-handling/java/error-handling-style-guide.md` (правила `R-ERR-*`). Цель — единая стратегия: типизированная иерархия, ровно три места catch (edge / out-adapter / резильянс-обёртка), консистентный ProblemDetails-mapping, наблюдаемость.
 
 Не делает: настройку валидации (`ucp-validation-design`), резилианс-обвязку (`ucp-resilience-design`), security-mapping для 401/403 (`ucp-auth-design`), маскирование PII в логах (`ucp-observability-design`).
 
 ## Инструкции
 
 1. **Прочитай**:
-   - `.claude/docs/error-handling-style-guide.md` — главный документ, правила `R-ERR-*`.
-   - `.claude/docs/rest-api-style-guide.md` — для REST mapping (`R-API-ERR-*`).
-   - `.claude/docs/resilience-style-guide.md` — `R-RES-RE-*`/`R-RES-FB-*` для retry-семантики.
-   - `.claude/docs/auth-patterns-style-guide.md` — `AUTH-19` для idempotency, `AUTH-18` для PII в response.
-   - `.claude/docs/observability-style-guide.md` — `R-OBS-LOG-*`/`R-OBS-MDC-*` для logging.
+   - `.claude/docs/backend/error-handling/error-handling-rules.md` — главный документ, правила `R-ERR-*` (полный текст с примерами — `backend/error-handling/java/error-handling-style-guide.md`, открывай точечно по разделу).
+   - `.claude/docs/backend/rest-api/rest-api-rules.md` — для REST mapping (`R-API-ERR-*`).
+   - `.claude/docs/backend/resilience/resilience-rules.md` — `R-RES-RE-*`/`R-RES-FB-*` для retry-семантики.
+   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — `AUTH-19` для idempotency, `AUTH-18` для PII в response.
+   - `.claude/docs/backend/observability/observability-rules.md` — `R-OBS-LOG-*`/`R-OBS-MDC-*` для logging.
 
 2. **Идентифицируй сервис.** `git diff` или путь от пользователя. Структура UCP:
    - `core/` — здесь будут базовые exception-классы + доменные наследники.
@@ -158,7 +159,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ---
    ```
 
-5. **Самопроверка перед выдачей** — пройдись по чеклисту из `error-handling-style-guide.md` §«Чеклист подключения к новому сервису».
+5. **Самопроверка перед выдачей** — пройдись по чеклисту из `backend/error-handling/java/error-handling-style-guide.md` §«Чеклист подключения к новому сервису».
 
 6. **Структура вывода:**
    1. **Audit таблица** (из шага 3).

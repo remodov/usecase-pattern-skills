@@ -1,6 +1,7 @@
 ---
 name: ucp-pattern-design
-description: Спроектировать или зашаблонить новую бизнес-операцию как UseCase + UseCaseHandler с библиотекой usecase-pattern, по командному Use Case Pattern Style Guide. Применяется при добавлении нового эндпоинта, команды или запроса в Spring Boot-сервис.
+description: Спроектировать новую бизнес-операцию как UseCase + UseCaseHandler с библиотекой usecase-pattern для Java/Spring (коды R-UC-*, R-HND-*, R-LAY-*) — команда/запрос, контроллер с диспатчем, маппинг JsonBean/Pojo/Domain.
+when_to_use: Добавление нового эндпоинта, команды или запроса в Spring Boot-сервис. После ucp-bootstrap-design в цепочке.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/usecase-pattern-rules.md` и считай каждое правило `R-*` обязательным. На Уровне 3 дополнительно прочитай `.claude/docs/ddd-tactical-rules.md`. Если в дизайне есть DDL новой таблицы или колонки — также прочитай `.claude/docs/pg-types-style-guide.md` и применяй правила `PG-T-NNN` к выбору типов (`bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `Instant`/`OffsetDateTime` на Java-стороне для `timestamptz`).
+1. **Прочитай** общий контракт `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` (коды `R-*`, язык-нейтральные) **и Java-реализацию** `.claude/docs/backend/usecase-pattern/java/usecase-pattern-style-guide.md` (библиотека `usecase-pattern`, `record`/`@RequiredArgsConstructor`/`@Transactional`/MapStruct — конкретика для Java-кода). Считай каждое правило `R-*` обязательным. На Уровне 3 дополнительно прочитай `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md`. Если в дизайне есть DDL новой таблицы или колонки — также прочитай `.claude/docs/backend/pg-types/pg-types-rules.md` и применяй правила `PG-T-NNN` к выбору типов (`bigint IDENTITY` или `uuid` v7 для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `Instant`/`OffsetDateTime` на Java-стороне для `timestamptz`).
 
 2. **Подтверди наличие библиотеки.** Проверь `build.gradle` / `pom.xml` на `ru.vikulinva:usecase-pattern-starter`. Если нет — попроси пользователя добавить (и предложи сниппет зависимости) — не выдумывай локальные копии `UseCase` / `UseCaseHandler` / `UseCaseDispatcher`.
 
@@ -28,7 +29,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Сквозные потребности: идемпотентность, контекст авторизации, асинхронность vs синхронность, batch.
    - На Уровне 3: какой агрегат затрагивается, какие инварианты держатся, какие события публикуются.
 
-5. **Произведи код.** Пиши полные Java-файлы (Java 21+). **Lombok-defaults обязательны** (`JS-6.1`–`JS-6.7` в `java-style-guide.md`): `@RequiredArgsConstructor` на каждом Spring-бине с DI, `@Slf4j` вместо ручного `Logger`, `@Getter` на доменных исключениях с payload-полями. Lombok **не** навешиваем на records.
+5. **Произведи код.** Пиши полные Java-файлы (Java 21+). **Lombok-defaults обязательны** (`JS-6.1`–`JS-6.7` в `backend/java/java-style/java-rules.md`): `@RequiredArgsConstructor` на каждом Spring-бине с DI, `@Slf4j` вместо ручного `Logger`, `@Getter` на доменных исключениях с payload-полями. Lombok **не** навешиваем на records.
 
    **Не цитируй коды правил в комментариях кода** (`JS-7.3`). Никаких `// R-UC-3`, `// R-LAY-2`, `// R-DSP-X2`, `// R-CQRS-1` в исходниках. Соответствие правилу выражается именами (`CreateProductUseCase`, `*Query*Handler`) и структурой (record + marker interface + `@Component` + `@Transactional`). Комментарий уместен только если WHY неочевиден из кода — и тогда без кода правила.
 
@@ -36,7 +37,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - **`<Operation>UseCaseHandler`** — `@Component` + `@RequiredArgsConstructor`, реализует `UseCaseHandler<MyUseCase, R>`, возвращает `MyUseCase.class` из `useCaseType()`, имеет `@Transactional` (или `readOnly = true`). Поля — `private final`, без явного конструктора. Логика живёт здесь.
    - **Controller** — `@RestController class XController implements <Tag>Api` (style guide §12.2 — интерфейс генерируется openapi-generator-ом из `src/main/resources/openapi/<service>.openapi.yaml`). Методы — `@Override` интерфейсных, дополнительно навешиваются `@PreAuthorize`. Тело метода: маппинг request DTO → UseCase, `dispatcher.dispatch(...)`, обёртка в `ResponseEntity`. Никакого `@RequestMapping` на классе, никаких ручных request/response DTO в `jsonbean/`. Если openapi-generator не подключён — это повод вызвать `ucp-bootstrap-design`, а не писать ручной контроллер.
    - **Mapper** (если нужен новый маппинг) — **MapStruct-интерфейс обязателен** (`R-LAY-3`): `@Mapper(componentModel = "spring")` + `default`-методы внутри интерфейса для нетривиальных конверсий. Ручной `@Component`-маппер — только при stateful / DI-зависимом маппинге, что не покрывается MapStruct.
-   - **(Уровень 3)** **Доменные части** — только если операция реально требует нового состояния агрегата, value object'а или события. Следуй `ddd-tactical-rules.md`. Если операция чисто read — предпочитай Read Model и пропускай агрегат.
+   - **(Уровень 3)** **Доменные части** — только если операция реально требует нового состояния агрегата, value object'а или события. Следуй `backend/ddd-tactical/ddd-tactical-rules.md`. Если операция чисто read — предпочитай Read Model и пропускай агрегат.
    - **(Уровень 3, Hexagonal-раскладка)** Раскладка файлов: `core/<bc>/usecase/...`, `core/<bc>/port/...`, `adapter/in/rest/...`, `adapter/out/<storage>/...`. Домен живёт в `core/<bc>/domain/...`.
 
 6. **Самопроверка перед выдачей.** Пройди эти проверки (style guide §12):

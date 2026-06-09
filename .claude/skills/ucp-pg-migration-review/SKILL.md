@@ -1,6 +1,8 @@
 ---
+lang: any
 name: ucp-pg-migration-review
-description: Ревью PostgreSQL миграций (Liquibase changelog / Flyway / сырой SQL) на безопасность для прода — ACCESS EXCLUSIVE-операции, lock_timeout, CONCURRENTLY для индексов, expand-contract при rename/drop/type-change, NOT VALID + VALIDATE для constraints, координация с N-1 версией кода. Вызывается на каждый PR с миграциями в `db/changelog/`, `db/migration/`, `migrations/`.
+description: Ревью PostgreSQL-миграций (Liquibase/Flyway/сырой SQL) на безопасность для прода (коды PG-M-*) — ACCESS EXCLUSIVE, lock_timeout, CONCURRENTLY для индексов, expand-contract, NOT VALID + VALIDATE, N-1 совместимость кода.
+when_to_use: Каждый PR с миграциями в db/changelog/, db/migration/, migrations/ или SQL с ALTER TABLE / CREATE INDEX.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,11 +12,11 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-migrations-style-guide.md`** — единственный источник правил. Кодами `PG-M-NNN`.
+- **`.claude/docs/backend/pg-migrations/pg-migrations-rules.md`** — источник правил. Кодами `PG-M-NNN`.
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/pg-migrations-style-guide.md`. Цитируй коды `PG-M-NNN` в каждой находке.
+1. **Прочти индекс правил** `.claude/docs/backend/pg-migrations/pg-migrations-rules.md` (полный текст с SQL-рецептами expand-contract — `backend/pg-migrations/pg-migrations-style-guide.md`, открывай точечно по разделу). Цитируй коды `PG-M-NNN` в каждой находке.
 
 2. **Найди миграции в diff:**
    - `db/changelog/**/*.{xml,sql,yml,json}` (Liquibase).

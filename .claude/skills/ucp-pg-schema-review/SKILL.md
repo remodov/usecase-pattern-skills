@@ -1,6 +1,8 @@
 ---
+lang: any
 name: ucp-pg-schema-review
-description: Ревью PostgreSQL-схемы и миграций (DDL Liquibase / Flyway / сырой SQL) против командного PG Types Style Guide. Проверяет типы колонок (числа, строки, время, UUID, JSONB, массивы, range), boolean, enum, антипаттерны (`varchar(255)`, `timestamp` без TZ, `varchar(36)` для UUID, `float` для денег, `serial`). Вызывается на каждый PR с DDL-файлами в `db/changelog/`, `migrations/`, `src/main/resources/db/`.
+description: Ревью PostgreSQL-схемы и DDL-миграций (Liquibase/Flyway/сырой SQL) против PG Types Style Guide (коды PG-T-*) — типы колонок, boolean, enum, антипаттерны varchar(255), timestamp без TZ, float для денег, serial.
+when_to_use: Каждый PR с DDL-файлами в db/changelog/, db/migration/, src/main/resources/db/.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,13 +12,13 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-types-style-guide.md`** — типы колонок (`PG-T-NNN`).
-- **`.claude/docs/pg-naming-style-guide.md`** — конвенции именования (`PG-N-NNN`).
-- **`.claude/docs/pg-partitioning-style-guide.md`** — партиционирование (`PG-P-NNN`).
+- **`.claude/docs/backend/pg-types/pg-types-rules.md`** — типы колонок (`PG-T-NNN`).
+- **`.claude/docs/backend/pg-naming/pg-naming-rules.md`** — конвенции именования (`PG-N-NNN`).
+- **`.claude/docs/backend/pg-partitioning/pg-partitioning-rules.md`** — партиционирование (`PG-P-NNN`).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/pg-types-style-guide.md`. Цитируй коды `PG-T-NNN` в каждой находке.
+1. **Прочти индекс правил** `.claude/docs/backend/pg-types/pg-types-rules.md` (полный текст с примерами и таблицами соответствия типов — `backend/pg-types/pg-types-style-guide.md`, открывай точечно по разделу). Цитируй коды `PG-T-NNN` в каждой находке.
 
 2. **Определи область ревью.** Если пользователь указал файл — ревью этого файла. Иначе — `git diff` против main / develop, ищи изменения в:
    - `db/changelog/**/*.{xml,sql,yml,json}` (Liquibase)
@@ -28,7 +30,6 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Цитируй код правила (`PG-T-013`).
    - Покажи проблемный фрагмент DDL.
    - Покажи как должно быть.
-   - Дай ссылку: <https://vikulin-va.ru/pg/{section}/>.
 
 4. **Сгруппируй вывод** по категориям: критично (`PG-T-082`/`-083`/`-091` — необратимое или ломающее), важно (типы id, время), мелкое (стилистика).
 
@@ -113,16 +114,13 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 [критично] PG-T-091 customer.created_at: timestamp without time zone для бизнес-времени.
    В Java маппинг будет на LocalDateTime → разные значения на UTC-сервере и MSK-разработке.
    Должно быть: created_at timestamptz NOT NULL DEFAULT now()
-   См. https://vikulin-va.ru/pg/time/
 
 [важно] PG-T-082 customer.public_id: varchar(36) для UUID.
    Размер 36+ байт vs 16, нет валидации формата на вставке, чувствительно к регистру.
    Должно быть: public_id uuid NOT NULL DEFAULT gen_random_uuid()
-   См. https://vikulin-va.ru/pg/uuid/
 
 [мелкое] PG-T-080 customer.full_name: varchar(255) без бизнес-обоснования.
    Должно быть: full_name text NOT NULL
-   См. https://vikulin-va.ru/pg/strings/
 ```
 
 В конце:
@@ -135,5 +133,5 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Что не входит
 
 - Производительность запросов и индексы — это `ucp-pg-explain-review`.
-- Миграционные операции (`ALTER TABLE` локи, `CONCURRENTLY`, expand-contract) — это `ucp-pg-migration-review`.
+- Миграционные операции (`ALTER TABLE` локи, `CONCURRENTLY`, expand-contract) — это `ucp-pg-migration-review` (когда появится).
 - Если в PR есть и DDL, и Java-код — для Java вызывай `ucp-pattern-review` отдельно.

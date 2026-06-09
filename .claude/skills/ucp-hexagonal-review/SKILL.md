@@ -1,6 +1,7 @@
 ---
 name: ucp-hexagonal-review
-description: Ревью Hexagonal Architecture — структура модулей (multi-module gradle с core/persistence/*-in-adapter/*-out-adapter/bootstrap), core слой (без Spring/JOOQ/Jackson, rich domain не anemic, generated POJO не используется как domain тип), ports (interfaces в core/<bc>/port/out/, domain-типы в сигнатурах не generated DTO, exceptions naming), adapters in (controller через UseCaseDispatcher не Repository напрямую, REST-DTO маппится а не domain entity наружу), adapters out (implements port из core/, mapper для generated DTO ↔ domain, не один adapter implements несколько ports), bootstrap (только composition, не business logic), архитектурные тесты ArchUnit. Применяется при ревью многомодульного Hexagonal-сервиса. Опирается на коды R-HEX-*.
+description: Ревью Hexagonal Architecture Java/Spring-сервиса (коды R-HEX-*) — multi-module gradle структура, чистота core без Spring/jOOQ/Jackson, ports в core/<bc>/port, маппинг в adapters in/out, bootstrap только композиция, ArchUnit-тесты.
+when_to_use: Ревью многомодульного Hexagonal-сервиса — core/, *-in-adapter, *-out-adapter, bootstrap, build-файлы.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/hexagonal-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-HEX-WHEN-*` (когда), `R-HEX-MOD-*` (модули), `R-HEX-CORE-*` (core), `R-HEX-PORT-*` (ports), `R-HEX-AIN-*` (adapters in), `R-HEX-AOUT-*` (adapters out), `R-HEX-BOOT-*` (bootstrap), `R-HEX-TEST-*` (архитектурные тесты).
-- Парные: `usecase-pattern-rules.md` (`R-LAY-*` — Уровень 3), `ddd-tactical-rules.md` (`R-AGG-*` для core), `jooq-rules.md` (`R-JOOQ-REPO-*`), `rest-api-rules.md` (`R-OAS-*` для in-adapter).
+- **`.claude/docs/backend/hexagonal/hexagonal-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-HEX-WHEN-*` (когда), `R-HEX-MOD-*` (модули), `R-HEX-CORE-*` (core), `R-HEX-PORT-*` (ports), `R-HEX-AIN-*` (adapters in), `R-HEX-AOUT-*` (adapters out), `R-HEX-BOOT-*` (bootstrap), `R-HEX-TEST-*` (архитектурные тесты).
+- Парные: `backend/usecase-pattern/usecase-pattern-rules.md` (`R-LAY-*` — Уровень 3), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-AGG-*` для core), `backend/java/jooq/jooq-rules.md` (`R-JOOQ-REPO-*`), `backend/rest-api/rest-api-rules.md` (`R-OAS-*` для in-adapter).
 
 ## Инструкции
 
-1. **Прочти** `.claude/docs/hexagonal-rules.md`. Цитируй коды (`R-HEX-CORE-X1`, `R-HEX-PORT-X2`).
+1. **Прочти** `.claude/docs/backend/hexagonal/hexagonal-rules.md`. Цитируй коды (`R-HEX-CORE-X1`, `R-HEX-PORT-X2`).
 
 2. **Определи объект ревью.** Если пользователь назвал — бери. Иначе:
    - `git diff` на любые файлы в `core/`, `*-in-adapter/`, `*-out-adapter/`, `bootstrap/`.
@@ -67,7 +68,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `*-in-adapter/build.gradle.kts` — `implementation(project(":core"))`, не другой adapter.
    - `bootstrap/build.gradle.kts` — `implementation(project(":core"))` + все adapters.
 
-7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md`.
+7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md`.
 
 8. **Доменные ориентиры серьёзности:**
    - **Критично:**

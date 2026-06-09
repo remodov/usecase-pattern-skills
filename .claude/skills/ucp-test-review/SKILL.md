@@ -1,6 +1,7 @@
 ---
 name: ucp-test-review
-description: Ревью интеграционных и unit-тестов Java/Spring-сервиса по командной Test Strategy — слой выбран корректно (unit vs @WebMvcTest vs integration vs e2e), синхронные тесты, Postgres + WireMock через Testcontainers, без Kafka/Redis в базовом классе, детерминированное время и UUID через @MockitoBean, fluent DatabasePreparer + TestObjectGenerator, покрытие use case-ов и BR-кодов из спеки, отсутствие Thread.sleep/Awaitility, отсутствие @MockBean на бизнес-логику. Вызывается на свеже-написанных тестах или при онбординге существующего модуля. Опирается на коды TS-1..TS-28.
+description: Ревью интеграционных и unit-тестов Java/Spring по командной Test Strategy (коды TS-1..TS-28) — выбор слоя, синхронность, Postgres + WireMock через Testcontainers, детерминированные время/UUID, покрытие UC и BR, без Thread.sleep/@MockBean.
+when_to_use: Свеже-написанные тесты в src/test/java или онбординг существующего модуля.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 ---
 
@@ -10,15 +11,15 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 
 ## Зависимости
 
-- **`.claude/docs/test-strategy.md`** — индекс правил `TS-1`..`TS-28`. Цитируй конкретные коды (`TS-9`, `TS-19`), не префикс.
+- **`.claude/docs/backend/java/test-strategy/test-strategy-rules.md`** — индекс правил `TS-1`..`TS-28`. Цитируй конкретные коды (`TS-9`, `TS-19`), не префикс.
 - Парные документы:
-  - `.claude/docs/usecase-pattern-rules.md` (`R-UC-*`, `R-HND-*`) — для понимания, что тестируется на каком слое.
-  - `.claude/docs/usecase-spec-template.md` — UC- и BR-коды берутся из спеки, в тесте цитируются в `@DisplayName`.
-  - `.claude/docs/java-style-guide.md` (`JS-6.1`, `JS-7.3`) — Lombok-defaults на тестовых хелперах, запрет цитат кодов правил в комментариях.
+  - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` (`R-UC-*`, `R-HND-*`) — для понимания, что тестируется на каком слое.
+  - `.claude/docs/shared/usecase-spec-template.md` — UC- и BR-коды берутся из спеки, в тесте цитируются в `@DisplayName`.
+  - `.claude/docs/backend/java/java-style/java-rules.md` (`JS-6.1`, `JS-7.3`) — Lombok-defaults на тестовых хелперах, запрет цитат кодов правил в комментариях.
 
 ## Инструкции
 
-1. **Прочти стратегию** `.claude/docs/test-strategy.md`. Цитируй конкретные коды правил (`TS-19`, `TS-7`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/backend/java/test-strategy/test-strategy-rules.md` (полный текст с примерами тестов и base-классов — `backend/java/test-strategy/test-strategy.md`, открывай точечно по разделу). Цитируй конкретные коды правил (`TS-19`, `TS-7`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в `src/test/java/**`.
@@ -94,7 +95,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
    - `generate()` — финальный билд.
    - `withNano(0)` обязательно на timestamp-полях.
 
-9. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`TS-19`, `TS-7`).
+9. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`TS-19`, `TS-7`).
 
 10. **Доменные ориентиры серьёзности** (`RFF-12`):
     - **Критично** — нарушения, ведущие к flaky-тестам, ложно-зелёным регрессиям или утечкам в прод:

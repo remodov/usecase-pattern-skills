@@ -1,6 +1,7 @@
 ---
 name: ucp-jooq-review
-description: Ревью persistence-слоя на jOOQ — repository-pattern, multiset для nested-fetch, filter-builders, record→domain маппинг, SelectMode, view-репозитории, transaction boundaries. Проверяет Jooq<X>Repository, конструкторное внедрение DSLContext, alias-keys для multiset, SelectMode + applyLock, plain-Java *DomainRecordMapper (не MapStruct), @Transactional на handler (не на репозитории). Вызывается при ревью кода в persistence/ модуле, новых JooqXRepository, *DomainRecordMapper, *FilterConditionBuilder. Опирается на коды R-JOOQ-*.
+description: Ревью persistence-слоя на jOOQ (Java/Spring) по UCP (коды R-JOOQ-*) — repository-pattern, multiset для nested-fetch, filter-builders, record→domain маппинг, SelectMode, view-репозитории, transaction boundaries.
+when_to_use: Изменения в persistence/ модуле — Jooq<X>Repository, *DomainRecordMapper, *FilterConditionBuilder, *ViewRepository.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/jooq-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-JOOQ-CFG-*` (codegen), `R-JOOQ-REPO-*` (репозиторий), `R-JOOQ-CTX-*` (DSLContext), `R-JOOQ-QRY-*` (запросы), `R-JOOQ-MS-*` (multiset), `R-JOOQ-FLT-*` (filter-builders), `R-JOOQ-MAP-*` (mapper), `R-JOOQ-PAG-*` (пагинация), `R-JOOQ-LCK-*` (locks), `R-JOOQ-TX-*` (транзакции), `R-JOOQ-VIEW-*` (view-репо).
-- Парные документы: `pg-runtime-style-guide.md` (PG-L-040/041 для locks), `spring-bootstrap-style-guide.md` (BS-17/18/19/20 для «только jOOQ + generated»).
+- **`.claude/docs/backend/java/jooq/jooq-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-JOOQ-CFG-*` (codegen), `R-JOOQ-REPO-*` (репозиторий), `R-JOOQ-CTX-*` (DSLContext), `R-JOOQ-QRY-*` (запросы), `R-JOOQ-MS-*` (multiset), `R-JOOQ-FLT-*` (filter-builders), `R-JOOQ-MAP-*` (mapper), `R-JOOQ-PAG-*` (пагинация), `R-JOOQ-LCK-*` (locks), `R-JOOQ-TX-*` (транзакции), `R-JOOQ-VIEW-*` (view-репо).
+- Парные документы: `backend/pg-runtime/pg-runtime-rules.md` (PG-L-040/041 для locks), `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (BS-17/18/19/20 для «только jOOQ + generated»).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/jooq-style-guide.md`. Цитируй конкретные коды правил в каждой находке (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`, не «нарушение раздела 5»).
+1. **Прочти индекс правил** `.claude/docs/backend/java/jooq/jooq-rules.md`. Цитируй конкретные коды правил в каждой находке (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`, не «нарушение раздела 5»).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в модуле `persistence/`.
@@ -51,7 +52,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - findSummaries/findForExport в основном `<X>Repository` — `R-JOOQ-VIEW-X1`.
    - `JdbcTemplate`, `JpaRepository`, `EntityManager` — `R-JOOQ-REPO-X3` + `BS-17`.
 
-5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`), не префикс.
+5. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1`), не префикс.
 
 6. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — нарушения, которые вылазят под нагрузкой: plain SQL (injection), `forUpdate()` без TX, lazy-fetch вместо multiset (N+1), `@Transactional` на репо вместо handler, JdbcTemplate/JPA в обход `BS-17`.

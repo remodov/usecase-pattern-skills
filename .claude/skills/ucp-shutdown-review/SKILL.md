@@ -1,21 +1,22 @@
 ---
 name: ucp-shutdown-review
-description: Ревью корректного завершения Spring Boot-сервиса по UCP — server.shutdown=graceful, ApplicationAvailability в SIGTERM-listener, Tomcat/Netty drain, Kafka listener-container shutdown-timeout, TaskScheduler/Async с awaitTermination, HikariCP не закрыт раньше времени, k8s preStop sleep + terminationGracePeriodSeconds: 60, readiness/liveness probes на actuator, идемпотентность in-flight write-операций (cross-ref AUTH-19), метрика app_shutdown_duration_seconds. Опирается на коды R-SHUT-*. Вызывается на ревью application.yml, k8s-манифестов (Deployment, Service), любых @PreDestroy / ContextClosedEvent-хендлеров, ThreadPoolTaskExecutor бинов.
+description: Ревью graceful shutdown Spring Boot-сервиса по UCP (коды R-SHUT-*) — server.shutdown=graceful, ApplicationAvailability на SIGTERM, Kafka shutdown-timeout, awaitTermination, HikariCP, k8s preStop + terminationGracePeriodSeconds, probes.
+when_to_use: Изменения в application.yml, k8s-манифестах, @PreDestroy/ContextClosedEvent-хендлерах, ThreadPoolTaskExecutor-бинах.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью graceful shutdown
 
-Ты ревьюишь Spring Boot-сервис на корректное завершение по SIGTERM согласно `graceful-shutdown-style-guide.md` (`R-SHUT-*`). Главные точки контроля: Spring graceful включён, readiness переключается на SIGTERM, k8s preStop существует и terminationGracePeriodSeconds достаточный, Kafka/TaskScheduler/Async ждут текущие задачи, in-flight write-операции идемпотентны.
+Ты ревьюишь Spring Boot-сервис на корректное завершение по SIGTERM согласно `backend/graceful-shutdown/graceful-shutdown-rules.md` (`R-SHUT-*`). Главные точки контроля: Spring graceful включён, readiness переключается на SIGTERM, k8s preStop существует и terminationGracePeriodSeconds достаточный, Kafka/TaskScheduler/Async ждут текущие задачи, in-flight write-операции идемпотентны.
 
 ## Зависимости
 
-- **`.claude/docs/graceful-shutdown-style-guide.md`** — источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-SHUT-CFG-*` (JVM/Spring конфиг), `R-SHUT-HTTP-*` (HTTP drain), `R-SHUT-KFK-*` (Kafka), `R-SHUT-DB-*` (БД/HikariCP), `R-SHUT-SCHED-*` (Scheduled/Async/outbox), `R-SHUT-K8S-*` (k8s манифесты), `R-SHUT-IDEM-*` (идемпотентность in-flight), `R-SHUT-OBS-*` (бюджет/метрики).
-- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency), `resilience-style-guide.md` (`R-RES-RE-X1`, `R-RES-ASYNC-*`), `spring-bootstrap-style-guide.md` (`BS-13` Kafka startup, `BS-15` ExternalEventPublisher).
+- **`.claude/docs/backend/graceful-shutdown/graceful-shutdown-rules.md`** — источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-SHUT-CFG-*` (JVM/Spring конфиг), `R-SHUT-HTTP-*` (HTTP drain), `R-SHUT-KFK-*` (Kafka), `R-SHUT-DB-*` (БД/HikariCP), `R-SHUT-SCHED-*` (Scheduled/Async/outbox), `R-SHUT-K8S-*` (k8s манифесты), `R-SHUT-IDEM-*` (идемпотентность in-flight), `R-SHUT-OBS-*` (бюджет/метрики).
+- Парные документы: `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для idempotency), `backend/resilience/resilience-rules.md` (`R-RES-RE-X1`, `R-RES-ASYNC-*`), `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (`BS-13` Kafka startup, `BS-15` ExternalEventPublisher).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/graceful-shutdown-style-guide.md`. Цитируй конкретные коды (`R-SHUT-CFG-1`, `R-SHUT-K8S-X1`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/backend/graceful-shutdown/graceful-shutdown-rules.md` (полный текст с yaml/Java-примерами и таблицей бюджетов — `backend/graceful-shutdown/java/graceful-shutdown-style-guide.md`, открывай точечно по разделу). Цитируй конкретные коды (`R-SHUT-CFG-1`, `R-SHUT-K8S-X1`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе скоп по умолчанию:
    - `application*.yml` — `server.shutdown`, `spring.lifecycle.*`, `spring.kafka.listener.shutdown-*`, `spring.task.scheduling.shutdown.*`, `management.endpoint.health.probes.*`.
@@ -86,7 +87,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `Thread.sleep`-loop в @Scheduled или @Async → `R-RES-ASYNC-X1`.
    - Kafka `enable.auto.commit: true` пересекается с outbox-pattern из `BS-15`.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-SHUT-K8S-X1`, `R-SHUT-CFG-1`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-SHUT-K8S-X1`, `R-SHUT-CFG-1`).
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — потеря данных или 502 для клиента под нагрузкой:

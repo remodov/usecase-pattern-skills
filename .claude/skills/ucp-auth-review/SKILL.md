@@ -1,6 +1,7 @@
 ---
 name: ucp-auth-review
-description: Проверить Spring Boot-сервис на соответствие правилам аутентификации/авторизации — валидация JWT на границе, RBAC на BFF, ABAC по владельцу ресурса в domain-handler-ах, mTLS или Client Credentials для сервис-к-сервису, audit log для admin-операций, PII-гигиена, идемпотентность для money-операций. Применяется при разборе security-конфигов, контроллеров, обработчиков или PR, затрагивающих auth-флоу.
+description: Ревью аутентификации/авторизации Spring Boot-сервиса (коды AUTH-*) — JWT на границе, RBAC на BFF, ABAC по владельцу в handler-ах, mTLS/Client Credentials, audit log, PII-гигиена, идемпотентность money-операций.
+when_to_use: Ревью security-конфигов, контроллеров, handler-ов, application.yml или PR, затрагивающих auth-флоу.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/auth-patterns-style-guide.md`. Цитируй коды (`AUTH-7`, `AUTH-15`) в замечаниях.
+1. **Прочти индекс правил** `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` (полный текст с примерами кода — `backend/auth-patterns/java/auth-patterns-style-guide.md`, открывай точечно по разделу). Цитируй коды (`AUTH-7`, `AUTH-15`) в замечаниях.
 
 2. **Определи объект ревью.** Скоп по умолчанию:
    - `**/SecurityConfig*.java` и любая `@Configuration`, общающаяся со Spring Security или `OAuth2ResourceServer`.
@@ -37,22 +38,11 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(./gradlew*) Bash(mvn*) Agent
    - **§8 Идемпотентность (`AUTH-19`):** money-эндпоинты декларируют заголовок `Idempotency-Key` в OpenAPI и проверяют его в handler-е.
    - **§9 Клиентская сторона (`AUTH-20`..`AUTH-21`):** для BFF — куки HttpOnly + Secure + SameSite; rotation refresh-токена; никакого `localStorage` в возвращаемых JS-подсказках.
 
-4. **Замечания** оформляй в стандартном формате:
+4. **Формат finding, локализация, серьёзность, резюме, запрет правок** — см. `.claude/docs/shared/review-finding-format.md` (правила `RFF-1`..`RFF-16`). Перед каждым finding обязательна Read-проверка строки (`RFF-1`..`RFF-5`), поле `Строка` в формате обязательно (`RFF-7`).
 
-   ```
-   <ПутьФайла>:<СтрокаНомер>  [<КодПравила>]  <Серьёзность>
-     Проблема: <однострочное описание>
-     Почему: <краткая цитата правила>
-     Как исправить: <конкретное предложение + сниппет кода>
-   ```
-
-   Серьёзности:
+5. **Доменные ориентиры для серьёзности** (`RFF-12`):
    - **Критично** — эндпоинт без `@PreAuthorize`, ABAC отсутствует на ресурс-связанной операции, кастомный JWT-фильтр, секреты в открытом виде в репо, PII в `ProblemDetails.detail`.
    - **Предупреждение** — слабая привязка правил (`hasAuthority` где должно быть `hasRole`), audit log отсутствует на admin-команде, refresh-token без rotation.
-   - **Замечание** — улучшения: переименовать роль, вынести ABAC в `@Component("access")`, добавить `@AuditLog`-аспект.
-
-5. **Заверши резюме** — счётчики по серьёзности + вердикт.
-
-6. **Код не модифицируй** — только сообщай.
+   - **Замечание** — переименовать роль, вынести ABAC в `@Component("access")`, добавить `@AuditLog`-аспект.
 
 $ARGUMENTS

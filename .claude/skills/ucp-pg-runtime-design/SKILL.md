@@ -1,12 +1,14 @@
 ---
+lang: any
 name: ucp-pg-runtime-design
-description: Сгенерировать runtime-инфраструктуру для типовых PG-сценариев под pg-runtime-style-guide — outbox-relay (publishing pattern с FOR UPDATE SKIP LOCKED), task-queue (durable retry для адаптеров), advisory-lock для singleton scheduled-job, optimistic-lock через version-колонку с retry на CannotAcquireLockException. Создаёт Liquibase-таблицу, Java-классы scheduler + handler, конфиг lock_timeout. Применяется когда нужен outbox для doмен-событий, task-queue для resilience-fallback, distributed scheduling. Триггеры: «нужен outbox-relay», «scheduler с SKIP LOCKED», «task-queue для платежей», «advisory lock для singleton job», «optimistic locking для агрегата X».
+description: Сгенерировать runtime-инфраструктуру PostgreSQL для Java/Spring (коды PG-W-*, PG-V-*, PG-L-*) — outbox-relay с FOR UPDATE SKIP LOCKED, task-queue для retry, advisory-lock для singleton-job, optimistic-lock через version + retry.
+when_to_use: Триггеры — «нужен outbox-relay», «scheduler с SKIP LOCKED», «task-queue для платежей», «advisory lock», «optimistic locking для агрегата X».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Runtime — проектирование
 
-Ты генерируешь runtime-инфраструктуру для типовых PG-сценариев по `pg-runtime-style-guide.md` (`PG-W-*`, `PG-V-*`, `PG-L-*`, `PG-CP-*`, `PG-IS-*`). Это узкий скилл — покрывает 4 паттерна:
+Ты генерируешь runtime-инфраструктуру для типовых PG-сценариев по `backend/pg-runtime/pg-runtime-rules.md` (`PG-W-*`, `PG-V-*`, `PG-L-*`, `PG-CP-*`, `PG-IS-*`). Это узкий скилл — покрывает 4 паттерна:
 
 1. **Outbox-relay** — durable publishing доменных событий.
 2. **Task-queue** — durable retry для resilience-fallback (см. `R-RES-FB-1`).
@@ -18,9 +20,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ## Инструкции
 
 1. **Прочитай:**
-   - `.claude/docs/pg-runtime-style-guide.md` — главный (правила `PG-W-*`, `PG-L-*`).
-   - `.claude/docs/pg-types-style-guide.md` — типы под `PG-T-*` (для DDL outbox-таблицы).
-   - `.claude/docs/jooq-style-guide.md` — `R-JOOQ-LCK-1`, `R-JOOQ-MS-3` (для запросов SKIP LOCKED).
+   - `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` — главный (правила `PG-W-*`, `PG-L-*`).
+   - `.claude/docs/backend/pg-types/pg-types-rules.md` — типы под `PG-T-*` (для DDL outbox-таблицы).
+   - `.claude/docs/backend/java/jooq/jooq-rules.md` — `R-JOOQ-LCK-1`, `R-JOOQ-MS-3` (для запросов SKIP LOCKED).
 
 2. **Уточни сценарий.** Один из:
    - `outbox` — outbox-relay для доменных событий.

@@ -1,6 +1,7 @@
 ---
 name: ucp-api-design
-description: Спроектировать новый REST API-эндпоинт или ресурс по командному REST API Style Guide. Применяется при создании новых эндпоинтов, планировании структуры API или написании OpenAPI-спек с нуля.
+description: Спроектировать новый REST API-эндпоинт или ресурс по REST API Style Guide для Java/Spring (коды R-URL-*, R-MTH-*, R-RSP-*, R-ERR-*, R-OAS-*) — OpenAPI-first, нейминг URL, статусы, ошибки ProblemDetails.
+when_to_use: Создание новых эндпоинтов, проектирование структуры API, написание OpenAPI-спеки с нуля.
 allowed-tools: Read Glob Grep Write Edit
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/rest-api-style-guide.md` в корне проекта. Следуй каждому правилу строго.
+1. **Прочитай индекс правил** `.claude/docs/backend/rest-api/rest-api-rules.md` — компактный список всех кодов (`R-URL-*`, `R-MTH-*`, `R-RSP-*`, `R-ERR-*`, …) с формулировками; следуй каждому строго. Полную версию `.claude/docs/backend/rest-api/java/rest-api-style-guide.md` (примеры, code-блоки, обоснование) читай **точечно по нужному разделу**, когда индекса не хватает — не целиком.
 
 2. **Уточни требования.** По описанию пользователя определи:
    - Какие ресурсы вовлечены

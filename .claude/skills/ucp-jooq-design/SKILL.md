@@ -1,6 +1,7 @@
 ---
 name: ucp-jooq-design
-description: Сгенерировать persistence-слой на jOOQ из доменного <X>Repository интерфейса по jOOQ Style Guide. Создаёт Jooq<X>Repository (с DSLContext + multiset для eager-fetch), <X>DomainRecordMapper (Plain Java или MapStruct по содержанию), <X>FilterConditionBuilder (если фильтр сложный), Jooq<X>ViewRepository для read-проекций. Решает: multiset vs batch-fetch, MapStruct vs plain Java mapper, SelectMode на каждом read-методе, alias-keys в SelectMultisetAliasKeys, exception на CallNotPermitted vs handler-level. Применяется при добавлении нового агрегата, после ucp-ddd-tactical-design (есть Aggregate + интерфейс репозитория). Триггеры: «сделай репозиторий для X», «нужна jooq-имплементация Y», «добавь persistence для агрегата Z», «генерим JooqXRepository».
+description: Сгенерировать persistence-слой на jOOQ (Java) из доменного <X>Repository по jOOQ Style Guide (коды R-JOOQ-*) — Jooq<X>Repository с DSLContext + multiset, <X>DomainRecordMapper, <X>FilterConditionBuilder, Jooq<X>ViewRepository, SelectMode.
+when_to_use: После ucp-ddd-tactical-design (есть Aggregate и Repository-интерфейс). Триггеры — «сделай репозиторий для X», «нужна jooq-имплементация Y».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -11,10 +12,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ## Инструкции
 
 1. **Прочитай style guide'ы** в порядке:
-   - `.claude/docs/jooq-rules.md` — главный (правила `R-JOOQ-*`).
-   - `.claude/docs/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
-   - `.claude/docs/usecase-pattern-rules.md` §2 — для Уровня 3 (`core/` ↔ `persistence/`).
-   - `.claude/docs/pg-runtime-style-guide.md` `PG-L-040`/`PG-L-041` — для locking-синтаксиса (FOR UPDATE / SKIP LOCKED).
+   - `.claude/docs/backend/java/jooq/jooq-rules.md` — главный (правила `R-JOOQ-*`).
+   - `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
+   - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` §2 — для Уровня 3 (`core/` ↔ `persistence/`).
+   - `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` `PG-L-040`/`PG-L-041` — для locking-синтаксиса (FOR UPDATE / SKIP LOCKED).
 
 2. **Подтверди наличие зависимостей.** Проверь `bootstrap/build.gradle.kts` на:
    - `spring-boot-starter-jooq` (`BS-17`).

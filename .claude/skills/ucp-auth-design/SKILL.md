@@ -1,6 +1,7 @@
 ---
 name: ucp-auth-design
-description: Зашаблонить конфиг Spring Security + OAuth2 Resource Server для UCP-сервиса — валидация JWT, маппинг ролей, RBAC на эндпоинтах, ABAC-хелперы (`AuthenticatedX`, `@Component("access")`), audit log-аспект, раскладка секретов, идемпотентность. Применяется при старте нового сервиса или добавлении auth в существующий.
+description: Зашаблонить Spring Security + OAuth2 Resource Server для UCP-сервиса на Java/Spring (коды AUTH-*) — валидация JWT, маппинг ролей, RBAC на эндпоинтах, ABAC-хелперы, audit log-аспект, раскладка секретов, идемпотентность.
+when_to_use: При старте нового сервиса или добавлении auth в существующий. В цепочке — после ucp-pattern-design.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/auth-patterns-style-guide.md`. Цитируй правила `AUTH-N` **в design-обосновании ответа пользователю**, но **не в комментариях сгенерированного кода** (`JS-7.3` в `java-style-guide.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
+1. **Прочти индекс правил** `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` (полный текст с примерами кода — `backend/auth-patterns/java/auth-patterns-style-guide.md`, открывай точечно по разделу). Цитируй правила `AUTH-N` **в design-обосновании ответа пользователю**, но **не в комментариях сгенерированного кода** (`JS-7.3` в `backend/java/java-style/java-rules.md`). Никаких `// AUTH-15`, `// AUTH-9` в исходниках — соответствие выражается через `@PreAuthorize`, наличие audit-таблицы, `JwtAuthenticationConverter` и т.д.
 
 2. **Подтверди слой.** Определи:
    - **Gateway** — здесь только валидация JWT + rate limiting. Сервис обычно не Gateway; если перед тобой именно Gateway — генерируешь правила маршрутизации, но не RBAC handler-ов.

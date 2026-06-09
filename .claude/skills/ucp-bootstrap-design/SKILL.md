@@ -1,6 +1,7 @@
 ---
 name: ucp-bootstrap-design
-description: Спроектировать или починить bootstrap-конфигурацию Spring Boot для UCP-сервиса — профили (local / integration-test / production), production-бины для clock / UUID-интерфейсов, SecurityConfig per profile, Liquibase, jOOQ codegen + persistence только на сгенерированных типах, гейтинг Kafka-листенеров, видимость event-payload в Jackson. Применяется при шаблонировании нового сервиса или когда bootRun падает с UnsatisfiedDependencyException, ошибками fetch JWK-set, пустыми outbox-payload-ами, сервис отказывается стартовать без живого Keycloak / Kafka, или когда persistence-слой использует JdbcTemplate / JPA вместо jOOQ.
+description: Спроектировать или починить bootstrap Spring Boot UCP-сервиса (коды BS-*) — профили local/integration-test/production, бины clock/UUID, SecurityConfig per profile, Liquibase, jOOQ codegen, гейтинг Kafka-листенеров, Jackson event-payload.
+when_to_use: Новый сервис без bootstrap, либо bootRun падает: UnsatisfiedDependencyException, fetch JWK-set, пустые outbox-payload, JdbcTemplate/JPA вместо jOOQ.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) Bash(curl*)
 ---
 
@@ -20,7 +21,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 ## Инструкции
 
-1. **Прочитай style guide** из `.claude/docs/spring-bootstrap-style-guide.md`. У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 3 дополнительно прочитай `usecase-pattern-rules.md` для раскладки модулей.
+1. **Прочти индекс правил** `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` (полный текст с примерами конфигов и gradle-сниппетами — `backend/java/spring-bootstrap/spring-bootstrap-style-guide.md`, открывай точечно по разделу). У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 3 дополнительно прочитай `backend/usecase-pattern/usecase-pattern-rules.md` для раскладки модулей.
 
 2. **Диагностируй: это починка или с нуля.** Для починки сначала запусти и прочитай реальную ошибку:
    ```bash
@@ -81,7 +82,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
     ```
     Плюс матрица профилей (`BS-2`). Если в README не сказано, какой профиль использовать для локальной разработки — следующий dev, склонировавший репо, потратит час на отладку JWK-fetch-сбоя.
 
-11. **Не цитируй коды правил в комментариях исходников** (`JS-7.3` в `java-style-guide.md`). В сгенерированных Java/YAML-файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.п. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
+11. **Не цитируй коды правил в комментариях исходников** (`JS-7.3` в `backend/java/java-style/java-rules.md`). В сгенерированных Java/YAML-файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.п. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
 
 12. **Lombok + MapStruct + OpenAPI-generator — обязательны в build с самого старта** (`JS-6.6`, `R-LAY-3`, style guide §12.2). Пропиши в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
 

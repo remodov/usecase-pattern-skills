@@ -1,6 +1,7 @@
 ---
 name: ucp-validation-review
-description: Ревью валидации входных данных (Jakarta Validation) — где валидируем, какие constraints применяем, custom-constraints размещение, validation groups, cross-field, @ConfigurationProperties + @Validated, OpenAPI-сгенерированные DTO с useBeanValidation. Проверяет @Valid на контроллерах и nested-полях, @Validated на configuration-properties, отсутствие manual if-цепочек в Handler, @NotNull на примитивах, кастомные constraints в правильных местах, validation groups только для одного класса с разными required-полями. Применяется при ревью контроллеров, DTO, custom validators, configuration-классов. Опирается на коды R-VLD-*.
+description: Ревью валидации входных данных Java/Spring (Jakarta Validation, коды R-VLD-*) — @Valid на контроллерах и nested-полях, @Validated на @ConfigurationProperties, custom constraints, validation groups, cross-field, OpenAPI useBeanValidation.
+when_to_use: Ревью контроллеров, DTO, custom validators, configuration-классов.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/validation-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-VLD-WHERE-*` (где валидируем), `R-VLD-STD-*` (стандартные constraints), `R-VLD-CC-*` (custom constraints), `R-VLD-GRP-*` (groups), `R-VLD-XF-*` (cross-field), `R-VLD-OAS-*` (OpenAPI generator), `R-VLD-CFG-*` (config), `R-VLD-MSG-*` (сообщения).
-- Парные документы: `rest-api-style-guide.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `auth-patterns-style-guide.md` (`AUTH-19` — Idempotency-Key валидация), `ddd-tactical-style-guide.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
+- **`.claude/docs/backend/validation/validation-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-VLD-WHERE-*` (где валидируем), `R-VLD-STD-*` (стандартные constraints), `R-VLD-CC-*` (custom constraints), `R-VLD-GRP-*` (groups), `R-VLD-XF-*` (cross-field), `R-VLD-OAS-*` (OpenAPI generator), `R-VLD-CFG-*` (config), `R-VLD-MSG-*` (сообщения).
+- Парные документы: `backend/rest-api/rest-api-rules.md` (`R-ERR-5`/`R-ERR-6` — формат violations), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` — Idempotency-Key валидация), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-ENT-*`/`R-AGG-*` — отличие domain invariants от validation).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/validation-style-guide.md`. Цитируй конкретные коды правил (`R-VLD-WHERE-1`, `R-VLD-OAS-X1`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/backend/validation/validation-rules.md` (общий контракт) **и Java-реализацию** `.claude/docs/backend/validation/java/validation-style-guide.md` (Jakarta/OpenAPI-first — для проверки Java-кода). Цитируй конкретные коды правил (`R-VLD-WHERE-1`, `R-VLD-OAS-X1`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые контроллеры (`*-in-adapter/`), DTO (`*Request`, `*Response`), `*ConfigurationProperties`/`*Settings`, кастомные validators (`common/validation/`, `core/<bc>/validation/`), OpenAPI YAML (`*.openapi.yaml`).
@@ -59,7 +60,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Nested schemas (`$ref`) валидируются автоматически generated `@Valid`.
    - Если в коде нужна стрикт-валидация, которой нет в YAML — это либо отсутствие правила в YAML (добавить), либо custom-wrapper в коде.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-VLD-WHERE-1`, `R-VLD-OAS-X2`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-VLD-WHERE-1`, `R-VLD-OAS-X2`).
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично:**

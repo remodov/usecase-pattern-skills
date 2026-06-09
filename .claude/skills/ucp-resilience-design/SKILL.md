@@ -1,6 +1,7 @@
 ---
 name: ucp-resilience-design
-description: Добавить Resilience4j-обвязку (Circuit Breaker, Bulkhead, Retry, Timeout, HealthIndicator) к УЖЕ существующему out-adapter, который сейчас работает на ad-hoc try/catch + timeouts. Миграционный скилл — превращает «защита из try-catch» в стандарт R-RES-*. Не создаёт новые модули, не трогает port в core/. Решает: per-system isolation OkHttpClient/RestClient, аннотации на adapter-методах (не на generated client), retry только при идемпотентности (R-RES-RE-1, AUTH-19), task-queue вместо sleep-loop polling, HealthIndicator с TTL-кешем. Применяется к существующим адаптерам, для новых интеграций — ucp-integration-design. Триггеры: «обвяжи адаптер X через Resilience4j», «добавь Circuit Breaker к sber-out-adapter», «мигрируй <system>-out-adapter под R-RES-*».
+description: Добавить Resilience4j-обвязку (Circuit Breaker, Bulkhead, Retry, HealthIndicator) к существующему Java out-adapter (коды R-RES-*) — per-system isolation, аннотации на adapter-методах, retry только при идемпотентности, task-queue вместо sleep-loop.
+when_to_use: Миграция существующего адаптера; для новых — ucp-integration-design. Триггеры — «обвяжи адаптер X через Resilience4j», «добавь Circuit Breaker к Y».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -12,7 +13,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/resilience-style-guide.md` (главный, правила `R-RES-*`) и `.claude/docs/auth-patterns-style-guide.md` (`AUTH-19` для retry-решения).
+1. **Прочитай** `.claude/docs/backend/resilience/resilience-rules.md` (главный, правила `R-RES-*`) и `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для retry-решения).
 
 2. **Идентифицируй существующий out-adapter:**
    - `git diff` или путь от пользователя.
@@ -69,7 +70,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
      ```java
      // TODO R-RES-ASYNC-1: sync-polling блокирует worker-threads.
      //   Перевести в task-queue: создать <X>PollingTask + scheduler @Scheduled(5s).
-     //   См. resilience-style-guide.md §11. Координирует ucp-pattern-design.
+     //   См. backend/resilience/resilience-rules.md §11. Координирует ucp-pattern-design.
      ```
    - В выводе — отдельный пункт «**Требует доработки в `core/`:** перевод polling в task-queue». Возможно отдельный PR.
 

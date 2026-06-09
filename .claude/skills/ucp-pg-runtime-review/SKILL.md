@@ -1,6 +1,8 @@
 ---
+lang: any
 name: ucp-pg-runtime-review
-description: Ревью PostgreSQL runtime-аспектов — WAL-нагрузка, autovacuum/bloat, блокировки, connection pool, уровни изоляции. Проверяет fillfactor, длинные транзакции (@Transactional вокруг HTTP/Kafka), bulk-операции (COPY vs INSERT), SELECT FOR UPDATE / SKIP LOCKED через jOOQ, advisory locks, deadlock-prone порядок блокировок, HikariCP/PgBouncer-настройку, выбор Isolation level, retry на 40001. Вызывается при тормозах под нагрузкой, ревью кода с транзакциями, тюнинге пула.
+description: Ревью PostgreSQL runtime-аспектов (коды PG-W-*, PG-V-*, PG-L-*, PG-CP-*, PG-IS-*) — WAL-нагрузка, autovacuum/bloat, блокировки и FOR UPDATE/SKIP LOCKED, длинные @Transactional, HikariCP/PgBouncer, уровни изоляции и retry на 40001.
+when_to_use: Тормоза под нагрузкой, ревью кода с транзакциями и блокировками, тюнинг connection pool.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,11 +12,11 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-runtime-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
+- **`.claude/docs/backend/pg-runtime/pg-runtime-rules.md`** в проекте (или из `claude-code-java`) — источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/pg-runtime-style-guide.md`. Цитируй коды правил в каждой находке.
+1. **Прочти индекс правил** `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` (полный текст с SQL-примерами и yaml-конфигами — `backend/pg-runtime/pg-runtime-style-guide.md`, открывай точечно по разделу). Цитируй коды правил в каждой находке.
 
 2. **Определи режим работы.** Если пользователь дал:
    - **Java-код с `@Transactional`** — фокус на длительность транзакций (PG-W-061, PG-V-050) и блокировки.

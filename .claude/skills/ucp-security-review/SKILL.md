@@ -1,22 +1,23 @@
 ---
 name: ucp-security-review
-description: Ревью Java/Spring-сервиса на соответствие security-style-guide — SAST-инструменты подключены и enforce-ятся в CI (Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks, Trivy), suppressions имеют срок и обоснование, severity-thresholds правильные, Dockerfile non-root + digest-pinned, секреты не в коде, криптография без MD5/SHA1/AES-ECB. Опирается на коды R-SEC-* и BS-SEC-*. Вызывается на ревью build.gradle, .github/workflows/*, Dockerfile, application.yml, suppression-файлов, любого Java-кода с криптографией.
+description: Ревью Java/Spring-сервиса по security-style-guide (коды R-SEC-*, BS-SEC-*) — SAST в CI (Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks, Trivy), suppressions со сроком, Dockerfile non-root, криптография без MD5/SHA1/AES-ECB.
+when_to_use: Ревью build.gradle, CI-workflows, Dockerfile, application.yml, suppression-файлов, Java-кода с криптографией.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 ---
 
-# Ревью security/SAST-настройки сервиса
+# Ревью backend/security/SAST-настройки сервиса
 
-Ты ревьюишь Java/Spring-сервис на соответствие `security-style-guide.md` (`R-SEC-*`) и enforcement-уровню `spring-bootstrap-style-guide.md` (`BS-SEC-*`). Главные точки контроля: подключение всех mandatory-инструментов, severity-thresholds, suppressions с обоснованием и сроком, Dockerfile-гигиена, криптография в коде.
+Ты ревьюишь Java/Spring-сервис на соответствие `backend/security/security-rules.md` (`R-SEC-*`) и enforcement-уровню `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (`BS-SEC-*`). Главные точки контроля: подключение всех mandatory-инструментов, severity-thresholds, suppressions с обоснованием и сроком, Dockerfile-гигиена, криптография в коде.
 
 ## Зависимости
 
-- **`.claude/docs/security-style-guide.md`** — источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-SEC-SAST-*` (SpotBugs/FindSecBugs/Error Prone), `R-SEC-DEP-*` (CVE в зависимостях), `R-SEC-SECRET-*` (секреты), `R-SEC-IMG-*` (контейнеры), `R-SEC-CRYPTO-*` (криптография), `R-SEC-FIND-*` (реакция на findings).
-- **`.claude/docs/spring-bootstrap-style-guide.md`** — `BS-SEC-*` для enforcement (наличие плагинов в build.gradle, CI-степы).
-- Парные документы: `auth-patterns-style-guide.md` (для контекста авторизации), `observability-style-guide.md` (PII в логах — отдельный гайд, не дублируем).
+- **`.claude/docs/backend/security/security-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-SEC-SAST-*` (SpotBugs/FindSecBugs/Error Prone), `R-SEC-DEP-*` (CVE в зависимостях), `R-SEC-SECRET-*` (секреты), `R-SEC-IMG-*` (контейнеры), `R-SEC-CRYPTO-*` (криптография), `R-SEC-FIND-*` (реакция на findings).
+- **`.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md`** — `BS-SEC-*` для enforcement (наличие плагинов в build.gradle, CI-степы).
+- Парные документы: `backend/auth-patterns/auth-patterns-rules.md` (для контекста авторизации), `backend/observability/observability-rules.md` (PII в логах — отдельный гайд, не дублируем).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/security-style-guide.md` и `BS-SEC-*` секцию из `spring-bootstrap-style-guide.md`. Цитируй конкретные коды (`R-SEC-DEP-X1`, `BS-SEC-3`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/backend/security/security-rules.md` и `BS-SEC-*` секцию из `backend/java/spring-bootstrap/spring-bootstrap-rules.md`. Цитируй конкретные коды (`R-SEC-DEP-X1`, `BS-SEC-3`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе скоп по умолчанию:
    - `build.gradle` / `build.gradle.kts` / `settings.gradle*` — наличие плагинов и dependencies (`R-SEC-SAST-1/2`, `R-SEC-DEP-1`).
@@ -76,7 +77,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
    - В CI workflow `if: always()` на upload SARIF (иначе падение early-step не публикует отчёт) — `R-SEC-FIND-3`.
 
    ### `BS-SEC-*` (enforcement-уровень из bootstrap-guide)
-   - Все mandatory-инструменты подключены — отсутствие любого = `BS-SEC-N` критическое (см. секцию в spring-bootstrap-style-guide).
+   - Все mandatory-инструменты подключены — отсутствие любого = `BS-SEC-N` критическое (см. секцию в spring-bootstrap-rules).
    - `./gradlew check` запускает spotbugs + dependency-check как dependsOn — `BS-SEC-2`.
 
 4. **При ревью кода ищи паттерны-нарушения:**
@@ -92,7 +93,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
    - Если `R-SEC-CRYPTO-5` (manual JWT parsing) обнаружен — также сошлись на `AUTH-4` («только oauth2ResourceServer().jwt()») для подкрепления.
    - PII в логах НЕ ревьюим здесь (это `R-OBS-PII-*` через `ucp-observability-review`) — но если видишь массовые findings FindSecBugs `INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE`, упомяни в финальной заметке.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-SEC-DEP-X1`, `R-SEC-IMG-X1`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-SEC-DEP-X1`, `R-SEC-IMG-X1`).
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — выключенный enforcement или утёкший секрет:

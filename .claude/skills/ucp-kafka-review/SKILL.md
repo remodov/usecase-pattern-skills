@@ -1,6 +1,7 @@
 ---
 name: ucp-kafka-review
-description: Ревью работы с Kafka — producer (idempotence, acks=all, partition key), consumer (manual ack, group.id per-purpose, idempotent с processed_event таблицей), outbox publishing вместо @TransactionalEventListener, retry topic + DLQ вместо blocking retry, event design (имя в past tense, eventId UUID v7, eventType версионированный), конфигурация (trusted.packages explicit allow-list, missing-topics-fatal), security (TLS, ACLs per-сервис), observability (consumer lag alerts). Проверяет KafkaTemplate.send из @Transactional с DB, enable.auto.commit, отсутствие partition key, listener без CB на HTTP, blocking retry через Thread.sleep, отсутствие eventId dedup, PII в широковещательных топиках. Применяется при ревью KafkaListener-классов, KafkaConfig, application.yml kafka-блока, outbox-relay реализаций. Опирается на коды R-KFK-*.
+description: Ревью работы с Kafka в Java/Spring (коды R-KFK-*) — producer idempotence и partition key, consumer manual ack и dedup через processed_event, outbox вместо @TransactionalEventListener, retry topic + DLQ, event design, config и security.
+when_to_use: Изменения в KafkaListener-классах, KafkaConfig, kafka-блоке application.yml, outbox-relay.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/kafka-style-guide.md`** — единственный источник правил. Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
-- Парные документы: `pg-runtime-style-guide.md` (`PG-L-021` — outbox-relay через SKIP LOCKED), `auth-patterns-style-guide.md` (`AUTH-19` — money-операции через Idempotency-Key), `resilience-style-guide.md` (CB вокруг HTTP-вызовов из listener), `ddd-tactical-style-guide.md` (`R-EVT-*` — domain events как payload).
+- **`.claude/docs/backend/kafka/kafka-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
+- Парные документы: `backend/pg-runtime/pg-runtime-rules.md` (`PG-L-021` — outbox-relay через SKIP LOCKED), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` — money-операции через Idempotency-Key), `backend/resilience/resilience-rules.md` (CB вокруг HTTP-вызовов из listener), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-EVT-*` — domain events как payload).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/kafka-style-guide.md`. Цитируй конкретные коды (`R-KFK-PROD-X1`, `R-KFK-OBX-X1`).
+1. **Прочти индекс правил** `.claude/docs/backend/kafka/kafka-rules.md`. Цитируй конкретные коды (`R-KFK-PROD-X1`, `R-KFK-OBX-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*KafkaListener*`, `*KafkaConfig*`, `*KafkaTemplate*`, `*OutboxRelay*`, `*OutboxPublisher*`.
@@ -65,7 +66,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `spring.kafka.consumer.properties.spring.json.trusted.packages: 'ru.example.events.*'` (explicit, не `*`).
    - `spring.kafka.bootstrap-servers: ${KAFKA_BROKERS:...}` — env-substitution.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-*`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-*`).
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично:**

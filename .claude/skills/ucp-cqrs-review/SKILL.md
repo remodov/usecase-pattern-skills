@@ -1,6 +1,7 @@
 ---
 name: ucp-cqrs-review
-description: Ревью CQRS-разделения — когда применён (с учётом уровня зрелости), command-side (запись через aggregate, FOR UPDATE, outbox), query-side (через ViewRepository с read-DTO), read-model (отдельная таблица/Redis/ES, sync через события, не bidirectional, не source-of-truth), синхронизация через outbox+Kafka не sync UPDATE в TX, идемпотентность consumer, eventual consistency декларирована в API, антипаттерны (write в query handler, query грузит агрегат целиком, read-model с бизнес-логикой, sync через PG triggers). Применяется при ревью UseCase/Handler-классов с маркерами Command/Query, ViewRepository, read-DTO, outbox-publishers, read-side consumers. Опирается на коды R-CQRS-*.
+description: Ревью CQRS-разделения в Java/Spring (коды R-CQRS-*) — command-side через aggregate и outbox, query-side через ViewRepository с read-DTO, read-model и sync через события, идемпотентность consumer, eventual consistency в API.
+when_to_use: Изменения в Command/Query-handler-ах, ViewRepository, read-DTO, outbox-publisher-ах, read-side consumer-ах.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/cqrs-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (уровень и эволюция CQRS).
-- Парные: `usecase-pattern-rules.md` (`R-UC-*` маркеры), `ddd-tactical-rules.md` (`R-AGG-*`), `jooq-rules.md` (`R-JOOQ-VIEW-*`), `kafka-rules.md` (`R-KFK-OBX-*`).
+- **`.claude/docs/backend/cqrs/cqrs-rules.md`** — индекс всех правил (полный текст — соответствующий `*-style-guide.md`). Подгруппы: `R-CQRS-WHEN-*` (когда), `R-CQRS-CMD-*` (command), `R-CQRS-QRY-*` (query), `R-CQRS-RM-*` (read-model), `R-CQRS-SYNC-*` (синхронизация), `R-CQRS-TIER-*` (уровень и эволюция CQRS).
+- Парные: `backend/usecase-pattern/usecase-pattern-rules.md` (`R-UC-*` маркеры), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-AGG-*`), `backend/java/jooq/jooq-rules.md` (`R-JOOQ-VIEW-*`), `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`).
 
 ## Инструкции
 
-1. **Прочти** `.claude/docs/cqrs-rules.md`. Цитируй коды конкретно (`R-CQRS-CMD-X1`, `R-CQRS-RM-X2`).
+1. **Прочти** `.claude/docs/backend/cqrs/cqrs-rules.md`. Цитируй коды конкретно (`R-CQRS-CMD-X1`, `R-CQRS-RM-X2`).
 
 2. **Определи объект ревью.** Если пользователь назвал — бери. Иначе:
    - `git diff` на handlers (`*CommandHandler*`, `*QueryHandler*`), `*ViewRepository*`, `*ReadModel*`, `*Summary.java`, `*Projection*`.
@@ -49,7 +50,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 5. **При ревью OpenAPI:**
    - Endpoint, отдающий read-проекцию, имеет `description: '...задержка до N секунд...'` если eventual consistent — `R-CQRS-SYNC-4`.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md`.
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md`.
 
 7. **Доменные ориентиры серьёзности**:
    - **Критично:**

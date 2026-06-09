@@ -1,10 +1,18 @@
-# claude-code-java
+# usecase-pattern-skills
 
-Скиллы (slash-команды) для Claude Code по методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; полные style-guide-снапшоты лежат в `.claude/docs/*.md`.
+Скиллы (slash-команды) для Claude Code по методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; полные style-guide-снапшоты лежат в `.claude/docs/`.
+
+> **Мультиязычность и специализации.** Методология устроена по двум ортогональным осям:
+> **язык** (`lang`: java — референс, python — полностью покрыт, node/go — пилот) и
+> **специализация** (`track`: backend; frontend/e2e — зарезервированы, скиллов пока нет).
+> Язык-нейтральный контракт (`<concern>/<concern>-rules.md`) один на все языки; реализация — в биндинге
+> `<concern>/<lang>/<concern>-style-guide.md`. Подробно — `.claude/docs/_meta/authoring-contract.md` (§10 — ось track)
+> и `_meta/rule-code-registry.md`. Backend-скиллы названы `ucp-<concern>` (java) / `ucp-<lang>-<concern>` (напр.
+> `ucp-py-pattern-design`); каталог ниже описывает java-набор — для python есть `ucp-py-*`-аналоги.
 
 ## Принцип
 
-- **`.claude/docs/*.md` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15`, `PG-T-013` и т.д.), агент читает соответствующий гайд при работе.
+- **`.claude/docs/` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15`, `PG-T-013` и т.д.), агент читает соответствующий гайд при работе.
 - **Скиллы** — короткие инструкции для агента: что проверить, как отчитаться.
 
 ## Workflow: как пользоваться скиллами
@@ -141,7 +149,7 @@
 
 ### `/ucp-ddd-tactical-review`
 
-Ревью доменного кода на соответствие тактическим паттернам DDD (`.claude/docs/ddd-tactical-style-guide.md`) и корректное использование библиотеки [`ddd-building-blocks`](https://gitlab.mosmetro.tech/common/ddd-building-blocks).
+Ревью доменного кода на соответствие тактическим паттернам DDD (контракт `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md`, Java-реализация `.claude/docs/backend/ddd-tactical/java/ddd-tactical-style-guide.md`) и корректное использование библиотеки [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks).
 
 **Что проверяет:**
 - Entity → `Entity<ID>`, equals/hashCode не переопределены, ID `final`
@@ -161,7 +169,7 @@
 
 ### `/ucp-pattern-review`
 
-Ревью Java/Spring-кода на соответствие методологии Use Case Pattern (`.claude/docs/usecase-pattern-style-guide.md`) и корректное использование библиотеки [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern).
+Ревью Java/Spring-кода на соответствие методологии Use Case Pattern (`.claude/docs/usecase-pattern-style-guide.md`) и корректное использование библиотеки [`usecase-pattern`](https://github.com/remodov/usecase-pattern).
 
 **Что проверяет:**
 - UseCase — immutable record/final, без логики
@@ -220,7 +228,7 @@
 
 ### `/ucp-spec-design`
 
-Написание Use Case спецификации (`.claude/docs/usecase-spec-template.md`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
+Написание Use Case спецификации (`.claude/docs/shared/usecase-spec-template.md`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
 
 **Что генерирует:**
 - Папка `docs/spec/` с **разбитыми по разделам файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — спеки одним файлом скилл больше не делает.
@@ -806,18 +814,53 @@ ucp-spec-design  →  спека в docs/spec/
 
 ## Подключение к проекту
 
-### Через `install.sh` (рекомендуется)
+Три способа, от простого к ручному. Все ставят только **нужный срез** (язык × специализация × профиль).
 
 ```bash
-git clone https://gitlab.mosmetro.tech/common/claude-code-java.git ~/projects/claude-code-java
-cd ~/projects/claude-code-java
-
-# подключить все скиллы и style-guide-снапшоты в свой Java-проект:
-./install.sh ~/my-java-project
+git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/usecase-pattern-skills
+cd ~/projects/usecase-pattern-skills
 ```
 
-Скрипт создаёт симлинки на `.claude/skills/*` и `.claude/docs/*.md` — обновления
-в этом репо автоматически прилетят в проект, без ручного re-копирования.
+#### A. Через Claude — диалогом (рекомендуется)
+
+Скажите Claude в любой сессии: **«поставь UCP-скиллы в ./my-project»**. Скилл `ucp-install` сам определит язык и
+специализацию из проекта (`pyproject.toml`→python, `build.gradle`→java, `go.mod`→go, …), подтвердит у вас, спросит
+профиль и запустит установку с проверкой. Помнить env-переменные не нужно.
+
+> Чтобы это работало в проекте, где скиллов ещё нет (холодный старт), поставьте `ucp-install` в личные скиллы один раз:
+> ```bash
+> ln -s ~/projects/usecase-pattern-skills/.claude/skills/ucp-install ~/.claude/skills/ucp-install
+> ```
+
+#### B. Интерактивный мастер (без Claude)
+
+```bash
+./install.sh --wizard         # спросит специализацию (track) → язык → профиль → каталог
+```
+
+#### C. Вручную через env-переменные
+
+```bash
+./install.sh ~/my-project                                    # всё, backend, java (дефолты)
+UCP_LANG=python ./install.sh ~/my-svc                        # python-срез (FastAPI/SQLAlchemy/…)
+UCP_LANG=python UCP_PROFILE=rest ./install.sh ~/my-svc       # python REST/UCP-сервис
+UCP_PROFILE=data ./install.sh ~/my-java-project              # data-heavy: pg+persistence+caching+observability
+UCP_TRACK=backend,e2e UCP_LANG=go ./install.sh ~/my-go-svc   # несколько специализаций
+UCP_SKILLS='ucp-py-pattern-* ucp-py-api-*' ./install.sh ~/p  # произвольный набор (перекрывает профиль)
+```
+
+Оси установки (ортогональны, композируются):
+
+| Переменная | Значения | Назначение |
+|---|---|---|
+| `UCP_TRACK` | `backend` (деф.) `frontend` `e2e` (список через запятую) | специализация — фильтр по frontmatter `track:` |
+| `UCP_LANG` | `java` (деф.) `python` `node` `go` | язык — фильтр скиллов по `lang:` и доков по `<concern>/<lang>/` |
+| `UCP_PROFILE` | `full` (деф.) `rest` `data` | набор concern'ов; **lang-aware** (`rest` для python = py-pattern/api/auth/sqlalchemy/… + pg) |
+| `UCP_SKILLS` | глоб-список | произвольный набор, перекрывает `UCP_PROFILE` |
+
+Скрипт создаёт симлинки на `.claude/skills/*` и `.claude/docs/` — обновления в репо автоматически прилетят в проект.
+При повторном запуске с другим срезом лишние ucp-симлинки чистятся (смена языка/трека корректна). `install.sh --check
+<project>` — диагностика без модификаций.
 
 После установки в проекте появятся:
 
@@ -917,6 +960,10 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 
 ```
 .claude/skills/
+# backend/java-набор ниже; для python — аналоги `ucp-py-<concern>-{design,review}`
+# (38 скиллов), node/go — пилот. Плюс тулинг: `ucp-install/` (Claude-мастер установки),
+# `ucp-new-service/`. install.sh ставит срез по UCP_TRACK × UCP_LANG × UCP_PROFILE.
+├── ucp-install/                    # установить/обновить UCP-скиллы в проект (диалогом)
 ├── ucp-api-review/                 # ревью контракта REST API
 ├── ucp-api-design/                 # проектирование REST-эндпоинтов
 ├── ucp-pattern-review/     # ревью кода на соответствие Use Case Pattern
@@ -952,29 +999,56 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 └── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
 
 .claude/docs/
-├── rest-api-style-guide.md          # REST API Style Guide (R-*-*)
-├── usecase-pattern-style-guide.md   # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
-├── ddd-tactical-style-guide.md      # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*)
-├── usecase-spec-template.md         # шаблон Use Case спецификации
-├── java-style-guide.md              # Java Style Guide (JS-*)
-├── jooq-style-guide.md              # jOOQ Style Guide (R-JOOQ-CFG-*/REPO-*/MS-*/...)
-├── resilience-style-guide.md        # Resilience Style Guide (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
-├── validation-style-guide.md        # Validation Style Guide (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
-├── caching-style-guide.md           # Caching Style Guide (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
-├── kafka-style-guide.md             # Kafka Style Guide (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
-├── observability-style-guide.md     # Observability Style Guide (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
-├── cqrs-style-guide.md              # CQRS Style Guide (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
-├── hexagonal-style-guide.md         # Hexagonal Style Guide (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
-├── distributed-patterns-style-guide.md  # Distributed Patterns Style Guide (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
-├── test-strategy.md                 # стратегия тестов
-└── auth-patterns-style-guide.md     # паттерны авторизации (AUTH-*)
+#
+# Каждый крупный гайд — папка `<concern>/`:
+#   <concern>/<concern>-rules.md            — язык-нейтральный индекс правил (код +
+#                                              формулировка интента, без code-сниппетов).
+#                                              ОБЩИЙ контракт на все языки. Рабочий вход
+#                                              скиллов: review цитирует код, design
+#                                              сверяется по чек-листу. ~15–45% полного.
+#   <concern>/<lang>/<concern>-style-guide.md — РЕАЛИЗАЦИЯ под язык (java=Spring/jOOQ,
+#                                              python=FastAPI/SQLAlchemy, …), примеры +
+#                                              обоснование, читается on-demand по разделу.
+# install.sh ставит rules-index всегда + style-guide только выбранного UCP_LANG.
+# Скиллы читают `*-rules.md` + свой `<lang>/`-биндинг. Языко-специфичные concern'ы
+# (backend/java/jooq/sqlalchemy, java-style/python-style, bootstrap, test-strategy) — без shared-слоя,
+# плоская пара на язык. Governance — в `_meta/` (authoring-contract + rule-code-registry).
+# Standalone-файлы (review-finding-format и т.п.) — плоско в корне docs/.
+├── backend/rest-api/              # REST API (R-URL-*/MTH-*/RSP-*/ERR-*/OAS-*/...)
+├── backend/usecase-pattern/       # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
+├── backend/ddd-tactical/          # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*, R-EVT-*)
+├── backend/java/jooq/                  # jOOQ (R-JOOQ-CFG-*/REPO-*/MS-*/FLT-*/...)
+├── backend/resilience/            # Resilience (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
+├── backend/validation/            # Validation (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
+├── backend/caching/               # Caching (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
+├── backend/kafka/                 # Kafka (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
+├── backend/observability/         # Observability (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
+├── backend/cqrs/                  # CQRS (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
+├── backend/hexagonal/             # Hexagonal (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
+├── backend/distributed-patterns/  # Distributed Patterns (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
+├── shared/arch/                  # платформенная согласованность (R-ARCH-*)
+├── java/                  # Java Style Guide (JS-2.*..8.*, JS-CS-*)
+├── backend/java/spring-bootstrap/      # Spring Boot bootstrap (BS-*, BS-LINT-*, BS-SEC-*)
+├── backend/auth-patterns/         # паттерны авторизации (AUTH-*)
+├── backend/error-handling/        # Error Handling (R-ERR-HIER-*/WHERE-*/MAP-*/LOG-*/RETRY-*/RESULT-*/OBS-*)
+├── backend/graceful-shutdown/     # Graceful Shutdown (R-SHUT-CFG-*/HTTP-*/KFK-*/DB-*/SCHED-*/K8S-*/IDEM-*/OBS-*)
+├── backend/security/              # Security enforcement (R-SEC-SAST-*/DEP-*/SECRET-*/IMG-*/CRYPTO-*/FIND-*)
+├── backend/pg-types/              # PostgreSQL типы (PG-T-*)
+├── backend/pg-naming/             # PostgreSQL нейминг (PG-N-*)
+├── backend/pg-indexes/            # PostgreSQL индексы / план (PG-I-*, PG-E-*)
+├── backend/pg-partitioning/       # PostgreSQL партиционирование (PG-P-*)
+├── backend/pg-migrations/         # PostgreSQL миграции expand-contract (PG-M-*)
+├── backend/pg-runtime/            # PostgreSQL runtime (PG-W-*/V-*/L-*/CP-*/IS-*)
+├── backend/java/test-strategy/         # стратегия тестов (TS-*) — индекс + полный test-strategy.md (без -style-guide суффикса)
+├── review-finding-format.md   # формат findings для review-скиллов (RFF-*) — standalone
+└── usecase-spec-template.md   # шаблон Use Case спецификации (не реестр правил) — standalone
 ```
 
 ## Связанные библиотеки
 
-- [`ddd-building-blocks`](https://gitlab.mosmetro.tech/common/ddd-building-blocks) — Java-библиотека базовых DDD-абстракций, на которой опираются скиллы DDD.
-- [`usecase-pattern`](https://gitlab.mosmetro.tech/common/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
-- [`hexagonal-architecture`](https://gitlab.mosmetro.tech/common/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
+- [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks) — Java-библиотека базовых DDD-абстракций, на которой опираются скиллы DDD.
+- [`usecase-pattern`](https://github.com/remodov/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
+- [`hexagonal-architecture`](https://github.com/remodov/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
 Все основные style guides покрыты. Дальнейшее расширение — по конкретным запросам команды.
 

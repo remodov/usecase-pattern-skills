@@ -59,11 +59,35 @@ prompt-кэш и удорожает каждый ход; раннее чтени
 | Ревью авторизации | `/ucp-auth-review` |
 | Ревью тестов (структура, покрытие UC/BR, slow/flaky) | `/ucp-test-review` |
 | Ревью outbound-интеграции (структура, port, mapper) | `/ucp-integration-review` |
+| Sync спек и контрактов в архитектурном репо | `/ucp-arch-sync` |
+| Новый сервис на платформенном уровне (карточка + context-map) | `/ucp-arch-design` |
+| Новый бизнес-процесс (BP-NN) | `/ucp-arch-bp-design` |
+| Impact-анализ изменения контракта/UC/события | `/ucp-arch-impact` |
+| Read-only навигация по архитектурному корпусу | `/ucp-arch-query` |
+| Платформенное ревью согласованности (R-ARCH-*) | `/ucp-arch-consistency-review` |
 
 (Полный список design↔review-пар — в README репо скиллов.) Style-guides — в
 `.claude/docs/*.md`. **Читай нужную секцию гайда, не весь файл**: гайды большие,
 у каждого правила есть код (`R-API-*`, `R-JOOQ-*`, `JS-*`, …) — навигируйся по
 кодам и заголовкам, full-read только когда реально нужен весь документ.
+
+### Архитектурный репозиторий
+
+Если в проекте есть `architecture/` с `services/_registry.yaml` — это
+**платформенный уровень**: карта сервисов, ubiquitous language, ownership,
+бизнес-процессы. Спеки и контракты сервисов туда **зеркалируются** через
+`/ucp-arch-sync` (не редактируются вручную, источник правды — `<service>/docs/spec/`).
+
+Шесть скиллов `ucp-arch-*` (sync / design / bp-design / impact / query /
+consistency-review) работают **только из** корня `architecture/` (детектируется
+по `services/_registry.yaml`). Из других директорий молча отказываются.
+Правила платформенной согласованности — `R-ARCH-*` в
+`.claude/docs/arch-style-guide.md`.
+
+**Disambiguation arch vs per-service:** «новый сервис» из директории сервиса
+запускает `/ucp-new-service` (per-service цепочка); та же фраза из
+`architecture/` — это `/ucp-arch-design` (системный уровень — карточка,
+реестр, context-map). Не путать.
 
 ### Триггеры и цепочки
 

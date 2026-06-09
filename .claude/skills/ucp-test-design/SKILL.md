@@ -1,6 +1,7 @@
 ---
 name: ucp-test-design
-description: Спроектировать интеграционные и unit-тесты для Java/Spring-сервиса по командной Test Strategy — синхронные тесты, только PostgreSQL через Testcontainers + WireMock для внешнего HTTP, без Kafka / Redis в базовом классе, детерминированное время и UUID через @MockitoBean, fluent DatabasePreparer + TestObjectGenerator. Применяется при добавлении тестов к новому UseCase / Handler или онбординге модуля под командный подход к тестированию.
+description: Спроектировать интеграционные и unit-тесты для Java/Spring-сервиса по Test Strategy (коды TS-*) — синхронные тесты, PostgreSQL через Testcontainers + WireMock, без Kafka/Redis в базовом классе, детерминированные время и UUID через @MockitoBean.
+when_to_use: При добавлении тестов к новому UseCase/Handler или онбординге модуля под командный подход к тестированию.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Bash(git diff*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Bash(git di
 
 ## Зависимости
 
-- **`.claude/docs/test-strategy.md`** в проекте (или из `claude-code-java`) — единственный источник правил. У каждого правила есть код `TS-N`.
-- **`.claude/docs/usecase-spec-template.md`** — если есть спека сервиса, тестовые сценарии берутся оттуда (UC-1, UC-2, …, BR-001, BR-002, …).
+- **`.claude/docs/backend/java/test-strategy/test-strategy-rules.md`** в проекте (или из `claude-code-java`) — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). У каждого правила есть код `TS-N`.
+- **`.claude/docs/shared/usecase-spec-template.md`** — если есть спека сервиса, тестовые сценарии берутся оттуда (UC-1, UC-2, …, BR-001, BR-002, …).
 
 ## Инструкции
 
-1. **Прочти стратегию** из `.claude/docs/test-strategy.md`. Цитируй коды `TS-N` в обоснованиях.
+1. **Прочти индекс правил** `.claude/docs/backend/java/test-strategy/test-strategy-rules.md` (полный текст с примерами тестов и base-классов — `backend/java/test-strategy/test-strategy.md`, открывай точечно по разделу). Цитируй коды `TS-N` в обоснованиях.
 
 2. **Определи слой теста** перед тем как писать:
 
@@ -78,7 +79,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Bash(git di
 
 9. **Что запрещено:**
 
-   - **Цитирование кодов правил в комментариях тестов** (`JS-7.3` в `java-style-guide.md`). Никаких `// TS-9..TS-11`, `// TS-7`, `// AC-C5` в исходниках. Названия классов / методов / `@DisplayName` уже выражают соответствие сценарию — в `@DisplayName` цитата BR / AC допустима (это бизнес-описание, не code-style-правило), а в коде — нет.
+   - **Цитирование кодов правил в комментариях тестов** (`JS-7.3` в `backend/java/java-style/java-rules.md`). Никаких `// TS-9..TS-11`, `// TS-7`, `// AC-C5` в исходниках. Названия классов / методов / `@DisplayName` уже выражают соответствие сценарию — в `@DisplayName` цитата BR / AC допустима (это бизнес-описание, не code-style-правило), а в коде — нет.
    - `Thread.sleep`, `Awaitility.await` — flaky (`TS-2`).
    - `Instant.now()`, `UUID.randomUUID()` напрямую в продакшен-коде — должны быть `DateTimeService` / `UuidGenerator` (`TS-7`).
    - `@MockBean` на бизнес-логику внутри своего сервиса (UseCaseHandler, агрегаты, репозитории). Mock-ируются только **внешние границы**: HTTP-клиенты (через WireMock или `@MockitoBean`), `DateTimeService`, `UuidGenerator`.

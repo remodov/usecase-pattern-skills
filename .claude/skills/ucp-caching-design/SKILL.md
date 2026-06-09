@@ -1,6 +1,7 @@
 ---
 name: ucp-caching-design
-description: Сгенерировать кеш-обвязку под Caching Style Guide — RedisCacheManager c per-cache TTL, GenericJackson2JsonRedisSerializer, CacheSettings с @ConfigurationProperties + @Validated, @Cacheable / @CacheEvict / @CachePut на конкретный метод, @EventListener invalidator для domain-events. Решает: где размещать кеш (read-method да, write-method нет, agg целиком — нет, money-cache с TTL ≤ 30s), какой паттерн (cache-aside дефолт, write-through через @CachePut, refresh-ahead через @Scheduled для hot keys), key generation (cacheNames slug + SpEL key), TTL под характер данных. Применяется при добавлении нового кеша или конфигурировании cache-backend в новом сервисе. Триггеры: «закешируй UserProfile», «нужен Redis-кеш для X», «cache-aside для справочника Y», «настрой CacheManager».
+description: Сгенерировать кеш-обвязку Spring Cache + Redis по Caching Style Guide (коды R-CACHE-*) — RedisCacheManager с per-cache TTL, JSON-сериализация, CacheSettings, @Cacheable/@CacheEvict, @EventListener-invalidation, паттерн cache-aside/write-through.
+when_to_use: Триггеры — «закешируй X», «нужен Redis-кеш для Y», «настрой CacheManager». При добавлении кеша или настройке cache-backend.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/caching-style-guide.md` (правила `R-CACHE-*`). Опционально — `auth-patterns-style-guide.md` (`AUTH-16` для PII), `validation-style-guide.md` (`R-VLD-CFG-*` для config).
+1. **Прочитай** `.claude/docs/backend/caching/caching-rules.md` (правила `R-CACHE-*`). Опционально — `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` для PII), `backend/validation/validation-rules.md` (`R-VLD-CFG-*` для config).
 
 2. **Уточни параметры:**
    - **Что кешируем** — конкретный read-метод. Имя cache (slug-style: `user-profiles`, `currencies`, `feature-flags`).

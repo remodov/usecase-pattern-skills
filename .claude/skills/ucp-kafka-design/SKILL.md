@@ -1,6 +1,7 @@
 ---
 name: ucp-kafka-design
-description: Сгенерировать Kafka producer/consumer обвязку под Kafka Style Guide — KafkaConfig (idempotent producer + JsonSerializer + manual-ack consumer), KafkaSettings @ConfigurationProperties + @Validated, @KafkaListener с правильным groupId/concurrency/retry-topic, idempotent consumer с processed_event таблицей, event-record в past tense, application.yml блок. Решает: outbox vs direct send (если есть DB-операция → outbox через ucp-pg-runtime-design); retry topic vs DLQ (max-attempts, backoff); idempotency через eventId UUID v7 + dedup-таблица; partition key (aggregate id); event design (имя в past tense, версионирование eventType). Применяется при добавлении нового producer / consumer / event-flow в сервис. Триггеры: «настрой Kafka producer», «нужен listener для X», «event-driven flow для Y», «outbox для Order».
+description: Сгенерировать Kafka producer/consumer обвязку на Java/Spring (коды R-KFK-*) — KafkaConfig с idempotent producer и manual-ack, @KafkaListener с retry-topic/DLQ, idempotent consumer с processed_event, event-record в past tense, partition key.
+when_to_use: Триггеры — «настрой Kafka producer», «нужен listener для X», «outbox для Order». При новом producer/consumer/event-flow в сервисе.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/kafka-style-guide.md` (`R-KFK-*`). Опционально — `pg-runtime-style-guide.md` (для outbox), `auth-patterns-style-guide.md` (`AUTH-19` для money), `ddd-tactical-style-guide.md` (`R-EVT-*`).
+1. **Прочитай** `.claude/docs/backend/kafka/kafka-rules.md` (`R-KFK-*`). Опционально — `backend/pg-runtime/pg-runtime-rules.md` (для outbox), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для money), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-EVT-*`).
 
 2. **Уточни сценарий:**
    - **Producer-only** — сервис публикует events, других сервисов потребители.

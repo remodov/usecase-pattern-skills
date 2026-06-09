@@ -1,6 +1,7 @@
 ---
 name: ucp-integration-design
-description: Сгенерировать полный скелет outbound-интеграции с внешней системой (платежи, фискализация, SMS, любой сторонний HTTP API) под Resilience Style Guide. Создаёт port в core/, client-generator модуль с openapi-generator (target spring-restclient), out-adapter модуль с ClientConfig + ClientAdapter (с @CircuitBreaker/@Bulkhead/@Retry на adapter-методах) + Mapper + HealthIndicator + exception hierarchy + блок application.yml. Решает: Retry только при идемпотентности (R-RES-RE-1), per-system isolation (R-RES-ISO-1), spring-restclient для нового кода (R-RES-OAS-2), task-queue для polling (R-RES-ASYNC-1). Применяется при создании нового outbound-клиента или подключении новой внешней системы. Триггеры: «сделай адаптер для X», «новый клиент к Y», «подключаем интеграцию с Z», «нужен outbound-клиент».
+description: Сгенерировать скелет outbound-интеграции с внешней системой на Java/Spring (коды R-RES-*) — port в core/, client-generator с openapi-generator (spring-restclient), out-adapter с CB/Bulkhead/Retry, Mapper, HealthIndicator, exception hierarchy.
+when_to_use: Триггеры — «сделай адаптер для X», «новый клиент к Y», «подключаем интеграцию с Z». При новом outbound-клиенте или внешней системе.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -11,11 +12,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ## Инструкции
 
 1. **Прочитай style guide'ы** в порядке:
-   - `.claude/docs/resilience-rules.md` — главный (правила `R-RES-*`).
-   - `.claude/docs/auth-patterns-style-guide.md` — `AUTH-19` для решения по retry.
-   - `.claude/docs/rest-api-rules.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
-   - `.claude/docs/spring-bootstrap-style-guide.md` — `BS-*` для gradle multi-module setup.
-   - `.claude/docs/usecase-pattern-rules.md` — на Уровне 3 для размещения port в `core/<bc>/port/out/`.
+   - `.claude/docs/backend/resilience/resilience-rules.md` — главный (правила `R-RES-*`).
+   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — `AUTH-19` для решения по retry.
+   - `.claude/docs/backend/rest-api/rest-api-rules.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
+   - `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` — `BS-*` для gradle multi-module setup.
+   - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` — на Уровне 3 для размещения port в `core/<bc>/port/out/`.
 
 2. **Уточни параметры интеграции** (один по одному, если пользователь не дал):
    - **Имя системы** (slug): `twilio`, `yandex-pay`, `sber`, `fns-receipt`. Имя = идентификатор для всех артефактов: модули `<system>-client-generator`, `<system>-out-adapter`, beans `@Bean("<system>RestClient")`, R4J instances `<system>`.
@@ -30,7 +31,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
      - **Non-money** → CB failure rate `50%` (default).
    - **Авторизация:** `none` (публичный API), `apiKey` (header `Authorization: <key>`), `bearer` (JWT/static), `oauth2-clientCredentials`, `mTLS`. См. `AUTH-13`/`AUTH-14`.
 
-3. **Определи уровень зрелости проекта** (см. `usecase-pattern-rules.md` §2). Outbound-интеграции с domain port в `core/` уместны на **Уровне 3** (DDD + Hexagonal). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>UseCaseHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
+3. **Определи уровень зрелости проекта** (см. `backend/usecase-pattern/usecase-pattern-rules.md` §2). Outbound-интеграции с domain port в `core/` уместны на **Уровне 3** (DDD + Hexagonal). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>UseCaseHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
 
 4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
 

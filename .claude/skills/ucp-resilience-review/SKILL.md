@@ -1,6 +1,7 @@
 ---
 name: ucp-resilience-review
-description: Ревью защиты сервиса от отказов внешних систем — timeouts, circuit breaker, retry, bulkhead, fallback, health checks. Проверяет per-system isolation OkHttpClient/pool/bulkhead, аннотации @CircuitBreaker/@Bulkhead/@Retry на out-adapter методах (не на generated client), retry только при идемпотентности, semaphore-based bulkhead, sleep-loop polling в синхронных handler-ах, HealthIndicator per-system с TTL-кешем, связку с OpenAPI generator (target spring-restclient для нового кода). Вызывается при ревью out-adapter, *ClientConfig, application.yml с resilience4j блоком, новых HTTP-клиентов. Опирается на коды R-RES-*.
+description: Ревью защиты Java/Spring-сервиса от отказов внешних систем (коды R-RES-*) — per-system isolation OkHttpClient/pool/bulkhead, @CircuitBreaker/@Bulkhead/@Retry на out-adapter методах, retry только при идемпотентности, HealthIndicator per-system с TTL.
+when_to_use: Ревью out-adapter, *ClientConfig, application.yml с resilience4j-блоком, новых HTTP-клиентов.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/resilience-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-RES-WHERE-*` (где какая защита), `R-RES-ISO-*` (per-system isolation), `R-RES-TO-*` (timeouts), `R-RES-CB-*` (circuit breaker), `R-RES-RE-*` (retry), `R-RES-BH-*` (bulkhead), `R-RES-FB-*` (fallback), `R-RES-CFG-*` (конфигурация), `R-RES-OAS-*` (связка с OpenAPI generator), `R-RES-HC-*` (health checks), `R-RES-ASYNC-*` (async и polling), `R-RES-OBS-*` (observability).
-- Парные документы: `auth-patterns-style-guide.md` (`AUTH-19` для idempotency-зависимого retry), `rest-api-style-guide.md` (`R-OAS-*` для OpenAPI-first).
+- **`.claude/docs/backend/resilience/resilience-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-RES-WHERE-*` (где какая защита), `R-RES-ISO-*` (per-system isolation), `R-RES-TO-*` (timeouts), `R-RES-CB-*` (circuit breaker), `R-RES-RE-*` (retry), `R-RES-BH-*` (bulkhead), `R-RES-FB-*` (fallback), `R-RES-CFG-*` (конфигурация), `R-RES-OAS-*` (связка с OpenAPI generator), `R-RES-HC-*` (health checks), `R-RES-ASYNC-*` (async и polling), `R-RES-OBS-*` (observability).
+- Парные документы: `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для idempotency-зависимого retry), `backend/rest-api/rest-api-rules.md` (`R-OAS-*` для OpenAPI-first).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/resilience-style-guide.md`. Цитируй конкретные коды правил (`R-RES-CB-1`, `R-RES-OAS-X1`), не префикс.
+1. **Прочти индекс правил** `.claude/docs/backend/resilience/resilience-rules.md`. Цитируй конкретные коды правил (`R-RES-CB-1`, `R-RES-OAS-X1`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в `*-out-adapter/`, `common-client-config/`.
@@ -59,7 +60,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Connection pool sizing: `maxConcurrent × 1.2`. Total всех систем ≤ HikariCP / 2.
    - Configs `resilience4j.{circuitbreaker,bulkhead,retry}.instances.<system>` определены с `base-config: default`.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-RES-CB-1`, `R-RES-OAS-X1`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-RES-CB-1`, `R-RES-OAS-X1`).
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично** — нарушения, ведущие к регрессу под нагрузкой или денежным багам:

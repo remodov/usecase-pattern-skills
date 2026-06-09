@@ -1,21 +1,22 @@
 ---
 name: ucp-security-design
-description: Подключить security/SAST-инструменты к УЖЕ существующему Spring Boot-сервису по Use Case Pattern — Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks (pre-commit + CI), Trivy для Docker-образа. Настраивает правильные плагины в build.gradle, suppression-файлы (config/spotbugs-exclude.xml, config/dependency-check-suppressions.xml, .gitleaks.toml), CI-степы с публикацией в SARIF/GitHub Code Scanning, severity-thresholds для failOnError. Применяется когда сервис без security-инструментов или есть только частично. Триггеры — «подключи security к сервису X», «настрой SAST», «добавь dependency-check», «настрой gitleaks».
+description: Подключить SAST-обвязку к существующему Spring Boot-сервису (Java) по UCP (коды R-SEC-*, BS-SEC-*) — Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks, Trivy, suppression-файлы, CI со SARIF, severity-thresholds.
+when_to_use: Триггеры — «подключи security к сервису X», «настрой SAST», «добавь dependency-check», «настрой gitleaks».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
-# Подключение security/SAST-инструментов к сервису
+# Подключение backend/security/SAST-инструментов к сервису
 
-Ты добавляешь к существующему Spring Boot-сервису полный mandatory-набор security-инструментов согласно `security-style-guide.md` (правила `R-SEC-*`) и `spring-bootstrap-style-guide.md` (правила `BS-SEC-*`). Цель — миграция от «scan вручную раз в квартал» или «вообще ничего» к enforcement в CI.
+Ты добавляешь к существующему Spring Boot-сервису полный mandatory-набор security-инструментов согласно `backend/security/java/security-style-guide.md` (правила `R-SEC-*`) и `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (правила `BS-SEC-*`). Цель — миграция от «scan вручную раз в квартал» или «вообще ничего» к enforcement в CI.
 
 Не делает: настройку Vault/KMS (это infra), audit-логи admin-операций (`AUTH-15` через `ucp-auth-design`), маскирование PII в логах (`R-OBS-PII-*` через `ucp-observability-design`), threat modeling (это спека-фаза).
 
 ## Инструкции
 
 1. **Прочитай**:
-   - `.claude/docs/security-style-guide.md` — правила `R-SEC-*`. Главный документ.
-   - `.claude/docs/spring-bootstrap-style-guide.md` — правила `BS-SEC-*` (enforcement-уровень).
-   - `.claude/docs/auth-patterns-style-guide.md` — для контекста, какие auth-правила пересекаются.
+   - `.claude/docs/backend/security/security-rules.md` — правила `R-SEC-*`. Главный документ (полный текст с gradle/CI-сниппетами — `backend/security/java/security-style-guide.md`, открывай точечно по разделу).
+   - `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` — правила `BS-SEC-*` (enforcement-уровень).
+   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — для контекста, какие auth-правила пересекаются.
 
 2. **Идентифицируй сервис.**
    - `git diff` или путь от пользователя.
@@ -90,7 +91,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   `<base-package>` — определи из `package` верхнего java-файла или из `group` в settings.gradle (типично `ru.vikulinva`).
+   `<base-package>` — определи из `package` верхнего java-файла или из `group` в settings.gradle (типично `ru.vikulinva` или `ru.vikulinva`).
 
    ### 4.2 Конфиг-файлы (создаются пустыми, если нет)
 
@@ -249,7 +250,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-5. **Самопроверка перед выдачей** — пройдись по чеклисту из `security-style-guide.md` §«Чеклист подключения нового сервиса».
+5. **Самопроверка перед выдачей** — пройдись по чеклисту из `backend/security/java/security-style-guide.md` §«Чеклист подключения нового сервиса».
 
 6. **Структура вывода:**
    1. **Audit таблица** (из шага 3).

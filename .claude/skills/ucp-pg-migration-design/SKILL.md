@@ -1,18 +1,20 @@
 ---
+lang: any
 name: ucp-pg-migration-design
-description: Сгенерировать БЕЗОПАСНЫЕ Liquibase changeset'ы для типовых breaking changes схемы по pg-migrations-style-guide. Применяет expand-contract pattern (3+ релиза) для RENAME COLUMN, DROP COLUMN, ALTER TYPE, ADD CONSTRAINT FK NOT VALID + VALIDATE, SET NOT NULL через CHECK NOT VALID, CREATE INDEX CONCURRENTLY, удаление enum-значения через теневой тип. Для каждого случая — 3 phase changeset с lock_timeout. Применяется при изменении existing-схемы, не для нового агрегата (это ucp-pg-schema-design). Триггеры: «как переименовать колонку без даунтайма», «миграция expand-contract», «безопасный ALTER TYPE», «удалить колонку из таблицы X», «добавить FK constraint».
+description: Сгенерировать безопасные Liquibase changeset'ы для breaking changes PostgreSQL-схемы (коды PG-M-*) — expand-contract для RENAME/DROP COLUMN и ALTER TYPE, FK через NOT VALID + VALIDATE, CREATE INDEX CONCURRENTLY, lock_timeout в каждой фазе.
+when_to_use: Триггеры — «переименовать колонку без даунтайма», «безопасный ALTER TYPE», «добавить FK constraint». Existing-схема, не новый агрегат.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Migration — проектирование
 
-Ты генерируешь expand-contract Liquibase changeset'ы для breaking changes existing-схемы по `pg-migrations-style-guide.md` (`PG-M-*`). Цель — миграция, которая **не ломает прод** под нагрузкой и совместима с предыдущей версией кода (N-1 правило, `PG-M-002`).
+Ты генерируешь expand-contract Liquibase changeset'ы для breaking changes existing-схемы по `backend/pg-migrations/pg-migrations-rules.md` (`PG-M-*`). Цель — миграция, которая **не ломает прод** под нагрузкой и совместима с предыдущей версией кода (N-1 правило, `PG-M-002`).
 
 Для нового агрегата (просто `CREATE TABLE`) — `ucp-pg-schema-design`, не этот скилл.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/pg-migrations-style-guide.md` (правила `PG-M-*`) и опционально `.claude/docs/pg-runtime-style-guide.md` (для понимания, какие операции `ACCESS EXCLUSIVE` влияют на trafic).
+1. **Прочитай** `.claude/docs/backend/pg-migrations/pg-migrations-rules.md` (правила `PG-M-*`) и опционально `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` (для понимания, какие операции `ACCESS EXCLUSIVE` влияют на trafic).
 
 2. **Уточни параметры:**
    - **Тип breaking change.** Самые частые:

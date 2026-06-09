@@ -1,6 +1,8 @@
 ---
+lang: any
 name: ucp-pg-explain-review
-description: Ревью индексов и плана запроса PostgreSQL. На вход — DDL индексов и/или вывод `EXPLAIN (ANALYZE, BUFFERS)`. Проверяет левый префикс composite, селективность, типы индексов (B-tree/GIN/GiST/BRIN/pg_trgm/partial/INCLUDE), нарушения по плану (`Filter` вместо `Index Cond`, `Heap Fetches > 0`, `Rows Removed by Filter` миллионы, `external merge Disk`, неиспользуемый Nested Loop). Вызывается при тормозящих запросах, добавлении индексов, ревью миграций с `CREATE INDEX`.
+description: Ревью индексов и плана запроса PostgreSQL (коды PG-I-*, PG-E-*) — левый префикс composite, селективность, типы индексов (B-tree/GIN/BRIN/partial/INCLUDE), Filter вместо Index Cond, Heap Fetches, external merge Disk.
+when_to_use: Тормозящие запросы, добавление индексов, миграции с CREATE INDEX, вывод EXPLAIN (ANALYZE, BUFFERS).
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,11 +12,11 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/pg-indexes-style-guide.md`** в проекте (или из `claude-code-java`) — единственный источник правил. Коды `PG-I-NNN` (индексы) и `PG-E-NNN` (план/runtime).
+- **`.claude/docs/backend/pg-indexes/pg-indexes-rules.md`** в проекте (или из `claude-code-java`) — источник правил. Коды `PG-I-NNN` (индексы) и `PG-E-NNN` (план/runtime).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/pg-indexes-style-guide.md`. Цитируй коды правил в каждой находке.
+1. **Прочти индекс правил** `.claude/docs/backend/pg-indexes/pg-indexes-rules.md` (полный текст с SQL-примерами и таблицей узлов плана — `backend/pg-indexes/pg-indexes-style-guide.md`, открывай точечно по разделу). Цитируй коды правил в каждой находке.
 
 2. **Определи режим работы:**
    - **Ревью DDL индексов** (если пользователь дал миграцию или ты видишь `CREATE INDEX` в `git diff`) — проверяй порядок полей, дубликаты, тип индекса, `CONCURRENTLY`.
@@ -99,7 +101,6 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    На бою это ACCESS EXCLUSIVE lock на orders на 5–15 минут — все INSERT/UPDATE заблокированы.
    Должно быть: CREATE INDEX CONCURRENTLY ix_orders_status_created ON orders (status, created_at);
    В Liquibase: <createIndex ... concurrent="true"/> + runInTransaction="false".
-   См. https://vikulin-va.ru/pg/indexes-composite/
 
 [важно] PG-I-013 ix_orders_at_status порядок полей.
    Текущий: (created_at, status). При WHERE status='NEW' AND created_at > X

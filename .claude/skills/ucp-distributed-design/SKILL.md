@@ -1,6 +1,7 @@
 ---
 name: ucp-distributed-design
-description: Сгенерировать распределённый паттерн под Distributed Patterns Style Guide — saga (orchestration или choreography с saga_<name> таблицей в БД, sagaId сквозной, каждый шаг — отдельная command + compensation), idempotency-инфраструктура (processed_event таблица для Kafka dedup, idempotency_record таблица для HTTP money-команд), inbox pattern (опционально), compensation-команды для каждого шага (semantic state-change не DELETE, идемпотентны), eventual consistency декларация в OpenAPI. Решает: orchestration vs choreography (по числу шагов и branching), inbox vs только processed_event (по criticality), TTL для idempotency-records, что делать при failed compensation (DLQ + alert). Применяется при добавлении cross-service flow или замене 2PC на saga. Триггеры: «нужна сага для X», «cross-service сценарий Y», «idempotency для money-API».
+description: Сгенерировать распределённый паттерн Java/Spring по UCP (коды R-DIST-*) — saga (orchestration/choreography, state в БД, sagaId), idempotency (processed_event, idempotency_record), inbox, compensation-команды, eventual consistency.
+when_to_use: Триггеры — «нужна сага для X», «cross-service сценарий Y», «idempotency для money-API». При замене 2PC на saga.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/distributed-patterns-style-guide.md` (`R-DIST-*`). Опционально — `kafka-style-guide.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `auth-patterns-style-guide.md` (`AUTH-19`).
+1. **Прочитай** `.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md` (`R-DIST-*`). Опционально — `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19`).
 
 2. **Уточни параметры:**
    - **Тип паттерна**: saga / только idempotency-обвязка / inbox.

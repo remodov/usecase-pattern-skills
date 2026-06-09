@@ -1,6 +1,7 @@
 ---
 name: ucp-hexagonal-design
-description: Сгенерировать или ре-структурировать сервис под Hexagonal Architecture — multi-module gradle skeleton (core/persistence/*-in-adapter/*-out-adapter/bootstrap), settings.gradle.kts с include-ами, build.gradle.kts для каждого модуля с правильными dependencies (core без Spring/JOOQ, adapters → core), placeholder-классы (Application.java в bootstrap, package-info.java в core/<bc>/{aggregate,port}, ArchUnit base test). Решает: применять ли Hexagonal (часть Уровня 3 — DDD + Hexagonal; на Уровне 1–2 skip), какие in-adapter модули нужны (user/admin/kafka), какие out-adapter модули (persistence + per-system: payment/notification/storage), композиция bootstrap. Применяется при старте нового сервиса Уровня 3 либо при upgrade существующего сервиса Уровня 2 → Уровень 3. Триггеры: «hexagonal layout для нового сервиса», «реструктурируй под core/adapter».
+description: Сгенерировать или реструктурировать Java-сервис под Hexagonal Architecture (коды R-HEX-*) — multi-module gradle skeleton core/persistence/in-adapter/out-adapter/bootstrap, dependencies модулей, placeholder-классы, ArchUnit base test.
+when_to_use: Старт сервиса Уровня 3 или upgrade 2→3. Триггеры — «hexagonal layout для нового сервиса», «реструктурируй под core/adapter».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
@@ -10,7 +11,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/hexagonal-rules.md` (`R-HEX-*`). Опционально — `usecase-pattern-rules.md` (`R-LAY-*`), `spring-bootstrap-style-guide.md` (`BS-*`).
+1. **Прочитай** `.claude/docs/backend/hexagonal/hexagonal-rules.md` (`R-HEX-*`). Опционально — `backend/usecase-pattern/usecase-pattern-rules.md` (`R-LAY-*`), `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (`BS-*`).
 
 2. **Уточни параметры:**
    - **Service name** — `<service>` (`order-service`, `notification-service`).
@@ -53,7 +54,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        version = "0.1.0-SNAPSHOT"
        repositories {
            mavenCentral()
-           maven("https://gitlab.mosmetro.tech/api/v4/groups/...") // если внутренняя репозиторий
+           maven("https://...") // если внутренний Maven-реестр
        }
    }
 

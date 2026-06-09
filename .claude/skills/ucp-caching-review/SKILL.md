@@ -1,6 +1,7 @@
 ---
 name: ucp-caching-review
-description: Ревью кеширования (Spring Cache + Redis) — где кешируем, конфигурация (RedisCacheManager + JSON-сериализация, не JDK), ключи (per-cache namespace, explicit SpEL key), TTL (per-cache explicit, не infinite), invalidation (@CacheEvict на write-методах, не allEntries=true), паттерны (cache-aside дефолт, не write-behind для money), cache stampede (sync=true для local, distributed lock для Redis), observability. Проверяет @Cacheable на write-методах, кеш доменных агрегатов целиком, money-кеш без TTL, JdkSerializationRedisSerializer, ConcurrentMapCacheManager в проде, дефолтный keyGenerator на multi-arg, отсутствие явного TTL. Применяется при ревью @Configuration с CacheManager, классов с @Cacheable/@CacheEvict, application.yml с cache-блоком, custom Cache-аспектов. Опирается на коды R-CACHE-*.
+description: Ревью кеширования Java/Spring (Spring Cache + Redis) по UCP (коды R-CACHE-*) — где кешируем, конфигурация и сериализация, ключи и TTL, invalidation, cache-aside, stampede, observability.
+when_to_use: Изменения в @Configuration с CacheManager, классах с @Cacheable/@CacheEvict, application.yml с cache-блоком, custom Cache-аспектах.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
@@ -10,12 +11,12 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/caching-style-guide.md`** — единственный источник правил. Каждое нарушение цитируется кодом из подгрупп: `R-CACHE-WHERE-*` (где), `R-CACHE-CFG-*` (конфигурация), `R-CACHE-KEY-*` (ключи), `R-CACHE-TTL-*` (TTL), `R-CACHE-INV-*` (invalidation), `R-CACHE-PATTERN-*` (паттерны), `R-CACHE-STAMP-*` (stampede), `R-CACHE-OBS-*` (observability).
-- Парные документы: `resilience-style-guide.md` (`R-RES-FB-1` — fallback из cache), `auth-patterns-style-guide.md` (`AUTH-16` — PII в кеше), `validation-style-guide.md` (`R-VLD-CFG-*` — `@ConfigurationProperties` для cache-настроек).
+- **`.claude/docs/backend/caching/caching-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-CACHE-WHERE-*` (где), `R-CACHE-CFG-*` (конфигурация), `R-CACHE-KEY-*` (ключи), `R-CACHE-TTL-*` (TTL), `R-CACHE-INV-*` (invalidation), `R-CACHE-PATTERN-*` (паттерны), `R-CACHE-STAMP-*` (stampede), `R-CACHE-OBS-*` (observability).
+- Парные документы: `backend/resilience/resilience-rules.md` (`R-RES-FB-1` — fallback из cache), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` — PII в кеше), `backend/validation/validation-rules.md` (`R-VLD-CFG-*` — `@ConfigurationProperties` для cache-настроек).
 
 ## Инструкции
 
-1. **Прочти style guide** из `.claude/docs/caching-style-guide.md`. Цитируй конкретные коды (`R-CACHE-WHERE-X2`, `R-CACHE-CFG-X1`).
+1. **Прочти индекс правил** `.claude/docs/backend/caching/caching-rules.md`. Цитируй конкретные коды (`R-CACHE-WHERE-X2`, `R-CACHE-CFG-X1`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*CacheConfig*`, `*CacheManager*`, `application*.yml` с `cache:` или `spring.cache.*` блоком.
@@ -59,7 +60,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `spring.redis.host`/`port` или `spring.data.redis.url` валидны (но это `R-VLD-CFG`-зона).
    - `management.endpoints.web.exposure.include` содержит `caches` actuator endpoint (для observability).
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/review-finding-format.md` (`RFF-1`..`RFF-16`). В качестве `<КодПравила>` — конкретный код.
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). В качестве `<КодПравила>` — конкретный код.
 
 7. **Доменные ориентиры серьёзности** (`RFF-12`):
    - **Критично:**

@@ -1,20 +1,22 @@
 ---
+lang: any
 name: ucp-pg-schema-design
-description: Сгенерировать Liquibase changeset для нового агрегата под pg-types-style-guide и pg-naming-style-guide. Создаёт CREATE TABLE с правильными типами (bigint IDENTITY для PK, numeric(p,s) для денег, timestamptz для бизнес-времени, uuid для UUID, text по умолчанию, JSONB для VO с complex structure), FK constraints с CASCADE-стратегией, индексы под фильтрацию, audit-колонки (created_at/updated_at). Применяется после ucp-ddd-tactical-design (есть Aggregate Root) и до ucp-jooq-design (jOOQ codegen из живой схемы). Триггеры: «сделай DDL для агрегата X», «нужна миграция под Order», «liquibase для нового домена», «schema для VO Money».
+description: Сгенерировать Liquibase changeset для нового агрегата (коды PG-T-*, PG-N-*) — CREATE TABLE с правильными типами (bigint IDENTITY, numeric для денег, timestamptz, uuid, text, JSONB для VO), FK с CASCADE-стратегией, индексы, audit-колонки.
+when_to_use: После ucp-ddd-tactical-design, до ucp-jooq-design. Триггеры — «сделай DDL для агрегата X», «нужна миграция под Order».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Schema — проектирование
 
-Ты генерируешь Liquibase changeset для нового агрегата по `pg-types-style-guide.md` (`PG-T-*`) и `pg-naming-style-guide.md` (`PG-N-*`). Цель — DDL, который сразу проходит `ucp-pg-schema-review` без findings.
+Ты генерируешь Liquibase changeset для нового агрегата по `backend/pg-types/pg-types-rules.md` (`PG-T-*`) и `backend/pg-naming/pg-naming-rules.md` (`PG-N-*`). Цель — DDL, который сразу проходит `ucp-pg-schema-review` без findings.
 
 ## Инструкции
 
 1. **Прочитай style guide'ы:**
-   - `.claude/docs/pg-types-style-guide.md` — выбор типов колонок (`PG-T-*`).
-   - `.claude/docs/pg-naming-style-guide.md` — naming convention (`PG-N-*`).
-   - `.claude/docs/ddd-tactical-style-guide.md` — для понимания Aggregate Root, Entity, VO.
-   - `.claude/docs/pg-migrations-style-guide.md` `PG-M-*` — лёгкая часть (для нового агрегата это просто `CREATE TABLE`, без expand-contract).
+   - `.claude/docs/backend/pg-types/pg-types-rules.md` — выбор типов колонок (`PG-T-*`).
+   - `.claude/docs/backend/pg-naming/pg-naming-rules.md` — naming convention (`PG-N-*`).
+   - `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, VO.
+   - `.claude/docs/backend/pg-migrations/pg-migrations-rules.md` `PG-M-*` — лёгкая часть (для нового агрегата это просто `CREATE TABLE`, без expand-contract).
 
 2. **Уточни параметры:**
    - **Aggregate Root** — имя (`Order`), Java-поля и их типы (включая VO). Если домен ещё не написан — это для `ucp-ddd-tactical-design`.
@@ -145,7 +147,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 6. **Решения по индексам:**
    - PK — автоматически индексируется.
    - FK — **обязательно** отдельный индекс (`PG-T-044` для UUID, общая практика для всех FK).
-   - Поля из `<X>Filter` — индексировать. Композитные индексы под типичные запросы (см. `pg-indexes-style-guide.md`).
+   - Поля из `<X>Filter` — индексировать. Композитные индексы под типичные запросы (см. `backend/pg-indexes/pg-indexes-rules.md`).
    - Если есть `status` + сортировка по `created_at` → composite `(status, created_at DESC)`.
    - Soft-delete (`deleted_at`) — partial index `WHERE deleted_at IS NULL` если большинство запросов «активные».
 
