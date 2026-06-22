@@ -42,6 +42,27 @@ func KindOf(err error) Kind {
 	}
 	return Technical
 }
+
+// FieldError — одна невалидная позиция в запросе.
+type FieldError struct {
+	Field   string // имя поля (JSON-нотация)
+	Code    string // машинный код правила (required, min, uuid4, …)
+	Message string // читаемый текст на языке сервиса
+}
+
+// ValidationError — ошибка валидации входного контракта; Kind() == Validation → HTTP 400.
+type ValidationError struct {
+	Message string
+	Fields  []FieldError
+}
+
+func (e *ValidationError) Error() string  { return e.Message }
+func (e *ValidationError) Kind() Kind     { return Validation }
+
+// NewValidation создаёт ValidationError без детализации по полям (некорректный JSON и т.п.).
+func NewValidation(msg string) *ValidationError {
+	return &ValidationError{Message: msg}
+}
 ```
 
 `R-ERR-HIER-3` — имя по бизнес-смыслу; типизированная структура с контекстом (`R-ERR-HIER-5`):
@@ -248,7 +269,7 @@ span.SetStatus(codes.Error, err.Error())
 
 ## Чеклист подключения к новому сервису (Go / net/http + chi)
 
-- [ ] `core/apperr` с `Kind` + `Categorized`-маркером + `KindOf(err)`
+- [ ] `core/apperr` с `Kind` + `Categorized`-маркером + `KindOf(err)` + `ValidationError{Message,Fields []FieldError}` + `NewValidation(msg)`
 - [ ] Доменные ошибки — типизированные структуры с контекстом и `Kind() Domain`, имена по бизнес-смыслу
 - [ ] Единый edge-renderer (`httperr.Write`) + `Recoverer`-middleware (panic → 500)
 - [ ] Integration: HTTP-клиент мапит транспорт/4xx/5xx → port-specific (`%w`-обёртка)

@@ -35,11 +35,11 @@
 
 ## 4. Persistence-wiring
 **MUST:**
-- **PYBOOT-10.** Async SQLAlchemy: `create_async_engine` + `async_sessionmaker` в lifespan; сессия per-request через DI/`Depends`. Миграции — **Alembic** (отдельно от рантайма), `alembic upgrade head` в CI/деплое, не в коде приложения на старте.
-- **PYBOOT-11.** Локальный quickstart документирован в README: `docker compose up -d postgres && alembic upgrade head && uvicorn app.main:app --reload`.
+- **PYBOOT-10.** Async SQLAlchemy: `create_async_engine` + `async_sessionmaker` в lifespan; сессия per-request через DI/`Depends`. Миграции — **Liquibase** (отдельно от рантайма), `liquibase update` в CI/деплое, не в коде приложения на старте.
+- **PYBOOT-11.** Локальный quickstart документирован в README: `docker compose up -d postgres && liquibase update && uvicorn app.main:app --reload`.
 
 **MUST NOT:**
-- **PYBOOT-X4.** `Base.metadata.create_all()` в проде для схемы — только Alembic (create_all допустим в unit-тестах без миграций).
+- **PYBOOT-X4.** `Base.metadata.create_all()` в проде для схемы — только Liquibase (create_all допустим в unit-тестах без миграций).
 
 ## 5. Server и shutdown
 **MUST:**
@@ -61,6 +61,6 @@
 ## Quickstart-чеклист (сервис не стартует)
 1. `APP_ENV` выставлен? (`local` для разработки)
 2. `Settings` валидируется — нет ли missing required env (ошибка на старте)?
-3. Postgres поднят (`docker compose up -d postgres`)? Alembic накатан (`alembic upgrade head`)?
+3. Postgres поднят (`docker compose up -d postgres`)? Liquibase накатан (`liquibase update`)?
 4. Ресурсы в lifespan, не в глобале (`PYBOOT-X2`)?
 5. На production-старте auth/JWKS — ленивый, сервис стартует без живого IdP.

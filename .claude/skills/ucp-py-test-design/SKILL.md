@@ -28,7 +28,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(git di
 
 3. **Если фикстур ещё нет** — создай в `conftest.py` (`PYTS-4..8`): session-scoped `PostgresContainer` (образ публичный `postgres:16`), engine/Settings на его DSN; `pytest-asyncio`; `AsyncClient`-фикстура; `app.dependency_overrides` на фейковые `Clock`/`IdGenerator` (предзаданные значения) и `get_principal`/JWT-валидатор + `success_token()`. **Без** Kafka/Redis (`PYTS-19/20`).
 
-4. **`<Domain>DatabasePreparer`** (`PYTS-9..11`) — над `AsyncSession`/Core: `clear*()` (`DELETE`/`TRUNCATE`), `create*(...)`, `prepare()`. Схему не пересоздавать — стоит один раз через Alembic. Учесть порядок FK.
+4. **`<Domain>DatabasePreparer`** (`PYTS-9..11`) — над `AsyncSession`/Core: `clear*()` (`DELETE`/`TRUNCATE`), `create*(...)`, `prepare()`. Схему не пересоздавать — стоит один раз через Liquibase. Учесть порядок FK.
 
 5. **`<Entity>ObjectGenerator`** (`PYTS-12..14`) — `with_*` fluent + `build()`; дефолты (валидный UUID, tz-aware `datetime(..., tzinfo=UTC)`); время усекать до микросекунд для сравнения с `timestamptz`.
 

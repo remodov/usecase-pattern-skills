@@ -54,7 +54,7 @@ for rules in sorted(DOCS.glob("**/*-rules.md")):
         # с примерами обоих биндингов, как в пилоте error-handling). Пропускаем строку,
         # если рядом с Java-токеном есть python-side маркер.
         PY_MARK = re.search(r"Python|Py\b|FastAPI|SQLAlchemy|Pydantic|aiokafka|httpx|"
-                            r"uvicorn|asyncio|bandit|ruff|pip-audit|Alembic|argon2|pytest|structlog", line)
+                            r"uvicorn|asyncio|bandit|ruff|pip-audit|argon2|pytest|structlog", line)
         if PY_MARK and re.search(r"Java\b|Spring|JPA", line):
             continue
         for m in DENY.finditer(line):

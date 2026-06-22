@@ -87,7 +87,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Что не входит
 
 - Формат problem+json (поля) — `ucp-api-review` (`R-API-ERR-*`).
-- class-validator constraints — `ucp-node-validation-review` (когда появится).
+- class-validator constraints — `ucp-node-validation-review`.
 - Retry-policy конфиг — `ucp-node-resilience-review`.
 - PII в логах — `ucp-node-observability-review` / `ucp-auth-review`.
 

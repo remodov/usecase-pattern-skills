@@ -38,6 +38,20 @@ def require_roles(*roles: str):
     return dep
 ```
 
+`PyJWKClient` кеширует JWK Set (`R-AUTH-5`), повторно не ходит в IdP на каждый запрос; невалидная подпись /
+просроченный `exp` → **401** (`AUTH-6`). RBAC — `Depends(require_roles(...))` на каждом endpoint (`AUTH-9`):
+
+```python
+# adapters/in/http/order_router.py — RBAC объявляется зависимостью (AUTH-9), не вручную внутри хендлера
+@router.post("/v1/orders", status_code=201, responses=get_error_responses(401, 403))  # 401 невалид JWT, 403 нет роли
+async def create_order(req: CreateOrderRequest,
+                       principal: Principal = Depends(require_roles("customer", "admin")),  # AUTH-7/AUTH-9
+                       dispatcher: Dispatcher = Depends(get_dispatcher)) -> CreateOrderResponse:
+    order_id = await dispatcher.dispatch(
+        CreateOrder(customer_id=principal.sub, items=req.to_domain_items()))   # owner = principal.sub, не из Request
+    return CreateOrderResponse(id_=str(order_id))           # PY-2.X2: поле без затенения builtin id
+```
+
 ## 3. RBAC (`AUTH-7..9`)
 
 `AUTH-7` — роли из claim (`realm_access.roles` Keycloak / `scope`) маппятся в `Principal.roles` в зависимости.
@@ -49,6 +63,41 @@ def require_roles(*roles: str):
 `AUTH-10` — команда/запрос с агрегатом по id — ABAC по владению: сравнение `aggregate.owner_id` с `principal.sub` в
 Handler с `403`/`ForbiddenError`. `AUTH-11` — ABAC-логика в выделенном компоненте (`AccessPolicy`)/Handler, не
 размазана по роутерам. `AUTH-12` — `admin` обходит ABAC, но каждое действие — в audit log (`AUTH-15`).
+
+ABAC в Python — **императивно в Handler**: грузим агрегат через репозиторий, сравниваем владельца с `principal.sub`,
+бросаем `ForbiddenError` при несовпадении (это сознательный UCP-биндинг — не декоративный `@PreAuthorize`-аналог,
+т.к. проверка владения требует загруженного агрегата). `principal` кладётся в UseCase как поле, не передаётся объект
+запроса (`R-DSP-X2`). `admin` обходит проверку, но действие пишется в audit log (`AUTH-12`, `AUTH-15`):
+
+```python
+# core/order/usecases.py
+@dataclass(frozen=True)
+class CancelOrder:                                   # Command[None]
+    order_id: OrderId
+    principal_sub: str                               # владелец из токена, не из body (R-DSP-X2)
+    principal_roles: frozenset[str]
+
+# core/order/handlers.py — ABAC императивно, после load-aggregate (AUTH-10/AUTH-11)
+class CancelOrderHandler:
+    def __init__(self, session_factory, orders: OrderRepository, audit: AuditLogRepository,
+                 clock: Clock) -> None:
+        self._session_factory = session_factory
+        self._orders = orders
+        self._audit = audit
+        self._clock = clock
+
+    async def handle(self, cmd: CancelOrder) -> None:
+        async with self._session_factory() as session, session.begin():
+            order = await self._orders.by_id(session, cmd.order_id)         # доступ к БД — через репозиторий
+            is_admin = "admin" in cmd.principal_roles
+            if not is_admin and order.owner_id != cmd.principal_sub:        # ABAC по владению (AUTH-10)
+                raise ForbiddenError("not the owner")                       # → 403, не 401 (AUTH-6)
+            order.cancel(self._clock.now())
+            await self._orders.save(session, order)
+            if is_admin:                                                    # admin обходит ABAC, но пишет audit (AUTH-12)
+                self._audit.add(session, actor_id=cmd.principal_sub, action="order.cancel",
+                                aggregate_id=order.id.value, at=self._clock.now())  # AUTH-15
+```
 
 ## 5. Service-to-service (`AUTH-13..14`)
 
@@ -67,6 +116,24 @@ inter-service трафик — критично.
 (только id, PII подгружает потребитель) — cross-ref `R-OBS-LOG-X1`. `AUTH-17` — секреты (client-secret, DB-пароли,
 ключи) **не в git** — через env / Vault / SealedSecrets, читаются `pydantic-settings`. `AUTH-18` — exception-handler
 не выводит `str(cause)` в `detail` — только заранее заданное сообщение по коду (cross-ref `R-ERR-MAP-*`).
+
+Секреты и параметры IdP — через `pydantic-settings` из env/Vault, не хардкодом и не в git (`AUTH-17`). `SecretStr`
+не утекает в логи/repr. Exception-handler отдаёт фиксированное сообщение по коду, без `str(cause)` (`AUTH-18`):
+
+```python
+# app/settings.py
+class AuthSettings(BaseSettings):
+    jwks_uri: str                                    # из env, не хардкод (AUTH-17)
+    issuer: str
+    audience: str
+    client_secret: SecretStr                         # SecretStr → не светится в repr/логах (AUTH-16)
+    model_config = SettingsConfigDict(env_prefix="AUTH_", secrets_dir="/run/secrets")  # Vault/SealedSecrets
+
+# adapters/in/http/error_handlers.py — фиксированное сообщение по коду, без str(cause) (AUTH-18)
+@app.exception_handler(ForbiddenError)
+async def _forbidden(_: Request, exc: ForbiddenError):
+    return problem_response(status=403, code="FORBIDDEN", detail="access denied")  # не str(exc) — нет утечки PII/internals
+```
 
 ## 8. Идемпотентность (`AUTH-19`)
 

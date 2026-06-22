@@ -121,6 +121,25 @@ class Money:
 
 > Деньги — **`Decimal`**, никогда `float` (cross-ref `pg-types` `PG-T-011`, `R-SQLA-MODEL-2`).
 
+Против primitive obsession (`R-VO-X2`): `str` email → VO `Email` с валидацией в `__post_init__` (`R-VO-4`),
+коллекция внутри VO — `tuple`, не `list` (`R-VO-X3`):
+
+```python
+# core/order/value_object/email.py
+@dataclass(frozen=True)                       # R-VO-1/-2: иммутабелен, hashable, equality по значению
+class Email:
+    value: str
+
+    def __post_init__(self) -> None:          # R-VO-4: инварианты в __post_init__
+        if "@" not in self.value:
+            raise ValueError("invalid email")
+
+@dataclass(frozen=True)
+class ShippingAddress:
+    lines: tuple[str, ...]                     # R-VO-X3: tuple, не list — иначе frozen не спасает от мутации
+    postcode: str
+```
+
 ---
 
 ## 3. Aggregate Root — `R-AGG-*`

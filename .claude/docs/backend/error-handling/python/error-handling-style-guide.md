@@ -279,4 +279,3 @@ span.record_exception(exc)
 - [ ] structlog: domain=WARNING, technical/unexpected=ERROR; PII не в логах (`AUTH-16`)
 - [ ] `application/problem+json` media-type на всех error-response
 - [ ] Spec в `docs/spec/errors/` — каждое доменное исключение имеет карточку
-```

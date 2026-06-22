@@ -44,7 +44,7 @@ persistence-impl (`jooq` ↔ `sqlalchemy`), `test-strategy` (JUnit+Testcontainer
 
 **Что shared** (один rules-index + per-lang style-guide): rest-api, error-handling, validation, cqrs,
 distributed, kafka, caching, resilience, observability, security, usecase-pattern, ddd-tactical, **все pg-***
-(меняется только инструмент миграций: Liquibase ↔ Alembic — это в style-guide).
+(инструмент миграций — Liquibase для Java и Python; конкретика — в style-guide).
 
 Всё выше — **backend-трек** (ось `lang`), живёт под `docs/backend/`. Для frontend/e2e и других специализаций
 есть вторая ось — `track` (см. **§10**); раскладка `docs/<track>/<concern>/...`. Кросс-трековое — в `docs/shared/`.

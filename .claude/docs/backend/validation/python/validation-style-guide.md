@@ -3,9 +3,16 @@
 Реализация язык-нейтрального контракта `../validation-rules.md` (`R-VLD-*`) на Pydantic v2 / FastAPI.
 Коды — общие с Java; здесь — Pydantic-идиомы.
 
-> **Парадигма (инверсия Java).** FastAPI **code-first**: Pydantic-модели — **источник правды** валидации входа,
-> OpenAPI генерируется из них (у Java наоборот — OpenAPI-first → generated DTO). Поэтому «не править generated
-> руками» (`R-VLD-OAS-X1`) для Python неактуально, а актуально «модель = контракт, без дублей» (`R-VLD-OAS-X4`).
+> **Парадигма — contract-first (как в Java).** Источник правды валидации входа — OpenAPI-контракт
+> (`doc/openapi.yaml`); из него генерируются Pydantic-схемы, и правило «не править generated руками»
+> (`R-VLD-OAS-X1`) действует. *Альтернатива (code-first, без codegen):* Pydantic-модель сама источник — тогда
+> актуально «модель = контракт, без дублей» (`R-VLD-OAS-X4`).
+
+> **Командный binding — contract-first через codegen.** На UCP-сервисах input-DTO **генерируются** из
+> `doc/openapi.yaml` через `datamodel-codegen` (concern `codegen`, `PYGEN-SC-1..6`): источник истины — контракт,
+> constraints живут в OpenAPI (`minLength`/`maximum`/`pattern`), `datamodel-codegen --field-constraints` переносит их
+> в Pydantic `Field(...)`. То есть «без дублей» (`R-VLD-OAS-X4`) обеспечивается генерацией: правило в YAML → один
+> `Field` в коде. Custom/cross-field-логика, которую OpenAPI не выражает, добавляется поверх (разделы 3 и 5).
 
 ---
 
@@ -18,8 +25,41 @@ class CreateOrderRequest(BaseModel):
     customer_id: UUID
     items: list[OrderItemRequest] = Field(min_length=1)   # nested валидируется рекурсивно (R-VLD-WHERE-4)
 
-@router.post("/v1/orders")
+@router.post("/v1/orders", responses=get_error_responses(400))   # 400 VALIDATION_ERROR + violations
 async def create_order(req: CreateOrderRequest, ...): ...   # FastAPI валидирует до тела хендлера
+```
+
+Невалидный вход FastAPI собирает в `RequestValidationError`; маппим его в `400 VALIDATION_ERROR` + `violations`
+(не дефолтный 422 FastAPI — `R-ERR-X3`), с dot-path вложенных полей и индексами массивов (`R-ERR-6`):
+
+```python
+# app/error_handlers.py — единый handler для входной валидации (cross-ref R-ERR-MAP-2, backend/error-handling/python)
+from fastapi.exceptions import RequestValidationError
+
+def _field_path(loc: tuple) -> str:
+    # loc вида ("body", "deliveryAddress", "zipCode") / ("body", "items", 0, "quantity")
+    parts: list[str] = []
+    for p in loc:
+        if p in ("body", "query", "path"):
+            continue                                            # служебный префикс не показываем
+        if isinstance(p, int):
+            parts[-1] = f"{parts[-1]}[{p}]"                     # items[0] (R-ERR-6: индексы массивов)
+        else:
+            parts.append(str(p))
+    return ".".join(parts)                                      # deliveryAddress.zipCode (R-ERR-6: dot-path)
+
+@app.exception_handler(RequestValidationError)
+async def on_request_validation_error(request: Request, exc: RequestValidationError) -> Response:
+    violations = [{"field": _field_path(e["loc"]), "message": e["msg"]} for e in exc.errors()]  # ВСЕ ошибки
+    body = {
+        "type": "urn:problem:order-service:validation-error",
+        "status": 400, "title": "Bad Request",                 # R-ERR-X3: 400, НЕ 422
+        "detail": "Ошибка валидации входных данных",
+        "traceId": get_trace_id(),
+        "code": "VALIDATION_ERROR",
+        "violations": violations,
+    }
+    return JSONResponse(status_code=400, content=body, media_type="application/problem+json")  # R-ERR-3
 ```
 
 `R-VLD-WHERE-2` — конфиг через `pydantic-settings BaseSettings` — валидируется по типам на старте (fail-fast).
@@ -41,6 +81,29 @@ async def create_order(req: CreateOrderRequest, ...): ...   # FastAPI валид
 `R-VLD-STD-5` — валидация на правильном типе (число — `int`/`Decimal` с числовыми constraints, деньги — `Decimal`/`condecimal`, не `float`).
 
 `R-VLD-STD-X1` ❌ `@field_validator` «не None» на non-Optional поле — тип уже гарантирует. `R-VLD-STD-X2` ❌ `Field(pattern=email-regex)` вместо `EmailStr`. `R-VLD-STD-X3` ❌ «всё-в-одном» валидатор вместо комбинации стандартных constraints.
+
+Маппинг OpenAPI-constraint → Pydantic v2 (`datamodel-codegen --field-constraints` генерирует это автоматически):
+
+| OpenAPI (`doc/openapi.yaml`) | Pydantic v2 `Field(...)` | Правило |
+|---|---|---|
+| `minLength` / `maxLength` | `Field(min_length=, max_length=)` | `R-VLD-STD-2` |
+| `minimum` / `maximum` | `Field(ge=, le=)` | `R-VLD-STD-2` |
+| `exclusiveMinimum` / `exclusiveMaximum` | `Field(gt=, lt=)` | `R-VLD-STD-2` |
+| `minItems` / `maxItems` (array) | `Field(min_length=, max_length=)` | `R-VLD-WHERE-4` |
+| `pattern` | `Field(pattern=...)` (но известный формат → спец-тип) | `R-VLD-STD-3` |
+| `format: email` / `uuid` / `uri` | `EmailStr` / `UUID` / `AnyUrl` | `R-VLD-STD-3` |
+| `format: date-time` | `datetime` (aware) | `R-VLD-STD-4` |
+| `type: number` (деньги) | `Decimal` + `Field(max_digits=, decimal_places=)` | `R-VLD-STD-5` |
+| не в `required` | `X | None = None` | `R-VLD-STD-1` |
+
+```python
+class CreateOrderRequest(BaseModel):
+    customer_id: UUID                                            # format: uuid → UUID (R-VLD-STD-3)
+    email: EmailStr                                              # format: email → EmailStr, не regex (R-VLD-STD-X2)
+    comment: str | None = Field(default=None, max_length=500)    # maxLength=500, optional (R-VLD-STD-1)
+    amount: Decimal = Field(gt=0, max_digits=12, decimal_places=2)  # exclusiveMinimum + деньги Decimal (R-VLD-STD-5)
+    items: list[OrderItemRequest] = Field(min_length=1)          # minItems=1 (R-VLD-WHERE-4)
+```
 
 ---
 
@@ -89,7 +152,7 @@ class DateRangeRequest(BaseModel):
 
 ## 6. Контракт-схема — `R-VLD-OAS-*`
 
-`R-VLD-OAS-1` — **code-first**: Pydantic-модель — источник; OpenAPI генерируется FastAPI (`/openapi.json`). Правило живёт в модели, в одном месте.
+`R-VLD-OAS-1` — **contract-first**: источник — `doc/openapi.yaml`, Pydantic-схемы генерируются (`datamodel-codegen`, `PYGEN-SC-*`); правило живёт в контракте, в одном месте. *Code-first* (без codegen): Pydantic-модель — источник, OpenAPI генерируется FastAPI (`/openapi.json`).
 `R-VLD-OAS-4` — контракт = типизированная Pydantic-модель в сигнатуре эндпоинта (не `dict`/`Request.json()`).
 `R-VLD-OAS-6` — после маппинга в UseCase-команду повторной валидации нет; домен-инварианты — на агрегате.
 

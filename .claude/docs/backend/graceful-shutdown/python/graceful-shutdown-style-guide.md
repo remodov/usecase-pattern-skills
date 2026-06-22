@@ -20,6 +20,36 @@ shutdown-хендлер первым переводит readiness в 503 (в `li
 `R-SHUT-CFG-X1` — свой `shutting_down: bool` вместо readiness-состояния приложения, не связанный с health (k8s не
 узнает).
 
+```python
+# Единый источник readiness (R-SHUT-3): один объект, на который смотрит и /health/ready, и shutdown.
+# НЕ разрозненные shutting_down: bool, не связанные с health (R-SHUT-CFG-X1).
+class ReadinessState:
+    def __init__(self) -> None:
+        self._ready = False
+
+    def mark_ready(self) -> None:
+        self._ready = True
+
+    def mark_not_ready(self) -> None:                      # SIGTERM → readiness=503 первым делом (R-SHUT-CFG-3)
+        self._ready = False
+
+    def is_ready(self) -> bool:
+        return self._ready
+
+# /health/ready читает тот же объект → на shutdown отдаёт 503, k8s убирает pod из endpoints (R-SHUT-CFG-4).
+@router.get("/health/ready")
+async def ready(state: ReadinessState = Depends(get_readiness_state)) -> JSONResponse:
+    code = 200 if state.is_ready() else 503
+    return JSONResponse({"status": "UP" if state.is_ready() else "DOWN"}, status_code=code)
+```
+
+uvicorn graceful обязателен (`R-SHUT-CFG-1/2`) — явный timeout, чтобы влезть в 60s-бюджет:
+
+```bash
+# R-SHUT-CFG-1/2: --timeout-graceful-shutdown явный (20–45s), не 0 (R-SHUT-HTTP-X1) — иначе in-flight рвутся.
+uvicorn service.app.main:app --host 0.0.0.0 --port 8080 --timeout-graceful-shutdown 25
+```
+
 ## 2. HTTP drain (`R-SHUT-HTTP-*`)
 
 `R-SHUT-HTTP-1` — in-flight HTTP дожимаются (uvicorn graceful). `R-SHUT-HTTP-2` — **preStop `sleep 10`** обязателен
@@ -37,13 +67,50 @@ shutdown; не оставлять задачу висеть). `R-SHUT-KFK-2` —
 
 `R-SHUT-KFK-X1` — `enable_auto_commit=True` (потеря/дубль; запрещено `R-KFK-CONS-X1`).
 
+```python
+# R-SHUT-KFK-1/4: consumer и producer останавливаются в lifespan-shutdown — commit offset + flush + close.
+# consumer.stop() докоммитит обработанное (manual commit, R-SHUT-KFK-3); producer.stop() сделает flush буфера.
+async def stop_kafka(consumer: AIOKafkaConsumer, producer: AIOKafkaProducer) -> None:
+    await consumer.stop()                                  # R-SHUT-KFK-1: не оставлять задачу висеть
+    await producer.stop()                                  # R-SHUT-KFK-4: flush + close, иначе теряются буферы
+```
+
 ## 4. БД и persistence (`R-SHUT-DB-*`)
 
 `R-SHUT-DB-1` — `engine.dispose()` (закрытие пула SQLAlchemy) в lifespan-shutdown **после** дренажа HTTP/задач, не
 раньше. `R-SHUT-DB-2` — активные транзакции завершаются своим каналом (HTTP — graceful, фон — отмена с дожатием
-итерации). `R-SHUT-DB-3` — Alembic не запускается на shutdown (это startup).
+итерации). `R-SHUT-DB-3` — Liquibase-миграции не запускаются на shutdown (это startup/деплой).
 
 `R-SHUT-DB-X1` — `engine.dispose()` в начале shutdown, до завершения фоновых задач (закроет пул под работающими тасками).
+
+```python
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+
+log = structlog.get_logger(__name__)
+
+# Lifespan связывает порядок shutdown (R-SHUT-3): readiness→503 ПЕРВЫМ, затем дренаж, engine.dispose() ПОСЛЕДНИМ.
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    container: Container = app.container
+    state: ReadinessState = container.readiness_state()
+    consumer, producer = container.kafka_consumer(), container.kafka_producer()
+    relay_task = asyncio.create_task(outbox_relay_loop(container.outbox_relay(), state))
+
+    await consumer.start()
+    await producer.start()
+    state.mark_ready()                                     # принимаем трафик
+    log.info("startup_complete")
+    yield
+    # --- SIGTERM: uvicorn останавливает lifespan после дренажа in-flight HTTP (R-SHUT-HTTP-1) ---
+    log.info("shutdown_started")                           # R-SHUT-OBS-3: лог факта SIGTERM
+    state.mark_not_ready()                                 # R-SHUT-CFG-3: readiness→503 ПЕРВЫМ, k8s убирает из endpoints
+    await stop_background_task(relay_task)                 # R-SHUT-SCHED-1: дожать фоновые задачи
+    await stop_kafka(consumer, producer)                  # R-SHUT-KFK-1/4: commit + flush
+    await container.engine().dispose()                    # R-SHUT-DB-1: пул закрываем ПОСЛЕ дренажа, не раньше (R-SHUT-DB-X1)
+    log.info("shutdown_complete")                          # R-SHUT-OBS-X1: нормальное закрытие — INFO, не ERROR
+```
 
 ## 5. Scheduled / async / outbox (`R-SHUT-SCHED-*`)
 
@@ -55,6 +122,28 @@ outbox-relay завершает текущий batch (`FOR UPDATE SKIP LOCKED`),
 
 `R-SHUT-SCHED-X1` — отмена фоновых задач без дожатия/обработки `CancelledError` — частичные изменения без rollback
 (inconsistent state).
+
+```python
+import asyncio
+import contextlib
+
+# R-SHUT-SCHED-3: outbox-relay цикл проверяет readiness, не while True; завершает текущий batch, не начинает новый.
+async def outbox_relay_loop(relay: OutboxRelay, state: ReadinessState) -> None:
+    while state.is_ready():                                # на shutdown readiness снят → новый batch не начинаем
+        try:
+            await relay.run_once(batch=50)                 # FOR UPDATE SKIP LOCKED — текущий batch дожимается
+        except asyncio.CancelledError:
+            # R-SHUT-SCHED-2: дожать критичную секцию (commit текущего batch), затем re-raise.
+            await relay.finish_current_batch()
+            raise                                          # пробрасываем — иначе задача не завершится
+        await asyncio.sleep(1)
+
+# R-SHUT-SCHED-1: на shutdown — task.cancel() + await с обработкой CancelledError (не оставлять незавершённые).
+async def stop_background_task(task: asyncio.Task) -> None:
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):      # ожидаем дожатие; X1 — отмена без await = inconsistent state
+        await task
+```
 
 ## 6. Kubernetes (`R-SHUT-K8S-*`, нейтрально)
 

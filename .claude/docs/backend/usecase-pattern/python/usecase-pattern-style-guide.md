@@ -57,6 +57,31 @@ class CreateOrderHandler:
             return order.id
 ```
 
+Полный handler с зависимостями через `__init__` и границей TX через `session.begin()`. Доступ к БД — **только через
+репозиторий** (никакого SQLAlchemy в хендлере); handler оркеструет load → доменный метод → save → outbox в одной
+TX. Зависимости — порты-`Protocol`, реализация инжектится DI-контейнером:
+
+```python
+# core/order/handlers.py
+class CreateOrderHandler:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession],   # R-HND-5: deps через __init__
+                 orders: OrderRepository, outbox: OutboxRepository,         # порты из core/<bc>/port/
+                 clock: Clock) -> None:
+        self._session_factory = session_factory
+        self._orders = orders
+        self._outbox = outbox
+        self._clock = clock
+
+    async def handle(self, uc: CreateOrder) -> OrderId:          # R-HND-1: единственный метод handle
+        structlog.contextvars.bind_contextvars(use_case="CreateOrder")     # R-SQLA-SESS-4: ошибка+шаг в edge-лог
+        async with self._session_factory() as session, session.begin():    # R-TX-1: граница TX на handler
+            order = Order.create(uc.customer_id, uc.items, self._clock.now())   # доменная фабрика
+            await self._orders.add(session, order)                          # запись — через репозиторий
+            for event in order.pull_events():                               # R-TX-3: события после save
+                self._outbox.add(session, event)                           # outbox в той же TX
+            return order.id                                                 # R-CQRS-X1: минимум (id), не read-DTO
+```
+
 `R-HND-2` — Handler регистрируется в DI-контейнере (dependency-injector / punq), чтобы dispatcher нашёл его (см. §3). `R-HND-4` — один Handler — один UseCase. `R-HND-5` — зависимости через `__init__`, поля приватные неизменяемые.
 
 `R-HND-X1` ❌ Handler зовёт другой Handler напрямую — через dispatcher / Step. `R-HND-X2` ❌ наружу летит `sqlalchemy.exc.*` / `httpx`-ошибка — мапить в доменную (cross-ref `R-ERR-WHERE-2b`, `ucp-py-error-handling-*`). `R-HND-X3` ❌ изменяемое состояние между вызовами — Handler stateless (контейнер может отдавать per-request, но без накопления state).
@@ -82,16 +107,47 @@ class Dispatcher:
 
 Реестр собирается в DI-композиции (`app/`), один dispatcher на приложение; второй — только при физическом разделении пулов команд/запросов.
 
+Регистрация handler'ов в DI-контейнере (`dependency-injector`/`punq`) и построение `Dispatcher` из реестра
+`type[UseCase] → Handler` (`R-HND-2`). Контейнер инжектит порты в handler'ы; FastAPI получает dispatcher через
+`Depends`:
+
+```python
+# app/container.py — DI-композиция: провайдеры + реестр UseCase→Handler (R-HND-2)
+class Container(containers.DeclarativeContainer):
+    session_factory = providers.Singleton(build_session_factory, dsn=settings.db.dsn)
+    clock = providers.Singleton(SystemClock)
+    orders = providers.Factory(SqlAlchemyOrderRepository)         # реализация порта из adapters/out
+    outbox = providers.Factory(SqlAlchemyOutboxRepository)
+    views = providers.Factory(SqlAlchemyOrderViewRepository)
+
+    create_order_handler = providers.Factory(
+        CreateOrderHandler, session_factory=session_factory, orders=orders,
+        outbox=outbox, clock=clock)
+    find_order_handler = providers.Factory(
+        FindOrderByIdHandler, session_factory=session_factory, views=views)
+
+    dispatcher = providers.Singleton(
+        Dispatcher,
+        registry=providers.Dict({                                # реестр type→handler (R-DSP-1)
+            CreateOrder: create_order_handler,
+            FindOrderById: find_order_handler,
+        }))
+
+# app/deps.py — FastAPI-зависимость отдаёт собранный dispatcher
+def get_dispatcher() -> Dispatcher:
+    return container.dispatcher()
+```
+
 `R-DSP-3` — endpoint делает только маппинг Request→UseCase, dispatch, маппинг Result→Response, HTTP-код:
 
 ```python
 # adapters/in/http/order_router.py
-@router.post("/v1/orders", status_code=201)
+@router.post("/v1/orders", status_code=201, responses=get_error_responses(401, 409))
 async def create_order(req: CreateOrderRequest, dispatcher: Dispatcher = Depends(get_dispatcher),
                        principal: Principal = Depends(get_principal)) -> CreateOrderResponse:
     order_id = await dispatcher.dispatch(
         CreateOrder(customer_id=principal.user_id, items=req.to_domain_items()))   # R-DSP-X2: userId из principal, не Request
-    return CreateOrderResponse(id=str(order_id))
+    return CreateOrderResponse(id_=str(order_id))           # PY-2.X2: поле без затенения builtin id
 ```
 
 `R-DSP-X1` ❌ бизнес-логика/обращение к БД в endpoint. `R-DSP-X2` ❌ передавать `Request`/`Principal` в UseCase — извлекать `user_id`/`tenant_id` в контроллере.
@@ -173,4 +229,3 @@ class SqlAlchemyUnitOfWork:
 - [ ] CQRS: команда read-write UoW + id/summary; запрос read-only + ViewRepository + read-DTO
 - [ ] Инфра-ошибки (SQLAlchemy/httpx) мапятся в доменные в адаптере (cross-ref `ucp-py-error-handling-*`)
 - [ ] DI-контейнер (dependency-injector/punq) собирает handlers + dispatcher
-```

@@ -30,7 +30,7 @@
 ## 3. DatabasePreparer — fluent setup БД
 **MUST:**
 - **PYTS-9.** На каждый Bounded Context — свой `<Domain>DatabasePreparer` над `AsyncSession`/Core с группами `clear*()`, `create*(...)`, `prepare()`.
-- **PYTS-10.** Не пересоздаём схему между тестами — только `DELETE`/`TRUNCATE` нужных таблиц (мс vs секунды); схема — один раз при старте через Alembic (cross-ref `R-SQLA-MIG-1`).
+- **PYTS-10.** Не пересоздаём схему между тестами — только `DELETE`/`TRUNCATE` нужных таблиц (мс vs секунды); схема — один раз при старте через Liquibase (cross-ref `R-SQLA-MIG-1`).
 - **PYTS-11.** Порядок методов в `prepare()` — порядок вызова; при FK учитывать (FK последним создаём, первым чистим).
 
 **MUST NOT:**

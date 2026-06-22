@@ -10,22 +10,25 @@ Scope:
 
 | Префикс | Concern | Scope | Статус генерализации |
 |---|---|---|---|
-| `R-API-*` | rest-api (URL/MTH/RSP/ERR/OAS) | shared | ✅ генерализован (java + python) |
-| `R-UC-*` / `R-HND-*` / `R-LAY-*` | usecase-pattern | shared | ✅ генерализован (java + python) |
-| `R-ENT-*` / `R-AGG-*` / `R-VO-*` / `R-EVT-*` / `R-REP-*` / `R-DS-*` / `R-FAC-*` / `R-SPEC-*` / `R-MOD-*` | ddd-tactical | shared | ✅ генерализован (java + python) |
-| `R-ERR-*` | error-handling | shared | **✅ генерализован (пилот)** |
-| `R-VLD-*` | validation | shared | ✅ генерализован (java + python) |
-| `R-CACHE-*` | caching | shared | ✅ генерализован (java + python) |
-| `R-RES-*` | resilience | shared | ✅ генерализован (java + python) |
-| `R-KFK-*` | kafka | shared | ✅ генерализован (java + python) |
-| `R-OBS-*` | observability | shared | ✅ генерализован (java + python) |
-| `R-CQRS-*` | cqrs | shared | ✅ генерализован (java + python) |
-| `R-DIST-*` | distributed-patterns | shared | ✅ генерализован (java + python) |
-| `R-HEX-*` | hexagonal | shared (концепт) | ✅ генерализован (java + python) |
+| `R-API-*` | rest-api (URL/MTH/RSP/ERR/OAS) | shared | ✅ генерализован (java + python + node + go) |
+| `R-UC-*` / `R-HND-*` / `R-LAY-*` | usecase-pattern | shared | ✅ генерализован (java + python + node + go) |
+| `R-ENT-*` / `R-AGG-*` / `R-VO-*` / `R-EVT-*` / `R-REP-*` / `R-DS-*` / `R-FAC-*` / `R-SPEC-*` / `R-MOD-*` | ddd-tactical | shared | ✅ генерализован (java + python + node + go) |
+| `R-ERR-*` | error-handling | shared | ✅ генерализован (java + python + node + go) |
+| `R-VLD-*` | validation | shared | ✅ генерализован (java + python + node + go) |
+| `R-CACHE-*` | caching | shared | ✅ генерализован (java + python + node + go) |
+| `R-RES-*` | resilience | shared | ✅ генерализован (java + python + node + go) |
+| `R-KFK-*` | kafka | shared | ✅ генерализован (java + python + node + go) |
+| `R-OBS-*` | observability | shared | ✅ генерализован (java + python + node + go) |
+| `R-CQRS-*` | cqrs | shared | ✅ генерализован (java + python + node + go) |
+| `R-DIST-*` | distributed-patterns | shared | ✅ генерализован (java + python + node + go) |
+| `R-HEX-*` | hexagonal | shared (концепт) | ✅ генерализован (java + python + node + go) |
 | `R-ARCH-*` | arch (платформа) | shared | язык-нейтрален |
-| `R-SHUT-*` | graceful-shutdown | shared (интент; k8s-часть нейтральна) | ✅ генерализован (java + python) |
-| `R-SEC-*` | security (принципы) | shared | ✅ генерализован (java + python) |
-| `AUTH-*` | auth-patterns | shared (интент) | ✅ генерализован (java + python) |
+| `R-SHUT-*` | graceful-shutdown | shared (интент; k8s-часть нейтральна) | ✅ генерализован (java + python + node + go) |
+| `R-JOB-*` | scheduler (background jobs & scheduling) | shared (IMPL-SHAPED; механизм в style-guide) | python (rules + design/review); java — TODO |
+| `R-PAYINT-*` | payment-integration | shared (IMPL-SHAPED; механизм в style-guide) | python (rules + design/review); java — TODO |
+| `R-STREAM-*` | streaming (websocket/SSE/real-time) | shared (IMPL-SHAPED; механизм в style-guide) | python (rules + design/review); java — TODO |
+| `R-SEC-*` | security (принципы) | shared | ✅ генерализован (java + python + node + go) |
+| `AUTH-*` | auth-patterns | shared (интент) | ✅ генерализован (java + python + node + go) |
 | `PG-T/N/I/E/P/M/W/V/L/CP/IS-*` | pg-* (сам PostgreSQL) | shared | нейтрален (инструмент миграций — в style-guide) |
 | `RFF-*` | review-finding-format | meta | нейтрален |
 | `R-META-*` | authoring-contract (LAYOUT/FMT/LANG/CODE/SKILL/TIER) | meta | нейтрален |
@@ -37,14 +40,16 @@ Scope:
 | `R-SQLA-*` | sqlalchemy (persistence) | python | реализован (rules + design/review) |
 | `PYBOOT-*` | python-bootstrap (FastAPI/uv/pydantic-settings) | python | реализован (rules + design/review) |
 | `PYTS-*` | python test-strategy (pytest+testcontainers) | python | реализован (rules + design/review) |
-| `NODE-*` | node-style (eslint/prettier/tsconfig strict) | node | зарезервирован |
-| `R-TYPEORM-*` | persistence (TypeORM; Prisma — альт.) | node | зарезервирован |
-| `NESTBOOT-*` | nest-bootstrap (NestJS modules/config/DI) | node | зарезервирован |
-| `NODETEST-*` | node test-strategy (jest/vitest + testcontainers-node) | node | зарезервирован |
-| `GO-*` | go-style (gofmt/golangci-lint: errcheck/errorlint/...) | go | зарезервирован |
-| `R-SQLC-*` | persistence (sqlc; pgx/squirrel — альт.) | go | зарезервирован |
-| `GOBOOT-*` | go-bootstrap (net/http+chi, config, graceful) | go | зарезервирован |
-| `GOTEST-*` | go test-strategy (testing + testcontainers-go) | go | зарезервирован |
+| `PYGEN-*` | codegen (OpenAPI→Pydantic / DBML→ORM, contract/DB-first; миграции Liquibase) | python | реализован (rules + design/review) |
+| `PYASYNC-*` | async (asyncio-дисциплина: event loop, TaskGroup, отмена/таймауты, ресурсы) | python | реализован (rules + design/review) |
+| `NODE-*` | node-style (eslint/prettier/tsconfig strict) | node | реализован (rules + review) |
+| `R-TYPEORM-*` | persistence (TypeORM 0.3 Data Mapper; Prisma — альт.) | node | реализован (rules + design/review) |
+| `NESTBOOT-*` | nest-bootstrap (NestJS modules/config/DI) | node | реализован (rules + design/review) |
+| `NODETEST-*` | node test-strategy (Jest + testcontainers-node; Vitest — альт.) | node | реализован (rules + design/review) |
+| `GO-*` | go-style (gofmt/golangci-lint: errcheck/errorlint/...) | go | реализован (rules + review) |
+| `R-SQLC-*` | persistence (sqlc; pgx/squirrel — альт.) | go | реализован (rules + design/review) |
+| `GOBOOT-*` | go-bootstrap (net/http+chi, config, graceful) | go | реализован (rules + design/review) |
+| `GOTEST-*` | go test-strategy (testing + testcontainers-go) | go | реализован (rules + design/review) |
 | `FE-CMP-*` | frontend components (React+TS) | frontend | каркас (эталон наполнен) |
 | `FE-ST-*` | frontend state | frontend | каркас (stub) |
 | `FE-DATA-*` | frontend data-fetching | frontend | каркас (stub) |
@@ -63,8 +68,8 @@ Scope:
 | Kind | Concern'ы |
 |---|---|
 | **NEUTRAL** (полный нейтральный shared-индекс) | usecase-pattern, ddd-tactical, cqrs, distributed-patterns, rest-api, error-handling, validation, pg-* (типы/именование/индексы/миграции/runtime), arch |
-| **IMPL-SHAPED** (тонкие принципы в shared, механизм/тюнинг в биндинге) | resilience, kafka, caching, observability, graceful-shutdown, hexagonal, auth-patterns, security |
-| **LANG-SPECIFIC** (нет shared-слоя) | `backend/java/`: jooq, java-style, spring-bootstrap, test-strategy · `backend/python/`: sqlalchemy, python-style, python-bootstrap, python-test-strategy |
+| **IMPL-SHAPED** (тонкие принципы в shared, механизм/тюнинг в биндинге) | resilience, kafka, caching, observability, graceful-shutdown, hexagonal, auth-patterns, security, scheduler, payment-integration, streaming |
+| **LANG-SPECIFIC** (нет shared-слоя) | `backend/java/`: jooq, java-style, spring-bootstrap, test-strategy · `backend/python/`: sqlalchemy, python-style, python-bootstrap, python-test-strategy, codegen, async |
 
 ## Ось специализации (track)
 

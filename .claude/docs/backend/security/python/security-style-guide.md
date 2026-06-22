@@ -27,6 +27,35 @@ hardcoded passwords, weak crypto, `eval`/`exec`, небезопасная дес
 
 `R-SEC-SAST-X1` — `# nosec` без кода и justification (≥30 символов).
 
+```toml
+# pyproject.toml — конфиг bandit в репо (R-SEC-3: suppressions файлом, не разрозненными # nosec)
+[tool.bandit]
+exclude_dirs = ["tests", ".venv"]
+# Каждый skip — с причиной и сроком (R-SEC-SAST-4); ничего «на всякий случай»:
+skips = [
+    "B101",  # assert_used — отключаем в тестах; justify: pytest-ассерты. до: 2026-12-31
+]
+
+[tool.bandit.assert_used]
+skips = ["*/test_*.py", "*/conftest.py"]
+
+# ruff подключает bandit-производный набор S (R-SEC-SAST-1):
+[tool.ruff.lint]
+select = ["E", "F", "S"]      # S = flake8-bandit: SQLi, hardcoded pwd, weak crypto, eval/exec
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]         # assert в тестах допустим
+```
+
+```bash
+bandit -r src/ -ll -f sarif -o bandit.sarif    # -ll = fail на HIGH/CRITICAL (R-SEC-SAST-3); SARIF в Security tab
+```
+
+Точечное подавление в коде — только с кодом правила, обоснованием и сроком (`R-SEC-SAST-X1`):
+
+```python
+subprocess.run(args, shell=False)  # nosec B603  # justify: args — статический список, не из ввода. до: 2026-12-31
+```
+
 ## 2. CVE в зависимостях (`R-SEC-DEP-*`)
 
 `R-SEC-DEP-1` — `pip-audit` (PyPA Advisory DB) обязателен; на merge в main + nightly + release. `R-SEC-DEP-2` —
@@ -46,6 +75,21 @@ rotate в течение часа, затем чистка истории.
 `R-SEC-SECRET-X1` — секреты в `settings`/yaml — только `${ENV_VAR}` / secret-store; локально `.env` (в `.gitignore`).
 `R-SEC-SECRET-X2` — закоммиченный `.env` (даже example) — `.env.example` без значений.
 
+PII/секреты не попадают в логи и тела ошибок (cross-ref `AUTH-16`, `R-ERR-MAP-X3`):
+
+```python
+# settings/secrets — типобезопасно, значение из env, не в git (R-SEC-SECRET-X1)
+class Settings(BaseSettings):
+    db_password: SecretStr                                  # SecretStr → repr/log = '**********'
+    model_config = SettingsConfigDict(env_prefix="APP_")
+
+# Логи: id'ы — да, PII — нет
+logger.info("order created", order_id=order.id, customer_id=order.customer_id)  # OK: ссылки
+# logger.info("order", email=req.email, card=req.card_number)   # ❌ PII/PAN в логах (AUTH-16)
+
+# В problem+json detail — фраза + traceId, не сырой str(exc)/PII (R-ERR-MAP-X3)
+```
+
 ## 4. Container/image (`R-SEC-IMG-*`)
 
 `R-SEC-IMG-1` — Trivy на все образы в CI до push. `R-SEC-IMG-2` — base image `python:3.12-slim` / distroless,
@@ -53,6 +97,33 @@ rotate в течение часа, затем чистка истории.
 readiness probe.
 
 `R-SEC-IMG-X1` — контейнер от root. `R-SEC-IMG-X2` — `:latest` base image (невоспроизводимо).
+
+```dockerfile
+# Dockerfile — multi-stage, non-root, digest-pinned, с HEALTHCHECK
+# R-SEC-IMG-2: slim + digest, не :latest (R-SEC-IMG-X2)
+FROM python:3.12-slim@sha256:<digest> AS build
+WORKDIR /app
+COPY pyproject.toml uv.lock ./                 # lock коммитится (R-SEC-DEP-4)
+RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev
+
+FROM python:3.12-slim@sha256:<digest>
+WORKDIR /app
+COPY --from=build /app/.venv /app/.venv
+COPY src/ ./src/
+ENV PATH="/app/.venv/bin:$PATH"
+
+USER 1000:1000                                 # R-SEC-IMG-3: non-root (R-SEC-IMG-X1)
+
+# R-SEC-IMG-4: HEALTHCHECK (или k8s liveness/readiness)
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else 1)"
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+```
+
+```bash
+trivy image --severity HIGH,CRITICAL --exit-code 1 <image>   # R-SEC-IMG-1: fail на HIGH/CRITICAL до push
+```
 
 ## 5. Криптография (`R-SEC-CRYPTO-*`)
 

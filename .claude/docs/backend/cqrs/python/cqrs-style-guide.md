@@ -35,6 +35,35 @@ class ConfirmOrderHandler:
         return order.id
 ```
 
+Полный command-handler: load агрегат через **репозиторий** (никакого SQL в хендлере) → доменный метод → save →
+**outbox в той же транзакции** (`R-CQRS-CMD-3`, `R-CQRS-SYNC-1`). Хендлер только оркестрирует и держит границу UoW
+(`async with ... session.begin()`); весь доступ к БД — в репозиториях:
+
+```python
+# core/order/usecases.py
+@dataclass(frozen=True)
+class ConfirmOrder:                                  # Command[OrderId] (R-CQRS-CMD-1: frozen dataclass)
+    order_id: OrderId
+
+# core/order/handlers.py — оркестрация; SQLAlchemy сюда не импортируется (R-CQRS-CMD-X1)
+class ConfirmOrderHandler:
+    def __init__(self, session_factory, orders: OrderRepository,    # порты-Protocol; реализация в adapters/out
+                 outbox: OutboxRepository, clock: Clock) -> None:
+        self._session_factory = session_factory
+        self._orders = orders
+        self._outbox = outbox
+        self._clock = clock
+
+    async def handle(self, cmd: ConfirmOrder) -> OrderId:           # R-HND-3: граница TX — здесь
+        async with self._session_factory() as session, session.begin():   # один UoW, read-write
+            order = await self._orders.by_id(session, cmd.order_id)       # load-aggregate = одно действие (R-CQRS-CMD-X1)
+            order.confirm(self._clock.now())                              # доменный метод; инвариант — в агрегате
+            await self._orders.save(session, order)
+            for event in order.pull_events():                            # R-CQRS-RM-3: обновление read-model — через события
+                self._outbox.add(session, event)                        # outbox в той же TX (R-CQRS-SYNC-1, R-CQRS-SYNC-X1)
+        return order.id                                                  # R-CQRS-CMD-4: минимум (id), не read-DTO
+```
+
 `R-CQRS-CMD-X1` — SELECT «для чтения и потом обновления» в command (read идёт через query; load-aggregate —
 одно действие, не отдельный read). `R-CQRS-CMD-X2` — возврат полного read-DTO из command (контроллер сам
 дёрнет query). `R-CQRS-CMD-X3` — несколько агрегатов в одном UoW без саги.
@@ -49,6 +78,54 @@ class ConfirmOrderHandler:
 целиком основным `<X>Repository` (с eager-load/`FOR UPDATE`) и мапит в read-DTO — используй/создай
 `<X>ViewRepository` (`R-SQLA-QRY-5`). `R-CQRS-QRY-X3` — возвращает агрегат/Entity наружу (потребитель вызовет
 доменный метод на read-объекте).
+
+Query-side читает через `<X>ViewRepository` (отдельный порт), а не основной агрегат-репозиторий. ViewRepository
+делает узкий `SELECT` нужных колонок и собирает **read-DTO (Pydantic `model_validate`)** — не агрегат
+(`R-CQRS-QRY-2`, `R-CQRS-QRY-3`). Сессия read-only: без `session.begin()`, без commit:
+
+```python
+# core/order/view.py — read-DTO под нужды UI/API, не агрегат (R-CQRS-QRY-3)
+class OrderSummaryView(BaseModel):
+    order_id: UUID
+    status: str
+    customer_name: str                  # денормализовано: без join к customer (R-CQRS-RM-2)
+    total_amount: Decimal               # деньги — Decimal; pre-computed
+    item_count: int                     # не list[OrderItem] — число
+    created_at: datetime                # aware datetime
+
+# core/order/port/order_view_repository.py
+class OrderViewRepository(Protocol):
+    async def summary_by_id(self, session: AsyncSession, order_id: UUID) -> OrderSummaryView | None: ...
+
+# adapters/out/persistence/order_view_repository.py — SQL живёт ТОЛЬКО здесь (R-CQRS-QRY-X2)
+class SqlAlchemyOrderViewRepository:
+    async def summary_by_id(self, session, order_id):
+        row = (await session.execute(
+            select(                                       # узкий select из read-таблицы/проекции, не агрегат целиком
+                OrderSummaryModel.order_id, OrderSummaryModel.status,
+                OrderSummaryModel.customer_name, OrderSummaryModel.total_amount,
+                OrderSummaryModel.item_count, OrderSummaryModel.created_at,
+            ).where(OrderSummaryModel.order_id == order_id)
+        )).mappings().one_or_none()
+        return OrderSummaryView.model_validate(row) if row else None    # read-DTO, не ORM/агрегат (R-CQRS-QRY-X3)
+
+# core/order/handlers.py — query-handler: read-only сессия, без begin/commit (R-CQRS-QRY-2)
+@dataclass(frozen=True)
+class GetOrderSummary:                                  # Query[OrderSummaryView]
+    order_id: UUID
+
+class GetOrderSummaryHandler:
+    def __init__(self, session_factory, views: OrderViewRepository) -> None:
+        self._session_factory = session_factory
+        self._views = views
+
+    async def handle(self, q: GetOrderSummary) -> OrderSummaryView:
+        async with self._session_factory() as session:                 # read-only: НЕТ session.begin() (R-CQRS-QRY-X1)
+            view = await self._views.summary_by_id(session, q.order_id)
+            if view is None:
+                raise NotFoundError(f"order {q.order_id} not found")
+            return view                                                 # доменные методы не зовём (R-CQRS-QRY-4)
+```
 
 ## 4. Read-model (`R-CQRS-RM-*`)
 
@@ -71,6 +148,29 @@ write-side для того же клиента / version-токен).
 `R-CQRS-SYNC-X1` — синхронный INSERT в read-таблицу внутри command-UoW (теряется decoupling, откатывается с TX) —
 через outbox. `R-CQRS-SYNC-X2` — sync через PG-триггеры (магия, ломается на bulk, не cross-DB). `R-CQRS-SYNC-X3` —
 schema-coupled events (payload = ORM-модель write-схемы; ALTER ломает consumer'ов, `R-KFK-EVT-X4`).
+
+Read-side consumer обновляет read-model **идемпотентно**: дедуп по `event_id` через `processed_event` в той же TX,
+что и UPSERT проекции (`R-CQRS-SYNC-2`, cross-ref `R-KFK-IDEM-3`). Доступ к read-таблице — через `ViewRepository`;
+consumer лишь оркестрирует и держит границу UoW:
+
+```python
+# adapters/in/messaging/order_summary_consumer.py — read-side; обновляет read-model по событию (R-CQRS-RM-3)
+class OrderSummaryProjector:
+    def __init__(self, session_factory, processed: ProcessedEventRepository,
+                 summaries: OrderSummaryWriteRepository) -> None:
+        self._session_factory = session_factory
+        self._processed = processed       # дедуп-репозиторий
+        self._summaries = summaries       # write-сторона read-модели (UPSERT проекции)
+
+    async def on_order_confirmed(self, event: OrderConfirmedSchema) -> None:
+        async with self._session_factory() as session, session.begin():    # одна TX (R-CQRS-SYNC-2)
+            if await self._processed.exists(session, event.event_id):
+                return                                                      # дубль → skip (идемпотентность)
+            await self._summaries.upsert(                                   # денормализованный UPSERT, без бизнес-логики (R-CQRS-RM-X1)
+                session, order_id=event.order_id, status="CONFIRMED",
+                total_amount=event.total_amount)                           # Decimal; read-model восстановима из write (R-CQRS-RM-4)
+            await self._processed.mark(session, event.event_id, consumer_group="order-summary-projector")
+```
 
 ## 6. Уровень и эволюция (`R-CQRS-TIER-*`)
 

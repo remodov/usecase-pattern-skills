@@ -54,7 +54,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        version = "0.1.0-SNAPSHOT"
        repositories {
            mavenCentral()
-           maven("https://...") // если внутренний Maven-реестр
+           maven("https://your-internal-registry.example.com/maven/...") // если внутренний репозиторий
        }
    }
 
