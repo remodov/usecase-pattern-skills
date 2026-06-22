@@ -89,7 +89,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    **`persistence/build.gradle.kts`:**
    ```kotlin
    plugins {
-       id("ru.mttech.jooq.jooq-postgresql-generator-plugin")
+       id("org.jooq.jooq-codegen-gradle") // или ваш jooq-codegen-плагин
    }
    dependencies {
        implementation(project(":core"))
