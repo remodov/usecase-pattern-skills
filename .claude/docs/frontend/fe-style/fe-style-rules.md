@@ -1,28 +1,57 @@
-# Frontend code style (eslint / prettier / tsconfig strict)
+# Code Style — индекс правил (React + TS, ESLint + Prettier + tsconfig)
 
-> **Что это.** Concern `fe-style` трека `frontend` (стек React+TS). Single-stack → плоская форма: коды + интент +
-> примеры внутри. Коды: `FE-STYLE-<N>` — обязательно, `FE-STYLE-X<N>` — антипаттерн. Карта трека — `frontend/_index.md`.
+> **Что это.** Concern `fe-style` трека `frontend` (стек React+TS). **LANG-SPECIFIC** (нет shared-слоя —
+> биндинг и есть реализация, langspecific-аналог python-style). Single-stack → плоская форма: коды + интент +
+> примеры внутри (отдельного style-guide нет). Коды: `FE-STYLE-<N>` — обязательно, `FE-STYLE-X<N>` — антипаттерн.
+> Карта трека — `frontend/_index.md`.
 >
-> **Статус: STUB (каркас).** Направление ниже задано, наполняет **FE-лид** по `_meta/authoring-contract.md` §8.
-> После наполнения — создать пару `ucp-fe-style-{design,review}` (track: frontend) и
-> прогнать `ucp-meta-review`. Зарегистрировать `FE-STYLE-*` в `_meta/rule-code-registry.md`.
+> **Реализация под проект:** ESLint с общим пресетом проекта (база airbnb-typescript),
+> плагины `eslint-plugin-simple-import-sort`, `jsx-a11y`, `react-hooks`, `unicorn` + интеграция с Prettier;
+> `stylelint` для CSS; TypeScript strict (`tsconfig`: `noImplicitAny`, `strictNullChecks`, цель — отсутствие
+> `any`). Команды: `yarn lint` (`lint:css` + `lint:scripts`), `yarn format`. Связанные: `fe-component`, `fe-state`
+> (общий код-стиль трека — те же правила линта/типов применяются к компонентам и стору).
 
-**Интент (что покрывает):** eslint+prettier обязательны в CI; `tsconfig` strict (no implicit any, strictNullChecks); запрет `any`; именование; нет inline-комментариев (cross-ref feedback-no-code-comments).
-
-## 1. Линт/формат в CI
+## 1. Линтер и форматтер — источник правды
 **MUST:**
-- **FE-STYLE-10.** [TODO: FE-лид] …
-**MUST NOT:**
-- **FE-STYLE-X1.** [TODO: FE-лид] …
+- **FE-STYLE-1.** Код проходит `yarn lint` (`lint:scripts` + `lint:css`) **без ошибок** и `yarn format` (Prettier) **без правок** — линтер и форматтер задают единый стиль, ручные споры о форматировании не ведутся.
+- **FE-STYLE-2.** Форматирование — за Prettier: не подгоняй отступы/переносы/кавычки руками вразрез с его выводом; конфиг один на репозиторий, локальных переопределений «под себя» нет.
+- **FE-STYLE-3.** Запускай `yarn lint` (и при правках стилей — `lint:css`/stylelint) **до коммита**; красный линт не коммитится.
 
-## 2. tsconfig strict
-**MUST:**
-- **FE-STYLE-20.** [TODO: FE-лид] …
 **MUST NOT:**
-- **FE-STYLE-X2.** [TODO: FE-лид] …
+- **FE-STYLE-X1.** Ручное форматирование вразрез с Prettier (выравнивание пробелами, «красивые» переносы), которое следующий `yarn format` всё равно перепишет — шум в diff.
 
-## 3. Именование и запреты
+## 2. Типобезопасность (strict, без `any`)
 **MUST:**
-- **FE-STYLE-30.** [TODO: FE-лид] …
+- **FE-STYLE-4.** `tsconfig` остаётся strict (`noImplicitAny`, `strictNullChecks`); код собирается без ослабления этих флагов под конкретный файл.
+- **FE-STYLE-5.** Вместо `any` — точный тип: `unknown` с сужением (type guard), дженерики, доменные `type`/`interface`; внешние данные (ответ API, `JSON.parse`) типизируй и валидируй, а не приводи к `any`.
+- **FE-STYLE-6.** `@ts-ignore`/`@ts-expect-error` — только с причиной и ссылкой на тикет в комментарии рядом; предпочитай `@ts-expect-error` (он сам отвалится, когда проблема уйдёт).
+
 **MUST NOT:**
-- **FE-STYLE-X3.** [TODO: FE-лид] …
+- **FE-STYLE-X2.** `any` (или `as any`) вместо настоящего типа — теряется проверка типов, ошибки утекают в рантайм.
+- **FE-STYLE-X3.** `@ts-ignore`/`@ts-expect-error` без обоснования и тикета — немое подавление, скрывающее реальную ошибку типов.
+
+## 3. Импорты и экспорты
+**MUST:**
+- **FE-STYLE-7.** Импорты отсортированы и сгруппированы по `eslint-plugin-simple-import-sort` (порядок чинится автофиксом, не руками); порядок единообразен по всему репозиторию.
+- **FE-STYLE-8.** Никаких неиспользуемых импортов, переменных и параметров — линтер их ловит; удаляй, а не глуши.
+- **FE-STYLE-9.** Единое именование: `camelCase` для переменных/функций, `PascalCase` для компонентов и типов, `UPPER_SNAKE_CASE` для констант-литералов; имя файла компонента совпадает с именем компонента.
+
+**MUST NOT:**
+- **FE-STYLE-X4.** Неиспользуемые импорты/переменные/параметры, оставленные «на потом» — мёртвый код и ложные зависимости.
+- **FE-STYLE-X5.** Перемешанный порядок импортов (внешние вперемешку с локальными), правленный руками вразрез с `simple-import-sort`.
+
+## 4. Подавления и мусор
+**MUST:**
+- **FE-STYLE-10.** Отключение правила ESLint — только точечным `// eslint-disable-next-line <rule>` с обоснованием в комментарии рядом; не глуши правило на весь файл и не правь глобальный конфиг ради одного места.
+- **FE-STYLE-11.** Никаких `console.log`/`debugger` в коммите — отладочный вывод убирается; намеренное логирование идёт через согласованный логгер, а не «голый» `console`.
+
+**MUST NOT:**
+- **FE-STYLE-X6.** `// eslint-disable` (особенно на файл/блок) без причины рядом — правило молча выключено, нарушение прячется.
+- **FE-STYLE-X7.** `console.log`/`debugger` (и закомментированные блоки мёртвого кода), попавшие в коммит.
+
+## 5. Чеклист подключения (React + TS)
+1. `yarn lint` — зелёный, `yarn format` — без правок; запуск до коммита.
+2. `tsconfig` strict не ослаблен; нет `any` — `unknown`+сужение/дженерики/доменные типы.
+3. `@ts-ignore`/`@ts-expect-error` и `eslint-disable` — только точечно, с причиной и тикетом рядом.
+4. Импорты отсортированы `simple-import-sort`; нет неиспользуемых импортов/переменных; именование согласовано.
+5. Нет `console.log`/`debugger` и мёртвого кода в diff.

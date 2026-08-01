@@ -51,14 +51,14 @@ Scope:
 | `GOBOOT-*` | go-bootstrap (net/http+chi, config, graceful) | go | реализован (rules + design/review) |
 | `GOTEST-*` | go test-strategy (testing + testcontainers-go) | go | реализован (rules + design/review) |
 | `FE-CMP-*` | frontend components (React+TS) | frontend | каркас (эталон наполнен) |
-| `FE-ST-*` | frontend state | frontend | каркас (stub) |
-| `FE-DATA-*` | frontend data-fetching | frontend | каркас (stub) |
-| `FE-FORM-*` | frontend forms | frontend | каркас (stub) |
-| `FE-RT-*` | frontend routing | frontend | каркас (stub) |
-| `FE-STY-*` | frontend styling/design-system | frontend | каркас (stub) |
-| `FE-A11Y-*` | frontend accessibility | frontend | каркас (stub) |
-| `FE-TEST-*` | frontend test (Vitest+Testing Library) | frontend | каркас (stub) |
-| `FE-STYLE-*` | frontend code style (eslint/prettier/tsconfig) | frontend | каркас (stub) |
+| `FE-ST-*` | frontend state (Redux Toolkit) | frontend | наполнен (project-stack) + design/review |
+| `FE-DATA-*` | frontend data-fetching (Fetcher+thunks; RTK Query alt) | frontend | наполнен (project-stack) + design/review |
+| `FE-FORM-*` | frontend forms (Formik + yup) | frontend | наполнен (project-stack) + design/review |
+| `FE-RT-*` | frontend routing (react-router 6) | frontend | наполнен (project-stack) + design/review |
+| `FE-STY-*` | frontend styling/design-system (@design-system/components) | frontend | наполнен (project-stack) + design/review |
+| `FE-A11Y-*` | frontend accessibility | frontend | наполнен (project-stack) + design/review |
+| `FE-TEST-*` | frontend test (jest + Testing Library) | frontend | наполнен (project-stack) + design/review |
+| `FE-STYLE-*` | frontend code style (eslint/prettier/tsconfig) | frontend | наполнен (project-stack) + design/review |
 
 ## Классификация concern'ов (kind: NEUTRAL / IMPL-SHAPED / LANG-SPECIFIC)
 

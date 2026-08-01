@@ -4,9 +4,10 @@
 CQRS) сюда **не тянем** — у фронта свой набор concern'ов (см. `_meta/authoring-contract.md` §10). Кросс-трековое
 (spec/arch/meta) приходит из `track: any` — не дублировать.
 
-> **Статус: КАРКАС.** Раскладка, гейты и шаблон вертикали готовы и работают. **Содержимое concern'ов наполняет
-> FE-лид** — текущие `*-rules.md` это скелеты с принципами-заглушками и `[TODO]`. Эталон формы — `fe-component/`
-> (наполнен полнее) + пара скиллов `ucp-fe-component-{design,review}`.
+> **Статус: НАПОЛНЕН (project-stack).** Раскладка, гейты и шаблон вертикали готовы. Все 9 concern'ов наполнены под
+> реальный стек проекта (React 17 + TS, Redux Toolkit + thunks, Fetcher-слой, Formik+yup,
+> react-router 6, @design-system/components, jest+Testing Library) и снабжены парами скиллов
+> `ucp-fe-<concern>-{design,review}`. Эталон формы — `fe-component/` и `fe-state/`.
 
 ## Раскладка (стек один → плоско, без `<lang>/`)
 
@@ -26,14 +27,14 @@ docs/frontend/
 | Concern | Префикс | Про что | Статус |
 |---|---|---|---|
 | `fe-component` | `FE-CMP-*` | компоненты: презентационные vs контейнеры, типизация props, композиция, мемоизация | эталон (наполнен) |
-| `fe-state` | `FE-ST-*` | состояние: local vs server-state, выбор стора, не держать server-data в глобальном сторе | [TODO] |
-| `fe-data-fetching` | `FE-DATA-*` | запросы к API: react-query/SWR, кеш, loading/error, отмена; не `fetch` в компоненте | [TODO] |
-| `fe-forms` | `FE-FORM-*` | формы: react-hook-form, схемная валидация (zod), submit/ошибки | [TODO] |
-| `fe-routing` | `FE-RT-*` | роутинг, code-splitting, guard'ы по auth | [TODO] |
-| `fe-styling` | `FE-STY-*` | дизайн-система, токены, CSS-подход, отказ от inline-магии | [TODO] |
-| `fe-a11y` | `FE-A11Y-*` | семантика, ARIA, фокус, контраст, клавиатура (web.dev) | [TODO] |
-| `fe-test` | `FE-TEST-*` | Vitest + Testing Library (юзер-центрично), MSW для API-моков | [TODO] |
-| `fe-style` | `FE-STYLE-*` | eslint/prettier/tsconfig strict (langspecific-аналог `python-style`) | [TODO] |
+| `fe-state` | `FE-ST-*` | состояние: Redux Toolkit slice по домену, local vs server-state, селекторы, эффекты в thunk'ах | наполнен + скиллы |
+| `fe-data-fetching` | `FE-DATA-*` | запросы: Fetcher+thunks+request-status, эндпоинты, ошибки, типизация (RTK Query — альт.); не `fetch` в компоненте | наполнен + скиллы |
+| `fe-forms` | `FE-FORM-*` | формы: Formik + yup (схемная валидация), submit/ошибки, блокировка | наполнен + скиллы |
+| `fe-routing` | `FE-RT-*` | react-router 6: централизованный ROUTES, ролевые guard'ы, code-splitting | наполнен + скиллы |
+| `fe-styling` | `FE-STY-*` | дизайн-система @design-system/components, deep-import, токены, отказ от inline-магии | наполнен + скиллы |
+| `fe-a11y` | `FE-A11Y-*` | семантика, ARIA, фокус, контраст, клавиатура | наполнен + скиллы |
+| `fe-test` | `FE-TEST-*` | jest + Testing Library (юзер-центрично), моки на границе | наполнен + скиллы |
+| `fe-style` | `FE-STYLE-*` | eslint/prettier/tsconfig strict (общий пресет проекта; langspecific-аналог `python-style`) | наполнен + скиллы |
 
 (E2E — **отдельный трек** `track: e2e` (Playwright), не под frontend: он дёргает контракты и backend, и фронта.)
 
