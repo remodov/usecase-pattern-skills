@@ -22,8 +22,9 @@
 ```
 1. ИНПУТ — спецификация
    ucp-spec-design                              (если спеки ещё нет)
-   ucp-spec-review                              (валидация дизайна — до кода!)
-      ▸ замечания → правки → ucp-spec-review (fast) → 0 Критично
+   ucp-spec-change                              (если спека есть и меняется контракт)
+   ucp-spec-review / ucp-spec-change-review     (валидация дизайна — до кода!)
+      ▸ замечания → правки → review (fast) → 0 Критично
 
 2. ПЛАНИРОВАНИЕ
    superpowers:brainstorming                    (если требования размытые)
@@ -80,6 +81,7 @@
 
 **Симметрия design ↔ review.** Для каждого design-скилла есть парный review:
 - `ucp-spec-design` ↔ `ucp-spec-review` (дизайн спеки)
+- `ucp-spec-change` ↔ `ucp-spec-change-review` (изменение живущей спеки: причина, класс, миграция, слияние в спеку и архив)
 - `ucp-pattern-design` ↔ `ucp-pattern-review` (UseCase Pattern)
 - `ucp-ddd-tactical-design` ↔ `ucp-ddd-tactical-review` (DDD-тактические паттерны)
 - `ucp-api-design` ↔ `ucp-api-review` (REST API контракт)
@@ -269,6 +271,35 @@
 /ucp-spec-review                              # полный прогон спеки в docs/spec/
 /ucp-spec-review fast                          # только критичные правила
 /ucp-spec-review es docs/event-storming.md    # ревью ES-черновика
+```
+
+### `/ucp-spec-change` · `/ucp-spec-change-review`
+
+Спека описывает контекст **как есть сейчас**. Правка её напрямую даёт результат, но не оставляет причины — через полгода никто не помнит, почему статус меняется именно так. Пара ведёт изменение живущего сервиса отдельным артефактом: он живёт, пока изменение делается, вливается в спеку и уходит в архив. Формат — `.claude/docs/shared/spec-change-template.md`, коды ревью — `SC-*`.
+
+**Что проверяет ревью:** есть ли причина, а не пересказ решения (`SC-WHY`); полнота «было → станет» по всем затронутым разделам, не только очевидному (`SC-DIFF`); класс изменения `compatible` / `breaking` / `semantic-break` и поимённые потребители (`SC-IMP`); expand-contract и `vN+1` для событий (`SC-MIG`); задачи вертикальными срезами со ссылкой на скилл (`SC-TASK`); приёмка GWT (`SC-ACR`); готовность к слиянию (`SC-MRG`).
+
+**Использование:**
+
+```
+/ucp-spec-change Отмена заказа после отгрузки  # написать документ изменения
+/ucp-spec-change-review                        # гейт перед реализацией
+/ucp-spec-change-review merge                  # гейт перед слиянием
+/ucp-spec-change merge                         # влить в спеку и заархивировать
+```
+
+**Типичный цикл:**
+
+```
+ucp-spec-change (propose)  →  docs/spec/changes/<дата>-<slug>.md
+                                        ↓
+                            ucp-spec-change-review
+                                        ↓
+                    design-скиллы по разделу «Задачи» → реализация
+                                        ↓
+                    ucp-spec-change-review merge → ucp-spec-change merge
+                                        ↓
+                            спека обновлена, документ в changes/archive/
 ```
 
 **Типичный цикл:**

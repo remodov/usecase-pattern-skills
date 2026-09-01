@@ -31,6 +31,8 @@ Scope:
 | `AUTH-*` | auth-patterns | shared (интент) | ✅ генерализован (java + python + node + go) |
 | `PG-T/N/I/E/P/M/W/V/L/CP/IS-*` | pg-* (сам PostgreSQL) | shared | нейтрален (инструмент миграций — в style-guide) |
 | `RFF-*` | review-finding-format | meta | нейтрален |
+| `SR-*` | spec-review (LV/FMT/UL/BC/AG/AR/CM/EV/FD/DO/ACR/NFR) | shared (ревью документа) | нейтрален |
+| `SC-*` | spec-change (WHY/DIFF/IMP/MIG/TASK/ACR/SCOPE/MRG) | shared (ревью документа) | нейтрален |
 | `R-META-*` | authoring-contract (LAYOUT/FMT/LANG/CODE/SKILL/TIER) | meta | нейтрален |
 | `JS-*` | java-style | java | — |
 | `BS-*` | spring-bootstrap | java | — |
