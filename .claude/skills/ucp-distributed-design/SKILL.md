@@ -1,17 +1,17 @@
 ---
 name: ucp-distributed-design
-description: Сгенерировать распределённый паттерн Java/Spring по UCP (коды R-DIST-*) — saga (orchestration/choreography, state в БД, sagaId), idempotency (processed_event, idempotency_record), inbox, compensation-команды, eventual consistency.
+description: Сгенерировать распределённый паттерн Java/Spring по UCP (требования distributed-patterns/*) — saga (orchestration/choreography, state в БД, sagaId), idempotency (processed_event, idempotency_record), inbox, compensation-команды, eventual consistency.
 when_to_use: Триггеры — «нужна сага для X», «cross-service сценарий Y», «idempotency для money-API». При замене 2PC на saga.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Distributed Patterns — проектирование
 
-Ты генерируешь распределённый паттерн (saga, idempotency-инфра, compensation) по Distributed Patterns Style Guide.
+Ты генерируешь распределённый паттерн (saga, idempotency-инфра, compensation) по требованиям `distributed-patterns/*`.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md` (`R-DIST-*`). Опционально — `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19`).
+1. **Прочитай** `.claude/docs/backend/distributed-patterns/spec.md` (`R-DIST-*`). Опционально — `backend/kafka/spec.md` (`R-KFK-OBX-*`/`R-KFK-IDEM-*`), `backend/auth-patterns/spec.md` (`auth-patterns/money-commands-need-idempotency-key`).
 
 2. **Уточни параметры:**
    - **Тип паттерна**: saga / только idempotency-обвязка / inbox.
@@ -267,16 +267,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - OpenAPI описание eventual consistency для read-endpoint'ов.
    - **Никакого** JTA / XADataSource / ChainedTransactionManager.
 
-5. **Структура вывода:**
-   1. **Решения** — orchestration vs choreography, money/critical (двойная защита), TTL для dedup-tables.
-   2. **Дерево новых файлов** — DDL для saga_/processed_event/idempotency_record + Saga orchestrator + Recovery scheduler + Compensation handlers.
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для existing файлов** — `application.yml` (Kafka topic configs если applicable), OpenAPI YAML с Idempotency-Key header.
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew compileJava`, `liquibaseUpdate`.
-      - **TODO для пользователя:** alerts на размер DLQ; alerts на saga в state COMPENSATING > N; дашборд in-flight sagas; runbook для manual recovery failed compensation.
-      - Если orchestration: dependency on `ucp-pg-runtime-design` (для recovery scheduler с SKIP LOCKED).
-   6. **Финальный шаг:** «после генерации запусти `ucp-distributed-review` для верификации».
+5. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

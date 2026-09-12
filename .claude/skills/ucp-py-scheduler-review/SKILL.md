@@ -1,18 +1,19 @@
 ---
 name: ucp-py-scheduler-review
 lang: python
-description: Проверить фоновую обработку FastAPI-сервиса по UCP (коды R-JOB-*) — корректный выбор механизма (work queue vs periodic vs after-response), идемпотентность read-before-write, антидубли на репликах (FOR UPDATE SKIP LOCKED, beat-singleton), отсутствие in-process APScheduler без leader-election, retry+DLQ+recovery, UTC tz-aware время, pydantic-settings, метрики queue-depth/lag. Вызывается на ревью фоновых хендлеров, /internal/jobs роутеров, claim-запросов, celery-beat конфигов, Redis-консьюмеров.
+description: Ревью фоновой обработки FastAPI-сервиса по UCP (требования scheduler/*) — выбор механизма, идемпотентность, антидубли на репликах (SKIP LOCKED, beat-singleton), retry и DLQ, UTC, метрики очереди.
+when_to_use: Ревью фоновых хендлеров, /internal/jobs роутеров, claim-запросов, конфигурации beat, Redis-консьюмеров.
 allowed-tools: Read Glob Grep
 ---
 
 # Ревью фоновой обработки (Python / FastAPI, БД-as-queue + Celery-beat)
 
-Ты проверяешь фоновую работу против `backend/scheduler/scheduler-rules.md` (`R-JOB-*`) и
-`backend/scheduler/python/scheduler-style-guide.md`. Формат findings — `shared/review-finding-format.md` (`RFF-*`).
+Ты проверяешь фоновую работу против `backend/scheduler/spec.md` (`R-JOB-*`) и
+`backend/scheduler/references/python/implementation.md`. Формат findings — `shared/review-format/spec.md` (`review-format/*`).
 
 ## Процесс ревью
 
-1. **Прочитай** `.claude/docs/backend/scheduler/scheduler-rules.md` (`R-JOB-*`), `.claude/docs/backend/scheduler/python/scheduler-style-guide.md` и `.claude/docs/shared/review-finding-format.md`. Связанные: `R-DIST-IDEM-*`, `R-RES-RETRY-*`, `R-SQLA-*`, `PG-W-*`, `R-OBS-*`.
+1. **Прочитай** `.claude/docs/backend/scheduler/spec.md` (`R-JOB-*`), `.claude/docs/backend/scheduler/references/python/implementation.md` и `.claude/docs/shared/review-format/spec.md`. Связанные: `R-DIST-IDEM-*`, `R-RES-RETRY-*`, `R-SQLA-*`, `PG-W-*`, `R-OBS-*`.
 
 2. **Определи объект:** фоновые хендлеры/UseCase периодики, `/internal/jobs/*` роутеры, claim-запросы репозитория, celery-beat/CronJob конфиги, Redis reliable-queue консьюмеры.
 
@@ -26,7 +27,7 @@ allowed-tools: Read Glob Grep
 
 4. **Частые реальные дефекты** (приоритет при ревью): naive `datetime.now()` для TTL-cutoff; async-логика/async SQLAlchemy внутри sync Celery-task (вместо task→HTTP); in-process планировщик в каждой реплике; Redis `recover()` с общим processing-list (двойная обработка); самописный `os.environ`-Settings вместо `pydantic-settings`.
 
-5. **Выдай findings** по `RFF-*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-scheduler-design` для исправлений.
+5. **Выдай findings** по `review-format/*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-scheduler-design` для исправлений.
 
 ## Что не входит
 

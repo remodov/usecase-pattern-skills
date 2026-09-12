@@ -1,22 +1,22 @@
 ---
 name: ucp-hexagonal-design
-description: Сгенерировать или реструктурировать Java-сервис под Hexagonal Architecture (коды R-HEX-*) — multi-module gradle skeleton core/persistence/in-adapter/out-adapter/bootstrap, dependencies модулей, placeholder-классы, ArchUnit base test.
+description: Сгенерировать или реструктурировать Java-сервис под Hexagonal Architecture (требования hexagonal/*) — multi-module gradle skeleton core/persistence/in-adapter/out-adapter/bootstrap, dependencies модулей, placeholder-классы, ArchUnit base test.
 when_to_use: Старт сервиса Уровня 3 или upgrade 2→3. Триггеры — «hexagonal layout для нового сервиса», «реструктурируй под core/adapter».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Hexagonal — проектирование
 
-Ты генерируешь multi-module gradle-проект под Hexagonal Architecture по Hexagonal Style Guide.
+Ты генерируешь multi-module gradle-проект под Hexagonal Architecture по требованиям `hexagonal/*`.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/hexagonal/hexagonal-rules.md` (`R-HEX-*`). Опционально — `backend/usecase-pattern/usecase-pattern-rules.md` (`R-LAY-*`), `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (`BS-*`).
+1. **Прочитай** `.claude/docs/backend/hexagonal/spec.md` (`R-HEX-*`). Опционально — `backend/usecase-pattern/spec.md` (`R-LAY-*`), `backend/java/spring-bootstrap/spec.md` (`BS-*`).
 
 2. **Уточни параметры:**
    - **Service name** — `<service>` (`order-service`, `notification-service`).
-   - **Уровень зрелости** — должен быть **3** (Hexagonal — часть Уровня 3 «DDD + Hexagonal»; на Уровне 1–2 = overkill, см. `R-HEX-WHEN-X1`). Если Уровень 3 не подтверждён — отказ генерировать с suggestion остаться на Уровне 1–2.
-   - **Bounded contexts** — список (для small-сервиса часто 1 BC; для модульного монолита 2-3+). Влияет на пакетную раскладку core/<bc>/.
+   - **Уровень зрелости** — должен быть **3** (Hexagonal — часть Уровня 3 «DDD + Hexagonal»; на Уровне 1–2 = overkill, см. `hexagonal/level-three-only`). Если Уровень 3 не подтверждён — отказ генерировать с suggestion остаться на Уровне 1–2.
+   - **Bounded contexts** — список (для small-сервиса часто 1 BC; для модульного монолита 2-3+). В `core/` слоя контекстов нет — BC отражаются в документации и в persistence-адаптере (`adapter/out/postgres/<bc>/`).
    - **Inbound** — какие нужны: REST user, REST admin, Kafka consumer, scheduler, CLI?
    - **Outbound** — какие внешние системы: PG (всегда), payment (`sber`, `yandex-pay`), SMS (`twilio`), file-storage (`s3`), Kafka producer?
 
@@ -89,7 +89,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    **`persistence/build.gradle.kts`:**
    ```kotlin
    plugins {
-       id("org.jooq.jooq-codegen-gradle") // или ваш jooq-codegen-плагин
+       id("org.jooq.jooq-codegen-gradle")
    }
    dependencies {
        implementation(project(":core"))
@@ -219,10 +219,15 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        }
 
        @Test
-       void coreShouldNotDependOnSpring() {
+       void coreUsesOnlyWhitelistedSpringPackages() {
            noClasses().that().resideInAPackage("..domain..")
                .or().resideInAPackage("..usecase..")
-               .should().dependOnClassesThat().resideInAPackage("org.springframework..")
+               .should().dependOnClassesThat(resideInAPackage("org.springframework..")
+                   .and(resideOutsideOfPackages(
+                       "org.springframework.stereotype..",
+                       "org.springframework.transaction..",
+                       "org.springframework.beans.factory",
+                       "org.springframework.core.task..")))
                .check(classes);
        }
 
@@ -268,25 +273,17 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 4. **Самопроверка перед выдачей** (`R-HEX-*`):
    - Multi-module: ≥ 4 модуля (core + persistence + ≥1 in-adapter + bootstrap).
-   - `core/build.gradle.kts` — нет Spring, JOOQ, Jackson.
+   - `core/build.gradle.kts` — Spring и Jackson только `compileOnly`, JOOQ нет; конфигурация в core — через интерфейс `port/in`, не `@Value`.
    - Каждый adapter — отдельный модуль; `*-in-adapter/` per-purpose; `*-out-adapter/` per-system.
    - `bootstrap/` зависит от всего, никто от него.
    - ArchUnit-тесты в bootstrap-test или отдельный модуль.
    - Placeholder package-info для domain и port.
 
-5. **Структура вывода:**
-   1. **Решения** — уровень зрелости, список модулей (in-adapters / out-adapters), bounded contexts.
-   2. **Дерево модулей** — `tree`-style.
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Для upgrade existing-сервиса** — пошаговый migration plan с `git mv`.
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew build`, `./gradlew :bootstrap:test --tests *HexagonalArchitectureTest`.
-      - **TODO для пользователя:** заполнить domain (через `ucp-ddd-tactical-design`), создать use cases (через `ucp-pattern-design`), настроить openapi YAML для каждого in-adapter; настроить port-implementations через `ucp-integration-design` для outbound.
-   6. **Финальный шаг:** «после генерации запусти `ucp-hexagonal-review` для верификации».
+5. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 
-- Domain (Aggregate, Entity, VO, Events) внутри `core/<bc>/` — `ucp-ddd-tactical-design`.
+- Domain (Aggregate, Entity, VO, Events) внутри `core/domain/` — `ucp-ddd-tactical-design`.
 - UseCase + Handler — `ucp-pattern-design`.
 - jOOQ-имплементация в persistence/ — `ucp-jooq-design`.
 - Out-adapter implementations — `ucp-integration-design`.

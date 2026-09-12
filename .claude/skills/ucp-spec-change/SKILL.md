@@ -13,10 +13,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(git diff*) Bash(git log*) Bash(mkd
 через полгода никто не помнит, почему статус меняется именно так, и новый срез строится поверх случайности.
 
 Ты ведёшь изменение как отдельный артефакт: он живёт, пока изменение делается, вливается в спеку и уходит в
-архив. Парный гейт — `ucp-spec-change-review` (коды `SC-*`).
+архив. Парный гейт — `ucp-spec-change-review` (требования корпуса).
 
-**Прочитай формат первым делом:** `.claude/docs/shared/spec-change-template.md` — он источник правды по
-разделам, раскладке и классификации. Формат самой спеки — `.claude/docs/shared/usecase-spec-template.md`.
+**Прочитай формат первым делом:** `.claude/docs/shared/spec-change/spec.md` — он источник правды по
+разделам, раскладке и классификации. Формат самой спеки — `.claude/docs/shared/spec-format/spec.md`.
 
 ## Два режима
 

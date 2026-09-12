@@ -1,7 +1,7 @@
 ---
 lang: any
 name: ucp-pg-runtime-review
-description: Ревью PostgreSQL runtime-аспектов (коды PG-W-*, PG-V-*, PG-L-*, PG-CP-*, PG-IS-*) — WAL-нагрузка, autovacuum/bloat, блокировки и FOR UPDATE/SKIP LOCKED, длинные @Transactional, HikariCP/PgBouncer, уровни изоляции и retry на 40001.
+description: Ревью PostgreSQL runtime-аспектов (требования pg-runtime/*) — WAL-нагрузка, autovacuum/bloat, блокировки и FOR UPDATE/SKIP LOCKED, длинные @Transactional, HikariCP/PgBouncer, уровни изоляции и retry на 40001.
 when_to_use: Тормоза под нагрузкой, ревью кода с транзакциями и блокировками, тюнинг connection pool.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
@@ -12,11 +12,14 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/backend/pg-runtime/pg-runtime-rules.md`** в проекте (или из `claude-code-java`) — источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
+- **`.claude/docs/backend/pg-runtime/spec.md`** в проекте (или из `claude-code-java`) — источник правил. Кодами `PG-W-NNN` (WAL), `PG-V-NNN` (VACUUM), `PG-L-NNN` (Locks), `PG-CP-NNN` (Connection Pool), `PG-IS-NNN` (Isolation).
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` (полный текст с SQL-примерами и yaml-конфигами — `backend/pg-runtime/pg-runtime-style-guide.md`, открывай точечно по разделу). Цитируй коды правил в каждой находке.
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/pg-runtime/spec.md` (полный текст с SQL-примерами и yaml-конфигами — `backend/pg-runtime/references/implementation.md`, открывай точечно по разделу). Цитируй коды правил в каждой находке.
 
 2. **Определи режим работы.** Если пользователь дал:
    - **Java-код с `@Transactional`** — фокус на длительность транзакций (PG-W-061, PG-V-050) и блокировки.
@@ -44,67 +47,67 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ### WAL и операционная нагрузка (`PG-W-*`)
 
-- `PG-W-010` Bulk-вставки через `COPY`/`batchUpdate`, не цикл.
-- `PG-W-011` Длина транзакции — не сотни тысяч insert'ов в одной (батчи 1–10K).
-- `PG-W-012` Перед массовой загрузкой — дроп индексов.
-- `PG-W-021` Write-heavy таблицы — `fillfactor = 80–90`.
-- `PG-W-022` Не вешать индекс на колонку, обновляемую почти на каждом UPDATE и редко в WHERE.
-- `PG-W-030` JSONB не должен содержать одновременно горячие и тяжёлые поля (полный re-write при UPDATE).
-- `PG-W-040` Кеши/временные данные — `UNLOGGED`.
-- `PG-W-051` `synchronous_commit = off` для метрик/логов через `SET LOCAL`.
-- `PG-W-061` `@Transactional` НЕ оборачивает HTTP/Kafka/S3 — длинная транзакция блокирует autovacuum и WAL.
-- `PG-W-070` Replication slot lag — мониторится.
+- `pg-runtime/bulk-load-via-copy` (`pg-runtime/bulk-load-via-copy`, `W`) Bulk-вставки через `COPY`/`batchUpdate`, не цикл.
+- `pg-runtime/bulk-load-via-copy` (`pg-runtime/bulk-load-via-copy`, `W`) Длина транзакции — не сотни тысяч insert'ов в одной (батчи 1–10K).
+- `pg-runtime/bulk-load-via-copy` (`pg-runtime/bulk-load-via-copy`, `W`) Перед массовой загрузкой — дроп индексов.
+- `pg-runtime/fillfactor-for-hot-updates` (`pg-runtime/fillfactor-for-hot-updates`, `W`) Write-heavy таблицы — `fillfactor = 80–90`.
+- `pg-runtime/fillfactor-for-hot-updates` (`pg-runtime/fillfactor-for-hot-updates`, `W`) Не вешать индекс на колонку, обновляемую почти на каждом UPDATE и редко в WHERE.
+- `pg-runtime/toast-large-values-separately` (`pg-runtime/toast-large-values-separately`, `W`) JSONB не должен содержать одновременно горячие и тяжёлые поля (полный re-write при UPDATE).
+- `pg-runtime/unlogged-for-disposable-data` (`pg-runtime/unlogged-for-disposable-data`, `W`) Кеши/временные данные — `UNLOGGED`.
+- `pg-runtime/synchronous-commit-scope` (`pg-runtime/synchronous-commit-scope`, `W`) `synchronous_commit = off` для метрик/логов через `SET LOCAL`.
+- `pg-runtime/short-transactions` (`pg-runtime/short-transactions`, `W`) `@Transactional` НЕ оборачивает HTTP/Kafka/S3 — длинная транзакция блокирует autovacuum и WAL.
+- `pg-runtime/replication-slots-watched` (`pg-runtime/replication-slots-watched`, `W`) Replication slot lag — мониторится.
 
 ### VACUUM (`PG-V-*`)
 
-- `PG-V-021` На больших горячих таблицах снижен `autovacuum_vacuum_scale_factor` до 0.05.
-- `PG-V-053` Нет `autovacuum_enabled = false` без явного плана.
-- `PG-V-060` После big-миграции — `VACUUM ANALYZE` в той же миграции.
-- `PG-V-061` После `CREATE INDEX CONCURRENTLY` — `VACUUM` для visibility map.
+- `pg-runtime/autovacuum-tuning-per-table` (`pg-runtime/autovacuum-tuning-per-table`, `V`) На больших горячих таблицах снижен `autovacuum_vacuum_scale_factor` до 0.05.
+- `pg-runtime/autovacuum-tuning-per-table` (`pg-runtime/autovacuum-tuning-per-table`, `V`) Нет `autovacuum_enabled = false` без явного плана.
+- `pg-runtime/vacuum-analyze-after-bulk-change` (`pg-runtime/vacuum-analyze-after-bulk-change`, `V`) После big-миграции — `VACUUM ANALYZE` в той же миграции.
+- `pg-runtime/vacuum-analyze-after-bulk-change` (`pg-runtime/vacuum-analyze-after-bulk-change`, `V`) После `CREATE INDEX CONCURRENTLY` — `VACUUM` для visibility map.
 
 ### Блокировки (`PG-L-*`)
 
-- `PG-L-010` `SELECT FOR UPDATE` для read-modify-write по одной строке.
-- `PG-L-020` Очереди / outbox-relay — `FOR UPDATE SKIP LOCKED LIMIT N`.
-- `PG-L-041` Lock-запрос внутри `@Transactional`.
-- `PG-L-051` Optimistic для read-heavy / низкоконкурентного, pessimistic для write-heavy / денежного.
-- `PG-L-060` Singleton scheduled-job — `pg_try_advisory_xact_lock`.
-- `PG-L-071` Multi-row блокировки — в порядке возрастания `id` (предотвращает deadlock).
-- `PG-L-072` Java retry на `CannotAcquireLockException` (1–3 попытки с backoff).
-- `PG-L-080` `SET LOCAL lock_timeout` для миграций и критичных операций.
-- `PG-L-090`/`091`/`092`/`093`/`094`/`095` — антипаттерны блокировок.
+- `pg-runtime/row-lock-inside-transaction` (`pg-runtime/row-lock-inside-transaction`, `L`) `SELECT FOR UPDATE` для read-modify-write по одной строке.
+- `pg-runtime/skip-locked-for-queues` (`pg-runtime/skip-locked-for-queues`, `L`) Очереди / outbox-relay — `FOR UPDATE SKIP LOCKED LIMIT N`.
+- `pg-runtime/row-lock-inside-transaction` (`pg-runtime/row-lock-inside-transaction`, `L`) Lock-запрос внутри `@Transactional`.
+- `pg-runtime/pessimistic-versus-optimistic` (`pg-runtime/pessimistic-versus-optimistic`, `L`) Optimistic для read-heavy / низкоконкурентного, pessimistic для write-heavy / денежного.
+- `pg-runtime/advisory-lock-for-singleton` (`pg-runtime/advisory-lock-for-singleton`, `L`) Singleton scheduled-job — `pg_try_advisory_xact_lock`.
+- `pg-runtime/deadlock-prevention-by-order` (`pg-runtime/deadlock-prevention-by-order`, `L`) Multi-row блокировки — в порядке возрастания `id` (предотвращает deadlock).
+- `pg-runtime/deadlock-prevention-by-order` (`pg-runtime/deadlock-prevention-by-order`, `L`) Java retry на `CannotAcquireLockException` (1–3 попытки с backoff).
+- `pg-runtime/lock-timeout-for-critical-operations` (`pg-runtime/lock-timeout-for-critical-operations`, `L`) `SET LOCAL lock_timeout` для миграций и критичных операций.
+- `pg-runtime/row-lock-inside-transaction`/`091`/`092`/`093`/`094`/`095` — антипаттерны блокировок.
 
 ## Формат вывода
 
 ```
-[критично] PG-W-061 OrderService.processOrder @Transactional оборачивает HTTP-вызов в PaymentGateway.
+[критично] pg-runtime/short-transactions (PG-W-061) OrderService.processOrder @Transactional оборачивает HTTP-вызов в PaymentGateway.
    Файл: src/main/java/.../OrderService.java:42
    `@Transactional` метод open ~3 секунд (HTTP latency) → транзакция держит row-lock на orders + блокирует autovacuum.
    Должно быть: разделить на 2 транзакции — внутри @Transactional только запись в БД, HTTP — отдельным шагом.
 
-[критично] PG-L-021 OutboxRelay не использует SKIP LOCKED.
+[критично] pg-runtime/skip-locked-for-queues (PG-L-021) OutboxRelay не использует SKIP LOCKED.
    Файл: src/main/java/.../OutboxRelay.java:18
    При >1 инстансе сервиса будет дублирующая публикация.
    Должно быть: ctx.selectFrom(OUTBOX).where(OUTBOX.PUBLISHED_AT.isNull()).limit(50)
                    .forUpdate().skipLocked().fetch();
 
-[важно] PG-W-021 order_doc создаётся без fillfactor.
+[важно] pg-runtime/fillfactor-for-hot-updates (PG-W-021) order_doc создаётся без fillfactor.
    Эта таблица — write-heavy (UPDATE статуса при каждом изменении заказа).
    Должно быть: CREATE TABLE order_doc (...) WITH (fillfactor = 85);
 
-[критично] PG-CP-082 OrderService.processOrder @Transactional оборачивает HTTP-вызов.
+[критично] pg-runtime/short-transactions (PG-CP-082) OrderService.processOrder @Transactional оборачивает HTTP-вызов.
    File: src/main/java/.../OrderService.java:42
    Соединение из HikariCP-пула удерживается всё время HTTP-вызова (~3 сек).
    При нагрузке пул полностью занят, новые запросы ждут или таймаутят.
    Должно быть: разделить на 2 транзакции, HTTP вне @Transactional.
 
-[критично] PG-IS-083 @Transactional(isolation = SERIALIZABLE) без retry.
+[критично] pg-runtime/retry-on-serialization-failure (PG-IS-083) @Transactional(isolation = SERIALIZABLE) без retry.
    File: src/main/java/.../TransferHandler.java:18
    Под нагрузкой будут случайные 40001 (CannotSerializeTransactionException).
    Должно быть: + @Retryable(retryFor = CannotSerializeTransactionException.class,
                               maxAttempts = 3, backoff = @Backoff(delay = 50)).
 
-[важно] PG-CP-002 maximum-pool-size = 100 для одного инстанса.
+[важно] pg-runtime/pool-size-is-calculated (PG-CP-002) maximum-pool-size = 100 для одного инстанса.
    Если у вас 10 инстансов и default max_connections=100 PG, общая сумма 1000
    при дефолте PG. Снизь до 20 либо подними max_connections.
 ```
@@ -115,20 +118,20 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ### Connection pool (`PG-CP-*`)
 
-- `PG-CP-002` Размер пула 10–20 на инстанс, не сотни.
-- `PG-CP-010` `maximum-pool-size = minimum-idle`.
-- `PG-CP-014` `leak-detection-threshold` включён (60s).
-- `PG-CP-013` `max-lifetime: 30 мин` (меньше LB-таймаута).
-- `PG-CP-045` При PgBouncer + transaction mode: `prepareThreshold = 0` или PgBouncer 1.21+.
-- `PG-CP-060` Read-replica routing — отдельный DataSource через `@Transactional(readOnly = true)`.
-- `PG-CP-082` `@Transactional` НЕ вокруг HTTP/Kafka/S3.
+- `pg-runtime/pool-size-is-calculated` (`pg-runtime/pool-size-is-calculated`, `CP`) Размер пула 10–20 на инстанс, не сотни.
+- `pg-runtime/pool-settings-complete` (`pg-runtime/pool-settings-complete`, `CP`) `maximum-pool-size = minimum-idle`.
+- `pg-runtime/leak-detection-enabled` (`pg-runtime/leak-detection-enabled`, `CP`) `leak-detection-threshold` включён (60s).
+- `pg-runtime/pool-settings-complete` (`pg-runtime/pool-settings-complete`, `CP`) `max-lifetime: 30 мин` (меньше LB-таймаута).
+- `pg-runtime/pooler-transaction-mode-constraints` (`pg-runtime/pooler-transaction-mode-constraints`, `CP`) При PgBouncer + transaction mode: `prepareThreshold = 0` или PgBouncer 1.21+.
+- `pg-runtime/read-replica-separate-datasource` (`pg-runtime/read-replica-separate-datasource`, `CP`) Read-replica routing — отдельный DataSource через `@Transactional(readOnly = true)`.
+- `pg-runtime/short-transactions` (`pg-runtime/short-transactions`, `CP`) `@Transactional` НЕ вокруг HTTP/Kafka/S3.
 
 ### Isolation (`PG-IS-*`)
 
-- `PG-IS-041` Дефолтный `READ COMMITTED` не указывать явно.
-- `PG-IS-022`/`PG-IS-042` На `Isolation.REPEATABLE_READ` / `SERIALIZABLE` обязательно `@Retryable` на `CannotSerializeTransactionException`.
-- `PG-IS-033` SERIALIZABLE — только когда инвариант невозможно выразить через CHECK / FOR UPDATE.
-- `PG-IS-070` Серверный `idle_in_transaction_session_timeout = 30–60 сек`.
+- `pg-runtime/default-isolation-is-right` (`pg-runtime/default-isolation-is-right`, `IS`) Дефолтный `READ COMMITTED` не указывать явно.
+- `pg-runtime/repeatable-read-for-consistent-snapshot`/`pg-runtime/retry-on-serialization-failure` На `Isolation.REPEATABLE_READ` / `SERIALIZABLE` обязательно `@Retryable` на `CannotSerializeTransactionException`.
+- `pg-runtime/serializable-for-cross-row-invariants` (`pg-runtime/serializable-for-cross-row-invariants`, `IS`) SERIALIZABLE — только когда инвариант невозможно выразить через CHECK / FOR UPDATE.
+- `pg-runtime/idle-in-transaction-timeout` (`pg-runtime/idle-in-transaction-timeout`, `IS`) Серверный `idle_in_transaction_session_timeout = 30–60 сек`.
 
 ## Что не входит
 

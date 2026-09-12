@@ -56,9 +56,9 @@ tools: Read, Bash, Glob, Grep
 - **MapStruct** для маппинга между слоями (кроме persistence — там plain Java mapper).
 - **jOOQ** для persistence, генерируется.
 - **Bean Validation** на DTO + `@Validated` на контроллере (не if-проверки в use case).
-- **Стиль** — `.claude/docs/java-style-guide.md` (`JS-N.M`).
-- **Тесты** — `.claude/docs/test-strategy.md` (`TS-N`): синхронно, PostgreSQL + WireMock через Testcontainers, события через Outbox, время/UUID детерминированные через `@MockitoBean`.
-- **Архитектура** — `.claude/docs/hexagonal-style-guide.md`, `.claude/docs/usecase-pattern-style-guide.md`.
+- **Стиль** — `.claude/docs/backend/java/java-style/spec.md` (требования `java-style/*`).
+- **Тесты** — `.claude/docs/backend/java/test-strategy/spec.md` (требования `test-strategy/*`): синхронно, PostgreSQL + WireMock через Testcontainers, события через Outbox, время/UUID детерминированные через `@MockitoBean`.
+- **Архитектура** — `.claude/docs/backend/hexagonal/spec.md`, `.claude/docs/backend/usecase-pattern/spec.md`.
 
 При коллизии общего правила (`JS-*`) и доменного guide'а (`R-JOOQ-*`, `R-HEX-*`, `R-VLD-*`, `R-CQRS-*` и т.д.) — побеждает доменный. Если исполнитель нарушил `JS-*` ради домена и отметил это в commit-message — это ок, не флагай.
 

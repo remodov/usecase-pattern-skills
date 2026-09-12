@@ -1,6 +1,6 @@
 ---
 name: ucp-test-review
-description: Ревью интеграционных и unit-тестов Java/Spring по командной Test Strategy (коды TS-1..TS-28) — выбор слоя, синхронность, Postgres + WireMock через Testcontainers, детерминированные время/UUID, покрытие UC и BR, без Thread.sleep/@MockBean.
+description: Ревью интеграционных и unit-тестов Java/Spring по командной Test Strategy (требования test-strategy/*) — выбор слоя, синхронность, Postgres + WireMock через Testcontainers, детерминированные время/UUID, покрытие UC и BR, без Thread.sleep/@MockBean.
 when_to_use: Свеже-написанные тесты в src/test/java или онбординг существующего модуля.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 ---
@@ -11,15 +11,18 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 
 ## Зависимости
 
-- **`.claude/docs/backend/java/test-strategy/test-strategy-rules.md`** — индекс правил `TS-1`..`TS-28`. Цитируй конкретные коды (`TS-9`, `TS-19`), не префикс.
+- **`.claude/docs/backend/java/test-strategy/spec.md`** — индекс правил `test-strategy/integration-test-shape`..`test-strategy/test-layers-separated`. Цитируй конкретные коды (`test-strategy/database-preparer-per-context`, `test-strategy/no-broker-or-cache-in-integration-tests`), не префикс.
 - Парные документы:
-  - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` (`R-UC-*`, `R-HND-*`) — для понимания, что тестируется на каком слое.
-  - `.claude/docs/shared/usecase-spec-template.md` — UC- и BR-коды берутся из спеки, в тесте цитируются в `@DisplayName`.
-  - `.claude/docs/backend/java/java-style/java-rules.md` (`JS-6.1`, `JS-7.3`) — Lombok-defaults на тестовых хелперах, запрет цитат кодов правил в комментариях.
+  - `.claude/docs/backend/usecase-pattern/spec.md` (`R-UC-*`, `R-HND-*`) — для понимания, что тестируется на каком слое.
+  - `.claude/docs/shared/spec-format/spec.md` — UC- и BR-коды берутся из спеки, в тесте цитируются в `@DisplayName`.
+  - `.claude/docs/backend/java/java-style/spec.md` (`java-style/boilerplate-is-generated`, `java-style/no-rule-codes-or-history-in-code`) — Lombok-defaults на тестовых хелперах, запрет цитат кодов правил в комментариях.
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/java/test-strategy/test-strategy-rules.md` (полный текст с примерами тестов и base-классов — `backend/java/test-strategy/test-strategy.md`, открывай точечно по разделу). Цитируй конкретные коды правил (`TS-19`, `TS-7`), не префикс.
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/java/test-strategy/spec.md` (полный текст с примерами тестов и base-классов — `backend/java/test-strategy/references/implementation.md`, открывай точечно по разделу). Цитируй конкретные коды правил (`test-strategy/no-broker-or-cache-in-integration-tests`, `test-strategy/tests-are-synchronous-and-deterministic`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в `src/test/java/**`.
@@ -28,62 +31,62 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
 
 3. **Прогон по правилам.** Проверяй каждое применимое:
 
-   - **`TS-1`** — тесты синхронные, без `Thread.sleep` / `Awaitility.await` / `CountDownLatch.await(timeout)`.
-   - **`TS-2`** — нет flaky-конструкций (`Awaitility`, `await().untilAsserted`, `Thread.sleep` в тесте).
-   - **`TS-3`** — нет `@DirtiesContext` — `DatabasePreparer.clear*()` чистит БД между тестами без пересоздания контекста.
-   - **`TS-4`** — два уровня базовых классов: платформенный `<App>BaseIntegrationTest` (`@SpringBootTest`, `@Testcontainers`, `@ServiceConnection`) и доменный `<Domain>BaseIntegrationTest` (наследует + `@Autowired <Domain>DatabasePreparer`).
-   - **`TS-5`–`TS-6`** — `@TestInstance(PER_CLASS)`, `@ActiveProfiles("integration-test")`, `@Import(TestJwtConfiguration.class)`.
-   - **`TS-7`** — `@MockitoBean DateTimeService dateTimeService` и `@MockitoBean UuidGenerator uuidGenerator`. Время / UUID детерминированные через `given(...)`, не `Instant.now()` / `UUID.randomUUID()` в продакшен-коде.
-   - **`TS-8`** — Testcontainers через `@ServiceConnection` (Spring Boot 3.1+), не ручной `@DynamicPropertySource`. PostgreSQL-образ — **публичный** (`postgres:16-alpine`), не внутренний registry.
-   - **`TS-9`–`TS-11`** — `<Domain>DatabasePreparer` есть, `@Component` + `@RequiredArgsConstructor`, методы трёх групп (`clear*`, `create*`, `prepare`), порядок FK соблюдён.
-   - **`TS-12`–`TS-14`** — `<Entity>TestObjectGenerator` есть, fluent `with*(value)`, `generate()` возвращает заполненную POJO. **`withNano(0)`** обязателен на timestamp-полях.
-   - **`TS-15`–`TS-18`** — структура теста AAA, `@DisplayName` с BR-кодом из спеки, HTTP через `TestRestTemplate` (не MockMvc в интеграции), JWT через `TestHttpHeaders.withSuccessToken()` / `with<Role>Token(id)`.
-   - **`TS-19`–`TS-20`** — в `BaseIntegrationTest` **нет** Kafka / Redis. Кафка-листенеры выключены через `spring.kafka.listener.auto-startup: false` в `application-integration-test.yml` (BS-13).
-   - **`TS-21`** — `EmbeddedKafka` запрещён в основном пакете тестов. Если нужен — отдельный `@Tag("kafka-it")`.
-   - **`TS-22`** — события проверяются через таблицу `outbox` (`dsl.selectFrom(OUTBOX)`), не через консьюмер.
-   - **`TS-23`–`TS-25`** — WireMock через `@RegisterExtension static WireMockExtension`, стабы пишутся **прямо в тесте**, не в общих JSON-маппингах.
-   - **`TS-26`** — unit-тесты бизнес-логики (агрегаты / VO) — `new Aggregate(...)`, без Spring.
-   - **`TS-27`** — `@WebMvcTest` + `MockMvc` только для теста контроллера / JSON-сериализации, не для бизнес-логики.
-   - **`TS-28`** — `@Tag("e2e")` для длинных Saga / реального Kafka, отдельная группа в CI, минимум.
+   - **`test-strategy/integration-test-shape`** — тесты синхронные, без `Thread.sleep` / `Awaitility.await` / `CountDownLatch.await(timeout)`.
+   - **`test-strategy/tests-are-synchronous-and-deterministic`** — нет flaky-конструкций (`Awaitility`, `await().untilAsserted`, `Thread.sleep` в тесте).
+   - **`test-strategy/one-test-one-scenario`** — нет `@DirtiesContext` — `DatabasePreparer.clear*()` чистит БД между тестами без пересоздания контекста.
+   - **`test-strategy/base-classes-layered`** — два уровня базовых классов: платформенный `<App>BaseIntegrationTest` (`@SpringBootTest`, `@Testcontainers`, `@ServiceConnection`) и доменный `<Domain>BaseIntegrationTest` (наследует + `@Autowired <Domain>DatabasePreparer`).
+   - **`test-strategy/container-connection-is-automatic`–`test-strategy/expensive-setup-runs-once`** — `@TestInstance(PER_CLASS)`, `@ActiveProfiles("integration-test")`, `@Import(TestJwtConfiguration.class)`.
+   - **`test-strategy/tests-are-synchronous-and-deterministic`** — время предзадано по варианту источника в проекте: `fixClock(now)` + `@AfterEach resetClock()` при статическом `DateTimeUtil`, либо `@MockitoBean DateTimeService` (и `UuidGenerator`) с `given(...)` при бинах; в продакшен-коде нет `Instant.now()` / `OffsetDateTime.now()`; два источника времени в одном сервисе — находка.
+   - **`test-strategy/test-auth-single-source`** — Testcontainers через `@ServiceConnection` (Spring Boot 3.1+), не ручной `@DynamicPropertySource`. PostgreSQL-образ — **публичный** (`postgres:16-alpine`), не внутренний registry.
+   - **`test-strategy/database-preparer-per-context`–`test-strategy/database-preparer-per-context`** — `<Domain>DatabasePreparer` есть, `@Component` + `@RequiredArgsConstructor`, методы трёх групп (`clear*`, `create*`, `prepare`), порядок FK соблюдён.
+   - **`test-strategy/builders-with-defaults`–`test-strategy/builders-with-defaults`** — `<Entity>TestObjectGenerator` есть, fluent `with*(value)`, `generate()` возвращает заполненную POJO. **`withNano(0)`** обязателен на timestamp-полях.
+   - **`test-strategy/test-uses-http-client`–`test-strategy/test-auth-single-source`** — структура теста AAA, `@DisplayName` с BR-кодом из спеки, HTTP через `TestRestTemplate` (не MockMvc в интеграции), JWT через `TestHttpHeaders.withSuccessToken()` / `with<Role>Token(id)`.
+   - **`test-strategy/no-broker-or-cache-in-integration-tests`–`test-strategy/no-broker-or-cache-in-integration-tests`** — в `BaseIntegrationTest` **нет** Kafka / Redis. Кафка-листенеры выключены через `spring.kafka.listener.auto-startup: false` в `application-integration-test.yml` (BS-13).
+   - **`test-strategy/no-broker-or-cache-in-integration-tests`** — `EmbeddedKafka` запрещён в основном пакете тестов. Если нужен — отдельный `@Tag("kafka-it")`.
+   - **`test-strategy/async-effects-made-synchronous`** — события проверяются через таблицу `outbox` (`dsl.selectFrom(OUTBOX)`), не через консьюмер.
+   - **`test-strategy/external-calls-via-stub-server`–`test-strategy/external-calls-via-stub-server`** — WireMock через `@RegisterExtension static WireMockExtension`, стабы пишутся **прямо в тесте**, не в общих JSON-маппингах.
+   - **`test-strategy/test-layers-separated`** — unit-тесты бизнес-логики (агрегаты / VO) — `new Aggregate(...)`, без Spring.
+   - **`test-strategy/test-layers-separated`** — `@WebMvcTest` + `MockMvc` только для теста контроллера / JSON-сериализации, не для бизнес-логики.
+   - **`test-strategy/test-layers-separated`** — `@Tag("e2e")` для длинных Saga / реального Kafka, отдельная группа в CI, минимум.
 
 4. **При ревью кода ищи паттерны-нарушения:**
 
-   - `Thread.sleep(N)`, `Awaitility.await()`, `CountDownLatch.await(timeout)` в теле теста — `TS-1` / `TS-2`.
-   - `Instant.now()` / `UUID.randomUUID()` в продакшен-коде вместо `DateTimeService` / `UuidGenerator` — `TS-7`.
+   - `Thread.sleep(N)`, `Awaitility.await()`, `CountDownLatch.await(timeout)` в теле теста — `test-strategy/integration-test-shape` / `test-strategy/tests-are-synchronous-and-deterministic`.
+   - `Instant.now()` / `OffsetDateTime.now()` в продакшен-коде мимо источника времени сервиса — `test-strategy/tests-are-synchronous-and-deterministic`.
    - `@MockBean` / `@MockitoBean` на собственный `UseCaseHandler`, агрегат, `*Repository` — `TS-7-X1` (мокать только внешние границы).
-   - `@DirtiesContext` на классе теста — `TS-3` (используй `DatabasePreparer.clear*()`).
-   - `@DynamicPropertySource` для Postgres-URL вместо `@ServiceConnection` — `TS-8`.
-   - PostgreSQL-образ `harbor.<company>.ru/...` или другой внутренний registry в публикуемых тестах — `TS-8` (использовать `postgres:16-alpine`).
-   - `EmbeddedKafkaBroker` / `@EmbeddedKafka` в `*IntegrationTest` без `@Tag` — `TS-21`.
-   - `KafkaTemplate.send(...)` + `consumer.poll(...)` для проверки события вместо чтения из `outbox` — `TS-22`.
-   - `MockMvc` в `@SpringBootTest`-тесте (вместо `TestRestTemplate`) — `TS-15` / `TS-27` (определись со слоем).
-   - `restTemplate.exchange(URL, METHOD, new HttpEntity<>(body), Class)` без JWT-заголовка для protected-endpoint — `TS-16`.
-   - `@DisplayName` отсутствует или не цитирует BR-/UC-код, при том что спека содержит соответствующий пункт — `TS-15`.
-   - Тест без assertions (`assertThat(...)`) или с `assertTrue(result != null)` вместо `assertThat(result).isNotNull()` — стиль AssertJ (`TS-17`).
-   - `TestObjectGenerator` с timestamp без `withNano(0)` — `TS-14`.
-   - `@BeforeEach` с прямым `dsl.deleteFrom(...)` вместо `databasePreparer.clearAll()` — `TS-9`.
-   - Цитаты кодов правил в комментариях тестов (`// TS-9`, `// AC-C5`) — `JS-7.3` (`@DisplayName` с BR-кодом — OK, это бизнес-описание; комментарий с кодом правила — нет).
-   - Поля состояния в классе теста, меняющиеся между тестами без cleanup — `TS-17` (тест зависит от порядка выполнения).
-   - `harbor.<company>.ru/postgres:...` в коммитимых тестах — `TS-8` (используй публичный образ).
+   - `@DirtiesContext` на классе теста — `test-strategy/one-test-one-scenario` (используй `DatabasePreparer.clear*()`).
+   - `@DynamicPropertySource` для Postgres-URL вместо `@ServiceConnection` — `test-strategy/test-auth-single-source`.
+   - PostgreSQL-образ `harbor.<company>.ru/...` или другой внутренний registry в публикуемых тестах — `test-strategy/test-auth-single-source` (использовать `postgres:16-alpine`).
+   - `EmbeddedKafkaBroker` / `@EmbeddedKafka` в `*IntegrationTest` без `@Tag` — `test-strategy/no-broker-or-cache-in-integration-tests`.
+   - `KafkaTemplate.send(...)` + `consumer.poll(...)` для проверки события вместо чтения из `outbox` — `test-strategy/async-effects-made-synchronous`.
+   - `MockMvc` в `@SpringBootTest`-тесте (вместо `TestRestTemplate`) — `test-strategy/test-uses-http-client` / `test-strategy/test-layers-separated` (определись со слоем).
+   - `restTemplate.exchange(URL, METHOD, new HttpEntity<>(body), Class)` без JWT-заголовка для protected-endpoint — `test-strategy/test-name-states-scenario`.
+   - `@DisplayName` отсутствует или не цитирует BR-/UC-код, при том что спека содержит соответствующий пункт — `test-strategy/test-uses-http-client`.
+   - Тест без assertions (`assertThat(...)`) или с `assertTrue(result != null)` вместо `assertThat(result).isNotNull()` — стиль AssertJ (`test-strategy/test-uses-http-client`).
+   - `TestObjectGenerator` с timestamp без `withNano(0)` — `test-strategy/builders-with-defaults`.
+   - `@BeforeEach` с прямым `dsl.deleteFrom(...)` вместо `databasePreparer.clearAll()` — `test-strategy/database-preparer-per-context`.
+   - Цитаты кодов правил в комментариях тестов (`// TS-9`, `// AC-C5`) — `java-style/no-rule-codes-or-history-in-code` (`@DisplayName` с BR-кодом — OK, это бизнес-описание; комментарий с кодом правила — нет).
+   - Поля состояния в классе теста, меняющиеся между тестами без cleanup — `test-strategy/test-uses-http-client` (тест зависит от порядка выполнения).
+   - `harbor.<company>.ru/postgres:...` в коммитимых тестах — `test-strategy/test-auth-single-source` (используй публичный образ).
 
-5. **Покрытие сценариев** (`TS-15` + структура спеки):
+5. **Покрытие сценариев** (`test-strategy/test-uses-http-client` + структура спеки):
    - На каждый use case из спеки §6 — позитивный + альтернативные потоки + ошибки.
    - На каждое бизнес-правило `BR-N` — отдельный тест, `BR-N` в `@DisplayName`.
    - На каждое доменное событие — тест чтения из `outbox`.
    - На каждый код ошибки из карточки команды — тест ProblemDetails-ответа.
 
-   Если в проекте есть `docs/spec/`, сверь список тестов с `§6 Use Cases` корневого файла и `§4 Бизнес-правила` файлов агрегатов. Пропущенные UC-/BR-коды — findings с кодом `TS-15`.
+   Если в проекте есть `docs/spec/`, сверь список тестов с `§6 Use Cases` корневого файла и `§4 Бизнес-правила` файлов агрегатов. Пропущенные UC-/BR-коды — findings с кодом `test-strategy/test-uses-http-client`.
 
 6. **При ревью базового класса (`*BaseIntegrationTest`):**
    - `@SpringBootTest(webEnvironment = RANDOM_PORT)`, `@ActiveProfiles("integration-test")`, `@Testcontainers`, `@TestInstance(PER_CLASS)` — обязательны.
    - `@ServiceConnection` на `PostgreSQLContainer` (не `@DynamicPropertySource`).
-   - `@MockitoBean DateTimeService` + `@MockitoBean UuidGenerator`.
+   - Фиксация времени по варианту проекта: `fixClock`/`resetClock` при статическом `Clock` либо `@MockitoBean DateTimeService` при бине.
    - `@Import(TestJwtConfiguration.class)`.
    - **Нет** `KafkaContainer`, `RedisContainer`, `@EmbeddedKafka`, `RedisStarter`.
    - PostgreSQL-образ публичный (`postgres:16-alpine`).
 
 7. **При ревью `DatabasePreparer`:**
-   - `@Component` + `@RequiredArgsConstructor` (`JS-6.1`).
+   - `@Component` + `@RequiredArgsConstructor` (`java-style/boilerplate-is-generated`).
    - Поля `private final DSLContext dsl;` + `private final List<Runnable> preparers = new ArrayList<>();`.
    - Методы `clear<Table>()`, `create<Entity>(<Pojo>)`, `prepare()`.
    - Не пересоздаёт схему, только `DELETE`.
@@ -95,25 +98,25 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(./gradlew*)
    - `generate()` — финальный билд.
    - `withNano(0)` обязательно на timestamp-полях.
 
-9. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`TS-19`, `TS-7`).
+9. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-format/spec.md` (`review-format/*`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`test-strategy/no-broker-or-cache-in-integration-tests`, `test-strategy/tests-are-synchronous-and-deterministic`).
 
-10. **Доменные ориентиры серьёзности** (`RFF-12`):
+10. **Доменные ориентиры серьёзности** (`review-format/severity-scale-is-shared`):
     - **Критично** — нарушения, ведущие к flaky-тестам, ложно-зелёным регрессиям или утечкам в прод:
-      - `Thread.sleep` / `Awaitility` в тесте (`TS-1`, `TS-2`) — flaky под нагрузкой CI.
+      - `Thread.sleep` / `Awaitility` в тесте (`test-strategy/integration-test-shape`, `test-strategy/tests-are-synchronous-and-deterministic`) — flaky под нагрузкой CI.
       - `@MockBean` на собственный `UseCaseHandler` / агрегат (`TS-7-X1`) — тест проверяет мок, не код.
-      - `Instant.now()` / `UUID.randomUUID()` в продакшен-коде (`TS-7`) — детерминированности нет, тесты ловят случайности.
-      - `EmbeddedKafka` в основном пакете тестов (`TS-21`) — десятки секунд на тест, тормозит CI.
-      - Pure-unit-логика, написанная как `@SpringBootTest` (`TS-26`) — раздувает время сборки на ровном месте.
-      - Внутренний Docker-registry в коммитимых тестах (`TS-8`) — публичный CI / open-source адопшен не пройдёт.
+      - `Instant.now()` / `UUID.randomUUID()` в продакшен-коде (`test-strategy/tests-are-synchronous-and-deterministic`) — детерминированности нет, тесты ловят случайности.
+      - `EmbeddedKafka` в основном пакете тестов (`test-strategy/no-broker-or-cache-in-integration-tests`) — десятки секунд на тест, тормозит CI.
+      - Pure-unit-логика, написанная как `@SpringBootTest` (`test-strategy/test-layers-separated`) — раздувает время сборки на ровном месте.
+      - Внутренний Docker-registry в коммитимых тестах (`test-strategy/test-auth-single-source`) — публичный CI / open-source адопшен не пройдёт.
     - **Предупреждение** — отклонения от конвенций:
-      - `MockMvc` в `@SpringBootTest` вместо `TestRestTemplate` (`TS-15`) — путаница слоёв.
-      - `@DirtiesContext` (`TS-3`) — медленные тесты, починить через `DatabasePreparer`.
-      - `@DynamicPropertySource` вместо `@ServiceConnection` (`TS-8`) — устаревший стиль для Spring Boot 3.1+.
-      - `withNano(0)` отсутствует (`TS-14`) — flaky сравнение с БД.
+      - `MockMvc` в `@SpringBootTest` вместо `TestRestTemplate` (`test-strategy/test-uses-http-client`) — путаница слоёв.
+      - `@DirtiesContext` (`test-strategy/one-test-one-scenario`) — медленные тесты, починить через `DatabasePreparer`.
+      - `@DynamicPropertySource` вместо `@ServiceConnection` (`test-strategy/test-auth-single-source`) — устаревший стиль для Spring Boot 3.1+.
+      - `withNano(0)` отсутствует (`test-strategy/builders-with-defaults`) — flaky сравнение с БД.
     - **Замечание** — стилистика:
-      - `@DisplayName` без BR-/UC-кода при наличии в спеке (`TS-15`).
-      - `assertTrue(x != null)` вместо `assertThat(x).isNotNull()` (`TS-17`).
-      - Цитата кода правила в комментарии теста (`JS-7.3`).
+      - `@DisplayName` без BR-/UC-кода при наличии в спеке (`test-strategy/test-uses-http-client`).
+      - `assertTrue(x != null)` вместо `assertThat(x).isNotNull()` (`test-strategy/test-uses-http-client`).
+      - Цитата кода правила в комментарии теста (`java-style/no-rule-codes-or-history-in-code`).
 
 ## Что не входит
 

@@ -1,18 +1,18 @@
 ---
 name: ucp-go-kafka-design
 lang: go
-description: Спроектировать работу с Kafka в Go-сервисе (net/http+chi) по UCP (коды R-KFK-*) — Writer RequireAll+Hash, outbox-relay FOR UPDATE SKIP LOCKED, Reader manual commit и processed_event, retry-топики+DLQ вне poll-цикла, событие-структура с конструктором.
+description: Спроектировать работу с Kafka в Go-сервисе (net/http+chi) по UCP — Writer RequireAll+Hash, outbox-relay FOR UPDATE SKIP LOCKED, Reader manual commit и processed_event, retry-топики+DLQ вне poll-цикла, событие-структура с конструктором.
 when_to_use: Триггеры — «publish событие X в Kafka», «consumer для Y», «outbox-relay на Go». При добавлении producer/consumer/outbox в Go-сервис.
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*)
 ---
 
 # Kafka — проектирование (Go / net/http + chi)
 
-Ты проектируешь работу с Kafka по **контракту** `backend/kafka/kafka-rules.md` (`R-KFK-*`) и **Go-реализации** `backend/kafka/go/kafka-style-guide.md`.
+Ты проектируешь работу с Kafka по **контракту** `backend/kafka/spec.md` (`R-KFK-*`) и **Go-реализации** `backend/kafka/references/go/implementation.md`.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Go-style-guide. Коды правил цитируй в design-обосновании, **не** в комментариях кода. Связанные: `backend/ddd-tactical/go/...` (событие как неизменяемая структура с конструктором), `backend/cqrs/...` (sync read-model через outbox), `backend/pg-runtime/...` (outbox-relay `FOR UPDATE SKIP LOCKED`), `backend/resilience/go/...` (CB для HTTP из consumer). Помни: в Go ошибки — значения; «retry» реализуется через `avast/retry-go`, CB — `sony/gobreaker`; DI — ручная конструкторная сборка.
+1. **Прочитай** требования `go-style/*`. Коды правил цитируй в design-обосновании, **не** в комментариях кода. Связанные: `backend/ddd-tactical/go/...` (событие как неизменяемая структура с конструктором), `backend/cqrs/...` (sync read-model через outbox), `backend/pg-runtime/...` (outbox-relay `FOR UPDATE SKIP LOCKED`), `backend/resilience/go/...` (CB для HTTP из consumer). Помни: в Go ошибки — значения; «retry» реализуется через `avast/retry-go`, CB — `sony/gobreaker`; DI — ручная конструкторная сборка.
 
 2. **Идентифицируй сервис.** `git diff` или путь от пользователя. Структура UCP на Go:
    - `core/<bc>/event/` — событие-структура + конструктор.
@@ -21,7 +21,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
    - `infra/kafka/` — `Writer`/`Reader` фабрики, outbox-relay, retry-relay, DLQ-relay.
    - `infra/config/` — `KafkaConfig` через `envconfig`.
 
-3. **Producer** (`R-KFK-PROD-*`): `kafka.Writer` с `RequiredAcks: kafka.RequireAll`, `Balancer: &kafka.Hash{}`, `MaxAttempts: math.MaxInt32`; ключ сообщения = aggregate id (`[]byte(aggregateID)`), JSON (`encoding/json`). Domain-события — **через outbox**, не прямой `WriteMessages` из handler (`R-KFK-PROD-4`).
+3. **Producer** (`R-KFK-PROD-*`): `kafka.Writer` с `RequiredAcks: kafka.RequireAll`, `Balancer: &kafka.Hash{}`, `MaxAttempts: math.MaxInt32`; ключ сообщения = aggregate id (`[]byte(aggregateID)`), JSON (`encoding/json`). Domain-события — **через outbox**, не прямой `WriteMessages` из handler (`kafka/publish-via-outbox`).
 
 4. **Outbox-relay** (`R-KFK-OBX-*`): запись в таблицу `outbox` в той же `pgx.Tx` (UoW-транзакции); отдельная горутина (`infra/kafka/outbox_relay.go`) читает `SELECT ... FOR UPDATE SKIP LOCKED`, batch 10–50, публикует через `kafka.Writer`, проставляет `published_at`; тик `200ms` через `time.NewTicker`. Partial-индекс `WHERE published_at IS NULL` — через `ucp-pg-schema-design`.
 
@@ -35,18 +35,18 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
 9. **Config/Security/Observability** (`R-KFK-CFG/SEC/OBS-*`): `KafkaConfig` через `envconfig` — `Brokers`, `ClientID`, `Topics.*` с тегом `required:"true"`, TLS через `kafka.Dialer`; per-service `ClientID` для ACL; PII — restricted-топик или «слабая ссылка» (только `customer_id`). Метрики через `promauto`: `kafka_messages_produced_total`, `kafka_messages_consumed_total`, `kafka_processing_errors_total`. Tracing: `traceparent` в `kafka.Header` через OTel propagator (inject на producer, extract на consumer). Alert на consumer lag + DLQ-size.
 
-10. **Самопроверка** — пройдись по чеклисту из `backend/kafka/go/kafka-style-guide.md` §«Чеклист подключения к новому сервису (Go)». DDL outbox-таблицы — через `ucp-pg-schema-design`.
+10. **Самопроверка** — пройдись по чеклисту из `backend/kafka/references/go/implementation.md` §«Чеклист подключения к новому сервису (Go)». DDL outbox-таблицы — через `ucp-pg-schema-design`.
 
 11. **Финальный шаг:** предложи «запусти `ucp-go-kafka-review` для верификации».
 
 ## Антипаттерны, которые НЕ генерировать
 
-- `RequiredAcks: kafka.RequireNone` / `kafka.RequireOne` (`R-KFK-PROD-X1/X2`); `Key: nil` в `kafka.Message` для бизнес-событий (`R-KFK-PROD-X3`); `WriteMessages` из UseCase Handler с DB-операцией (`R-KFK-PROD-X4` / `R-KFK-OBX-X1`).
-- `CommitInterval > 0` (авто-коммит) (`R-KFK-CONS-X1`); `time.Sleep` / тяжёлая блокировка >1s в poll-цикле без `ctx.Done()` (`R-KFK-CONS-X2`); HTTP из listener без CB (`R-KFK-CONS-X4`).
-- Handler без проверки `event_id` при non-idempotent side-effects (`R-KFK-IDEM-X1`); Kafka offset как dedup-ключ (`R-KFK-IDEM-X2`).
-- `time.Sleep` / retry **внутри** основной poll-горутины (`R-KFK-RTRY-X1`); проглатывание ошибки + commit (`R-KFK-RTRY-X2`); retry-топик без счётчика попыток (`R-KFK-RTRY-X3`); DLQ без мониторинга (`R-KFK-RTRY-X4`).
-- Имя-команда у события (`R-KFK-EVT-X1`); агрегат/Entity целиком в payload (`R-KFK-EVT-X2`); PII в широковещательном топике (`R-KFK-EVT-X3`); breaking change без версии (`R-KFK-EVT-X4`).
-- Динамический `reflect` по строке из payload (`R-KFK-CFG-X1`); `Brokers: []string{"localhost:9092"}` хардкодом (`R-KFK-CFG-X2`); `Dialer` без TLS в проде (`R-KFK-SEC-X1`).
+- `RequiredAcks: kafka.RequireNone` / `kafka.RequireOne` (`R-KFK-PROD-X1/X2`); `Key: nil` в `kafka.Message` для бизнес-событий (`kafka/partition-key-required`); `WriteMessages` из UseCase Handler с DB-операцией (`kafka/publish-via-outbox` / `kafka/publish-via-outbox`).
+- `CommitInterval > 0` (авто-коммит) (`kafka/manual-offset-commit`); `time.Sleep` / тяжёлая блокировка >1s в poll-цикле без `ctx.Done()` (`kafka/listener-does-not-block-poll-loop`); HTTP из listener без CB (`kafka/listener-does-not-block-poll-loop`).
+- Handler без проверки `event_id` при non-idempotent side-effects (`kafka/consumer-is-idempotent`); Kafka offset как dedup-ключ (`kafka/consumer-is-idempotent`).
+- `time.Sleep` / retry **внутри** основной poll-горутины (`kafka/retry-topics-with-limits`); проглатывание ошибки + commit (`kafka/no-swallowing-in-listener`); retry-топик без счётчика попыток (`kafka/retry-topics-with-limits`); DLQ без мониторинга (`kafka/dlq-monitored-and-manually-replayed`).
+- Имя-команда у события (`kafka/event-named-in-past-tense`); агрегат/Entity целиком в payload (`kafka/event-payload-hygiene`); PII в широковещательном топике (`kafka/event-payload-hygiene`); breaking change без версии (`kafka/event-schema-forward-compatible`).
+- Динамический `reflect` по строке из payload (`kafka/deserialization-allow-list`); `Brokers: []string{"localhost:9092"}` хардкодом (`kafka/settings-are-typed-and-external`); `Dialer` без TLS в проде (`kafka/transport-security-and-acls`).
 
 После работы скилла — обязательно `ucp-go-kafka-review`.
 

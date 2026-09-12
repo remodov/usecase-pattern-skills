@@ -1,28 +1,28 @@
 ---
 name: ucp-go-caching-review
 lang: go
-description: Ревью кеширования Go-сервиса (net/http + chi) по UCP (коды R-CACHE-*) — cache-порт как interface, go-redis/v9 + JSON, per-cache TTL из CacheConfig, namespace-ключи kebab-case, evict на write, stampede singleflight/SetNX, метрики promauto.
+description: Ревью кеширования Go-сервиса (net/http + chi) по UCP (требования caching/*) — cache-порт как interface, go-redis/v9 + JSON, per-cache TTL из CacheConfig, namespace-ключи kebab-case, evict на write, stampede singleflight/SetNX, метрики promauto.
 when_to_use: Изменения в adapters/out/cache/*.go, core/**/cache_port.go, CacheConfig, invalidation-логики в Handler'ах или событийных обработчиках.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(go vet*)
 ---
 
 # Ревью Caching (Go / net/http + chi)
 
-Ты ревьюишь Go-сервис на соответствие **общему контракту** `backend/caching/caching-rules.md` (`R-CACHE-*`)
-и **Go-реализации** `backend/caching/go/caching-style-guide.md`.
+Ты ревьюишь Go-сервис на соответствие **общему контракту** `backend/caching/spec.md` (`R-CACHE-*`)
+и **Go-реализации** `backend/caching/references/go/implementation.md`.
 Помни парадигму: в Go нет декларативного `@Cacheable` — кеш реализуется явно через cache-aside в `core/`
 (Handler читает/пишет через cache-порт-`interface`) и адаптер `adapters/out/cache/` (`redis/go-redis/v9`).
 Ошибки — **значения** (`apperr.Kind` + `errors.As`), не исключения.
 
 ## Зависимости
 
-- **`.claude/docs/backend/caching/caching-rules.md`** — общий контракт (`R-CACHE-WHERE-*`/`CFG-*`/`KEY-*`/`TTL-*`/`INV-*`/`PATTERN-*`/`STAMP-*`/`OBS-*`).
-- **`.claude/docs/backend/caching/go/caching-style-guide.md`** — Go-реализация (cache-порт, go-redis/v9, JSON, CacheConfig через envconfig, singleflight/SetNX, promauto, testcontainers-go).
-- Парные: `backend/caching/caching-rules.md` (кеш read-проекций), `backend/error-handling/go/error-handling-style-guide.md` (apperr.Kind + errors.As), `backend/observability/observability-rules.md` (hit-rate), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-5`).
+- **`.claude/docs/backend/caching/spec.md`** — общий контракт (`R-CACHE-WHERE-*`/`CFG-*`/`KEY-*`/`TTL-*`/`INV-*`/`PATTERN-*`/`STAMP-*`/`OBS-*`).
+- **`.claude/docs/backend/caching/references/go/implementation.md`** — Go-реализация (cache-порт, go-redis/v9, JSON, CacheConfig через envconfig, singleflight/SetNX, promauto, testcontainers-go).
+- Парные: `backend/caching/spec.md` (кеш read-проекций), `backend/error-handling/references/go/implementation.md` (apperr.Kind + errors.As), `backend/observability/spec.md` (hit-rate), `backend/auth-patterns/spec.md` (`auth-patterns/token-validated-by-library`).
 
 ## Инструкции
 
-1. **Прочти** общий `caching-rules.md` (коды) и Go-style-guide (идиомы). Цитируй конкретные коды (`R-CACHE-KEY-X4`, `R-CACHE-CFG-X1`), не только префикс.
+1. **Прочти** общий `caching/spec.md` и `references/go/implementation.md` (идиомы). Цитируй конкретные коды (`caching/no-sensitive-data-in-keys`, `caching/values-serialized-as-json`), не только префикс.
 
 2. **Определи объект ревью.** Файлы от пользователя либо скоп по умолчанию:
    - `core/**/cache_port.go` — интерфейс cache-порта.
@@ -36,62 +36,62 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(go vet*)
 3. **Прогон по подгруппам.**
 
    ### `R-CACHE-WHERE-*` — где кешируем
-   - Кешируются read-проекции (`*Summary`, `*View`)? Кеш агрегата целиком (`Order{Items, Payment}`) → `R-CACHE-WHERE-X2`.
-   - Write-path Handler (`CreateOrder`, `ConfirmPayment`) делает cache-read → `R-CACHE-WHERE-X1`.
-   - Money-данные (`Balance`, `CreditLimit`) без TTL и evict → `R-CACHE-WHERE-X3`.
-   - Кеш результата ABAC-проверки → `R-CACHE-WHERE-X5` (security risk при изменении ролей).
+   - Кешируются read-проекции (`*Summary`, `*View`)? Кеш агрегата целиком (`Order{Items, Payment}`) → `caching/cache-projections-not-aggregates`.
+   - Write-path Handler (`CreateOrder`, `ConfirmPayment`) делает cache-read → `caching/no-cache-on-write-path`.
+   - Money-данные (`Balance`, `CreditLimit`) без TTL и evict → `caching/money-data-needs-explicit-invalidation`.
+   - Кеш результата ABAC-проверки → `caching/no-caching-authorization-results` (security risk при изменении ролей).
 
    ### `R-CACHE-CFG-*` — конфигурация
-   - Backend — `redis/go-redis/v9`? `sync.Map` / ristretto в multi-instance проде → `R-CACHE-CFG-X2`.
-   - Сериализация — `encoding/json`? `encoding/gob` → `R-CACHE-CFG-X1` (security risk + fragility).
-   - Per-cache TTL через `CacheConfig`? Один глобальный `DEFAULT_TTL` → `R-CACHE-CFG-X3`.
-   - `nil`-имплементация кеш-порта вместо explicit `NoopCache` → `R-CACHE-CFG-X4`.
-   - Тесты — Testcontainers Redis (`testcontainers-go`)? Мок cache-порта теряет поведение TTL/eviction → замечание к `R-CACHE-CFG-5`.
+   - Backend — `redis/go-redis/v9`? `sync.Map` / ristretto в multi-instance проде → `caching/distributed-cache-in-production`.
+   - Сериализация — `encoding/json`? `encoding/gob` → `caching/values-serialized-as-json` (security risk + fragility).
+   - Per-cache TTL через `CacheConfig`? Один глобальный `DEFAULT_TTL` → `caching/explicit-ttl-per-cache`.
+   - `nil`-имплементация кеш-порта вместо explicit `NoopCache` → `caching/no-cache-without-manager`.
+   - Тесты — Testcontainers Redis (`testcontainers-go`)? Мок cache-порта теряет поведение TTL/eviction → замечание к `caching/tests-use-real-cache`.
 
    ### `R-CACHE-KEY-*` — ключи
-   - Namespace-префикс kebab-case (`"customer-profiles:" + id`) присутствует? Без префикса → `R-CACHE-KEY-X3`.
-   - Составные ключи — явный join через разделитель? `fmt.Sprintf("%v", args...)` → `R-CACHE-KEY-X1`.
-   - Указатель на struct (`fmt.Sprintf("%p", &req)`) в ключе → `R-CACHE-KEY-X2`.
-   - Email/phone/токен plain-text в ключе → `R-CACHE-KEY-X4` (хешируй через `crypto/sha256`).
+   - Namespace-префикс kebab-case (`"customer-profiles:" + id`) присутствует? Без префикса → `caching/cache-name-is-namespace`.
+   - Составные ключи — явный join через разделитель? `fmt.Sprintf("%v", args...)` → `caching/explicit-cache-key`.
+   - Указатель на struct (`fmt.Sprintf("%p", &req)`) в ключе → `caching/explicit-cache-key`.
+   - Email/phone/токен plain-text в ключе → `caching/no-sensitive-data-in-keys` (хешируй через `crypto/sha256`).
 
    ### `R-CACHE-TTL-*` — TTL
-   - Каждый именованный кеш имеет explicit TTL? `c.redis.Set(ctx, key, val, 0)` → `R-CACHE-TTL-X1` (infinite в go-redis).
-   - TTL > 24h для бизнес-данных → `R-CACHE-TTL-X2`.
-   - Money-кеш без TTL или TTL > 1м без строгой invalidation → `R-CACHE-TTL-X3`.
+   - Каждый именованный кеш имеет explicit TTL? `c.redis.Set(ctx, key, val, 0)` → `caching/explicit-ttl-per-cache` (infinite в go-redis).
+   - TTL > 24h для бизнес-данных → `caching/ttl-matches-data-nature`.
+   - Money-кеш без TTL или TTL > 1м без строгой invalidation → `caching/money-data-needs-explicit-invalidation`.
    - TTL берётся из `CacheConfig`, не хардкодится в методе?
 
    ### `R-CACHE-INV-*` — invalidation
    - На каждом write-методе того же ресурса — evict затронутых ключей? Ошибка evict-а логируется `slog.WarnContext`, не возвращается (best-effort)?
    - Write меняет несколько кешей → evict всех затронутых?
    - При доменных событиях — invalidation как side-effect обработчика?
-   - `c.redis.Del(ctx, "namespace:*")` (wildcard) или `FLUSHDB` → `R-CACHE-INV-X1`.
-   - Только TTL для money/orders → `R-CACHE-INV-X2`.
-   - Eventual consistency не задекларирована в OpenAPI → `R-CACHE-INV-X3`.
+   - `c.redis.Del(ctx, "namespace:*")` (wildcard) или `FLUSHDB` → `caching/no-routine-full-flush`.
+   - Только TTL для money/orders → `caching/ttl-is-not-consistency`.
+   - Eventual consistency не задекларирована в OpenAPI → `caching/staleness-is-declared`.
 
    ### `R-CACHE-PATTERN-*` — паттерны
-   - Один паттерн на именованный кеш? Миксуется cache-aside + write-through для одного namespace → `R-CACHE-PATTERN-X2`.
-   - Write-behind для money/critical: запись в кеш, в БД асинхронно → `R-CACHE-PATTERN-X1` (crash до flush = потеря данных).
+   - Один паттерн на именованный кеш? Миксуется cache-aside + write-through для одного namespace → `caching/cache-aside-is-default`.
+   - Write-behind для money/critical: запись в кеш, в БД асинхронно → `caching/cache-aside-is-default` (crash до flush = потеря данных).
    - refresh-ahead реализован через горутину (`time.NewTicker` на 80% TTL)?
 
    ### `R-CACHE-STAMP-*` — stampede
    - Single-instance: используется `singleflight.Group` для защиты hot-ключей?
-   - Multi-instance Redis: distributed lock через `c.redis.SetNX(ctx, lockKey, "1", 5*time.Second)`? `sync.Mutex` / `sync.Map` как защита distributed-кеша → `R-CACHE-STAMP-X2`.
-   - Hot endpoints (>100 RPS) без stampede-защиты → `R-CACHE-STAMP-X1`.
+   - Multi-instance Redis: distributed lock через `c.redis.SetNX(ctx, lockKey, "1", 5*time.Second)`? `sync.Mutex` / `sync.Map` как защита distributed-кеша → `caching/stampede-protection`.
+   - Hot endpoints (>100 RPS) без stampede-защиты → `caching/stampede-protection`.
 
    ### `R-CACHE-OBS-*` — observability
    - `cache_hits_total`, `cache_misses_total`, `cache_evictions_total` через `promauto.NewCounterVec` с label `cache`?
-   - Отсутствие этих метрик → `R-CACHE-OBS-X1`.
+   - Отсутствие этих метрик → `caching/cache-metrics-enabled`.
    - Eviction логируется на `slog.DebugContext`, не `InfoContext`?
    - Hit rate alert (< 70% для долгих кешей) задекларирован в конфиге мониторинга?
 
-4. **Cross-check:** кешируемые read-проекции → `ucp-go-cqrs-review`; cache-порт в `core/` → `ucp-go-hexagonal-review`; hit-rate метрика/алерты → `ucp-go-observability-review`; ABAC-кеш → `ucp-auth-review` (`AUTH-5`). Проверь наличие `errcheck`+`errorlint` в линтере (`.golangci.yml`).
+4. **Cross-check:** кешируемые read-проекции → `ucp-go-cqrs-review`; cache-порт в `core/` → `ucp-go-hexagonal-review`; hit-rate метрика/алерты → `ucp-go-observability-review`; ABAC-кеш → `ucp-auth-review` (`auth-patterns/token-validated-by-library`). Проверь наличие `errcheck`+`errorlint` в линтере (`.golangci.yml`).
 
-5. **Формат findings** — `.claude/docs/shared/review-finding-format.md` (`RFF-*`), Read-проверка строки обязательна, код правила в каждой находке.
+5. **Формат findings** — `.claude/docs/shared/review-format/spec.md` (`review-format/*`), Read-проверка строки обязательна, код правила в каждой находке.
 
-6. **Серьёзность** (`RFF-12`):
-   - **Критично** — `encoding/gob` сериализация (`R-CACHE-CFG-X1`), кеш ABAC-результата (`R-CACHE-WHERE-X5`), money без TTL/invalidation (`R-CACHE-WHERE-X3`/`R-CACHE-TTL-X3`), write-behind для money (`R-CACHE-PATTERN-X1`), `sync.Mutex` как distributed-lock (`R-CACHE-STAMP-X2`), sensitive plain-text в ключе (`R-CACHE-KEY-X4`).
-   - **Предупреждение** — кеш агрегата целиком (`R-CACHE-WHERE-X2`), `sync.Map` в multi-instance проде (`R-CACHE-CFG-X2`), `0` TTL / TTL > 24h (`R-CACHE-TTL-X1/X2`), `FLUSHDB`/wildcard evict без причины (`R-CACHE-INV-X1`), stampede на hot endpoint без защиты (`R-CACHE-STAMP-X1`).
-   - **Замечание** — один глобальный TTL (`R-CACHE-CFG-X3`), микс паттернов (`R-CACHE-PATTERN-X2`), отсутствие `cache_hits_total`/`cache_misses_total` (`R-CACHE-OBS-X1`), мок порта вместо Testcontainers.
+6. **Серьёзность** (`review-format/severity-scale-is-shared`):
+   - **Критично** — `encoding/gob` сериализация (`caching/values-serialized-as-json`), кеш ABAC-результата (`caching/no-caching-authorization-results`), money без TTL/invalidation (`caching/money-data-needs-explicit-invalidation`/`caching/money-data-needs-explicit-invalidation`), write-behind для money (`caching/cache-aside-is-default`), `sync.Mutex` как distributed-lock (`caching/stampede-protection`), sensitive plain-text в ключе (`caching/no-sensitive-data-in-keys`).
+   - **Предупреждение** — кеш агрегата целиком (`caching/cache-projections-not-aggregates`), `sync.Map` в multi-instance проде (`caching/distributed-cache-in-production`), `0` TTL / TTL > 24h (`R-CACHE-TTL-X1/X2`), `FLUSHDB`/wildcard evict без причины (`caching/no-routine-full-flush`), stampede на hot endpoint без защиты (`caching/stampede-protection`).
+   - **Замечание** — один глобальный TTL (`caching/explicit-ttl-per-cache`), микс паттернов (`caching/cache-aside-is-default`), отсутствие `cache_hits_total`/`cache_misses_total` (`caching/cache-metrics-enabled`), мок порта вместо Testcontainers.
 
 ## Что не входит
 

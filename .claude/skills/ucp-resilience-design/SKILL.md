@@ -1,19 +1,19 @@
 ---
 name: ucp-resilience-design
-description: Добавить Resilience4j-обвязку (Circuit Breaker, Bulkhead, Retry, HealthIndicator) к существующему Java out-adapter (коды R-RES-*) — per-system isolation, аннотации на adapter-методах, retry только при идемпотентности, task-queue вместо sleep-loop.
+description: Добавить Resilience4j-обвязку (Circuit Breaker, Bulkhead, Retry, HealthIndicator) к существующему Java out-adapter — per-system isolation, аннотации на adapter-методах, retry только при идемпотентности, task-queue вместо sleep-loop.
 when_to_use: Миграция существующего адаптера; для новых — ucp-integration-design. Триггеры — «обвяжи адаптер X через Resilience4j», «добавь Circuit Breaker к Y».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Resilience-обвязка существующего адаптера
 
-Ты добавляешь Resilience4j-аннотации, конфиг и HealthIndicator к **уже существующему** out-adapter'у, который сейчас защищается ad-hoc (только timeouts + try/catch). Цель — миграция к Resilience Style Guide шаг за шагом, не trash-rewrite.
+Ты добавляешь Resilience4j-аннотации, конфиг и HealthIndicator к **уже существующему** out-adapter'у, который сейчас защищается ad-hoc (только timeouts + try/catch). Цель — миграция к требования `resilience/*` шаг за шагом, не trash-rewrite.
 
 Для **новых** интеграций (новый внешний клиент с нуля) — используй `ucp-integration-design`.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/resilience/resilience-rules.md` (главный, правила `R-RES-*`) и `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для retry-решения).
+1. **Прочитай** `.claude/docs/backend/resilience/spec.md` (главный, правила `R-RES-*`) и `.claude/docs/backend/auth-patterns/spec.md` (`auth-patterns/money-commands-need-idempotency-key` для retry-решения).
 
 2. **Идентифицируй существующий out-adapter:**
    - `git diff` или путь от пользователя.
@@ -21,23 +21,23 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Определи имя системы (`<system>`) — slug из имени класса/пакета.
 
 3. **Проинспектируй текущее состояние адаптера** (что есть, что нужно добавить):
-   - **Имеется ли `OkHttpClient`/`RestClient` бин?** Per-system или shared? Если shared — это нарушение `R-RES-ISO-X1`, шаг 1 миграции — разделить.
+   - **Имеется ли `OkHttpClient`/`RestClient` бин?** Per-system или shared? Если shared — это нарушение `resilience/client-per-external-system`, шаг 1 миграции — разделить.
    - **Есть ли уже Resilience4j-аннотации?** Если есть — какие методы покрыты, какие пропущены?
-   - **Какие методы в adapter** — public-операции, оборачивающие generated client? Это объекты для аннотаций (`R-RES-CB-1`).
+   - **Какие методы в adapter** — public-операции, оборачивающие generated client? Это объекты для аннотаций (`resilience/breaker-on-adapter-method`).
    - **Идемпотентность каждого метода:**
      - GET-эквивалент → `@Retry` ОК.
-     - Write с `Idempotency-Key` (`AUTH-19`) → `@Retry` ОК.
-     - Write без → **только** `@CircuitBreaker` + `@Bulkhead`, без `@Retry` (`R-RES-RE-X1`).
-   - **Есть ли `Thread.sleep` в коде** (особенно в циклах)? Это нарушение `R-RES-ASYNC-X1`. Перевести в task-queue (если в адаптере) или в комментарий «TODO миграция к task-queue» (если требует доработки в core/).
+     - Write с `Idempotency-Key` (`auth-patterns/money-commands-need-idempotency-key`) → `@Retry` ОК.
+     - Write без → **только** `@CircuitBreaker` + `@Bulkhead`, без `@Retry` (`resilience/retry-only-when-safe`).
+   - **Есть ли `Thread.sleep` в коде** (особенно в циклах)? Это нарушение `resilience/no-long-synchronous-waits`. Перевести в task-queue (если в адаптере) или в комментарий «TODO миграция к task-queue» (если требует доработки в core/).
    - **Есть ли `<System>HealthIndicator`?** Если нет — добавить.
    - **Application.yml** — есть ли блок `resilience4j.*.instances.<system>`? Если нет — добавить.
    - **Money/non-money:** определить из доменного контекста (если адаптер реализует `PaymentPort`, `BillingPort` — money; `NotificationPort`, `LookupPort` — non-money). Влияет на CB threshold (30% vs 50%) и fallback strategy.
 
-4. **Произведи изменения.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Произведи изменения.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
    ### 4.1. Per-system isolation в `<X>ClientConfig.java`
    - Если бин клиента сейчас shared — раздели его на `@Bean("<system>RestClient")` или `@Bean("<system>OkHttpClient")`.
-   - Свой `Dispatcher`/`ConnectionPool` per-system (`R-RES-ISO-1`).
+   - Свой `Dispatcher`/`ConnectionPool` per-system (`resilience/client-per-external-system`).
    - `<System>ClientSettings` (`@ConfigurationProperties("client.<system>")`) — если ещё нет.
 
    ### 4.2. Аннотации в `<X>ClientAdapter.java`
@@ -57,25 +57,25 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ```
 
    Fallback-методы:
-   - **Money** → fallback ставит запрос в task-queue, возвращает `<X>Result.queued(taskId)`. Не `null`/`Money.ZERO` (`R-RES-FB-X1`).
+   - **Money** → fallback ставит запрос в task-queue, возвращает `<X>Result.queued(taskId)`. Не `null`/`Money.ZERO` (`resilience/fallback-does-not-fake-success`).
    - **Non-money read** → fallback из локального кеша или пустой результат (`<X>Result.empty()`).
-   - **Если адаптер не имеет очевидной fallback-стратегии** → fallback бросает port-specific exception, handler решит на верхнем уровне. Тогда `fallbackMethod` опускается, а `CallNotPermittedException` маппится в exception (`R-RES-CB-6`).
+   - **Если адаптер не имеет очевидной fallback-стратегии** → fallback бросает port-specific exception, handler решит на верхнем уровне. Тогда `fallbackMethod` опускается, а `CallNotPermittedException` маппится в exception (`resilience/open-breaker-maps-to-domain-error`).
 
    ### 4.3. `Thread.sleep`-loop polling (если есть, как в bus-tickets `InsuranceClientAdapter`)
 
-   Если в коде adapter обнаружен `Thread.sleep` в цикле, опрашивающем внешнюю систему (антипаттерн `R-RES-ASYNC-X1`):
+   Если в коде adapter обнаружен `Thread.sleep` в цикле, опрашивающем внешнюю систему (антипаттерн `resilience/no-long-synchronous-waits`):
 
    - **Не переписывай** прямо сейчас в task-queue (это требует доработок в `core/` — Port + UseCase + scheduler).
    - **Замени логику** на одиночный sync-вызов и **TODO-комментарий**:
      ```java
      // TODO R-RES-ASYNC-1: sync-polling блокирует worker-threads.
      //   Перевести в task-queue: создать <X>PollingTask + scheduler @Scheduled(5s).
-     //   См. backend/resilience/resilience-rules.md §11. Координирует ucp-pattern-design.
+     //   См. backend/resilience/spec.md §11. Координирует ucp-pattern-design.
      ```
    - В выводе — отдельный пункт «**Требует доработки в `core/`:** перевод polling в task-queue». Возможно отдельный PR.
 
    ### 4.4. `<System>HealthIndicator.java`
-   Если ещё нет — создать (см. шаблон в `ucp-integration-design` пункт 4.3 или Resilience Style Guide §10). С `AtomicReference<CachedHealth>` и TTL 30s.
+   Если ещё нет — создать (см. шаблон в `ucp-integration-design` пункт 4.3 или требования `resilience/*` §10). С `AtomicReference<CachedHealth>` и TTL 30s.
 
    ### 4.5. Patch `application.yml`
    Добавить блок per-system instances:
@@ -122,16 +122,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Все sleep-loop polling — заменены на одиночный вызов + TODO-комментарий.
    - В application.yml — блок `resilience4j.*.instances.<system>` присутствует.
 
-6. **Структура вывода:**
-   1. **Audit текущего состояния:** одна таблица — что есть, чего нет, какие нарушения `R-RES-*`-кодов обнаружены.
-   2. **План миграции** — какие правила покрываются этим скиллом сейчас, что требует отдельной работы (например, переход polling-loop в task-queue нужно делать вместе с `ucp-pattern-design`).
-   3. **Изменения по файлам:**
-      - Каждый изменённый файл — отдельный code block.
-      - Patch для `application.yml` — явно «add» / «replace».
-   4. **Заметки по реализации:**
-      - Команды проверки: `./gradlew compileJava`, `./gradlew test --tests *<X>ClientAdapterTest`.
-      - Если есть TODO в коде (sleep-loop) — список TODO в отчёте с приоритетами.
-      - **Финальный шаг:** «запусти `ucp-resilience-review <x>-out-adapter/`» для верификации.
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

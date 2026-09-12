@@ -1,19 +1,19 @@
 ---
 name: ucp-node-observability-design
 lang: node
-description: Спроектировать наблюдаемость NestJS-сервиса (Node) по UCP (коды R-OBS-*) — nestjs-pino JSON/DI, prom-client RED/USE, OTel-node автоинструментация + sampling, @nestjs/terminus live/ready, management-порт, AsyncLocalStorage, SLO + burn-rate alerts.
+description: Спроектировать наблюдаемость NestJS-сервиса (Node) по UCP — nestjs-pino JSON/DI, prom-client RED/USE, OTel-node автоинструментация + sampling, @nestjs/terminus live/ready, management-порт, AsyncLocalStorage, SLO + burn-rate alerts.
 when_to_use: Триггеры — «настрой логи/метрики/трейсинг», «pino», «prometheus в NestJS». При настройке observability.
 allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(npx*) Bash(jest*)
 ---
 
 # Observability — проектирование (Node / nestjs-pino + prom-client + OTel)
 
-Ты проектируешь наблюдаемость по **контракту** `backend/observability/observability-rules.md` (`R-OBS-*`) и
-**Node-реализации** `backend/observability/node/observability-style-guide.md`.
+Ты проектируешь наблюдаемость по **контракту** `backend/observability/spec.md` (`R-OBS-*`) и
+**Node-реализации** `backend/observability/references/node/implementation.md`.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Node-style-guide. Коды в обосновании, не в коде. Связанные: `backend/node/nest-bootstrap/...` (`NESTBOOT-*` health/wiring), `backend/resilience/...` (health-check внешних, `R-RES-HC-*`), `backend/auth-patterns/...` (PII-гигиена `AUTH-16`).
+1. **Прочитай** требования `node-style/*`. Коды в обосновании, не в коде. Связанные: `backend/node/nest-bootstrap/...` (`NESTBOOT-*` health/wiring), `backend/resilience/...` (health-check внешних, `R-RES-HC-*`), `backend/auth-patterns/...` (PII-гигиена `auth-patterns/no-pii-in-logs-and-events`).
 
 2. **Logging** (`R-OBS-LOG-*`): `nestjs-pino` через DI (`@InjectPinoLogger`), не `new Logger()` и не `console`. JSON в проде / `pino-pretty` локально по `NODE_ENV`. Структурные поля — merge-объект первым аргументом (`{ orderId }`, не template-literal). `{ err }` для ошибок — pino-сериализатор выводит stack. `redact` для PII (`req.headers.authorization`, `*.password`, `*.email`). Нет `console.log`.
 
@@ -29,12 +29,12 @@ allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(npx*) Bash(
 
 ## Антипаттерны, которые НЕ генерировать
 
-- PII в логах/спанах (`R-OBS-LOG-X1`/`R-OBS-TRC-X2`); `console.log`/`console.error` (`R-OBS-LOG-X2`); `logger.error(err.message)` без `{ err }` (`R-OBS-LOG-X4`); `JSON.stringify` в template-literal аргументе (`R-OBS-LOG-X3`).
-- High-cardinality labels (`R-OBS-MTR-X1`); нестандартные labels (`R-OBS-MTR-X2`); `/metrics` без сетевой защиты (`R-OBS-MTR-X4`).
-- `tracing.ts` импортирован после `NestFactory.create` (`R-OBS-TRC-X1` — модули не пропатчены); sampling 100% в проде (`R-OBS-TRC-X1`); manual span без `finally`/callback-формы — утечка span (`R-OBS-TRC-X3`); разрыв trace при offload в worker/BullMQ без передачи контекста (`R-OBS-TRC-X4`).
-- Liveness зависит от DB/Redis (`R-OBS-HC-X2`) — restart-loop; бизнес-состояние в health (`R-OBS-HC-X1`); health-probe бизнес-операцией (`R-OBS-HC-X3`).
-- Один порт business + management (`R-OBS-CFG-X2`); общий мутируемый контекст вместо per-request ALS-store (`R-OBS-CTX-X1`) — `userId` соседнего запроса в логах = compliance-инцидент; обогащение контекста вне middleware/guard/interceptor (`R-OBS-CTX-X2`); потеря контекста при offload без явной передачи (`R-OBS-CTX-X3`).
-- Alert на каждый ERROR (`R-OBS-SLO-X1`); SLO без error budget (`R-OBS-SLO-X2`); алерты без runbook (`R-OBS-SLO-X3`).
+- PII в логах/спанах (`observability/no-pii-in-logs`/`observability/manual-spans-are-closed`); `console.log`/`console.error` (`observability/no-direct-stdout-logging`); `logger.error(err.message)` без `{ err }` (`observability/parameterized-log-messages`); `JSON.stringify` в template-literal аргументе (`observability/parameterized-log-messages`).
+- High-cardinality labels (`observability/low-cardinality-labels`); нестандартные labels (`observability/standard-metric-dimensions`); `/metrics` без сетевой защиты (`observability/management-endpoints-restricted`).
+- `tracing.ts` импортирован после `NestFactory.create` (`observability/sampling-strategy` — модули не пропатчены); sampling 100% в проде (`observability/sampling-strategy`); manual span без `finally`/callback-формы — утечка span (`observability/manual-spans-are-closed`); разрыв trace при offload в worker/BullMQ без передачи контекста (`observability/context-propagated-to-async`).
+- Liveness зависит от DB/Redis (`observability/liveness-and-readiness-split`) — restart-loop; бизнес-состояние в health (`observability/health-check-is-technical`); health-probe бизнес-операцией (`observability/health-check-is-technical`).
+- Один порт business + management (`observability/separate-management-port`); общий мутируемый контекст вместо per-request ALS-store (`observability/context-set-at-edge-and-cleared`) — `userId` соседнего запроса в логах = compliance-инцидент; обогащение контекста вне middleware/guard/interceptor (`observability/context-set-at-edge-and-cleared`); потеря контекста при offload без явной передачи (`observability/context-propagated-to-async`).
+- Alert на каждый ERROR (`observability/burn-rate-alerting`); SLO без error budget (`observability/slo-with-error-budget`); алерты без runbook (`observability/alerts-have-runbooks`).
 
 После работы скилла — обязательно `ucp-node-observability-review`.
 

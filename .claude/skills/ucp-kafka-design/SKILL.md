@@ -1,17 +1,17 @@
 ---
 name: ucp-kafka-design
-description: Сгенерировать Kafka producer/consumer обвязку на Java/Spring (коды R-KFK-*) — KafkaConfig с idempotent producer и manual-ack, @KafkaListener с retry-topic/DLQ, idempotent consumer с processed_event, event-record в past tense, partition key.
+description: Сгенерировать Kafka-обвязку на Java/Spring (требования kafka/*) — idempotent producer, ack после записи, retry-топики или backoff контейнера, DLQ топиком или таблицей, dedup через processed_event, outbox.
 when_to_use: Триггеры — «настрой Kafka producer», «нужен listener для X», «outbox для Order». При новом producer/consumer/event-flow в сервисе.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Kafka — проектирование
 
-Ты генерируешь Kafka-обвязку (producer config, consumer config, listener-классы, event-records, processed_event DDL) по Kafka Style Guide. Цель — компоненты, проходящие `ucp-kafka-review` без findings.
+Ты генерируешь Kafka-обвязку (producer config, consumer config, listener-классы, event-records, processed_event DDL, при DLQ в базе — `kafka_errors` DDL и recoverer) по требованиям `kafka/*`. Цель — компоненты, проходящие `ucp-kafka-review` без findings.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/kafka/kafka-rules.md` (`R-KFK-*`). Опционально — `backend/pg-runtime/pg-runtime-rules.md` (для outbox), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для money), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-EVT-*`).
+1. **Прочитай** `.claude/docs/backend/kafka/spec.md` (`R-KFK-*`). Опционально — `backend/pg-runtime/spec.md` (для outbox), `backend/auth-patterns/spec.md` (`auth-patterns/money-commands-need-idempotency-key` для money), `backend/ddd-tactical/spec.md` (`R-EVT-*`).
 
 2. **Уточни сценарий:**
    - **Producer-only** — сервис публикует events, других сервисов потребители.
@@ -24,10 +24,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - **Topic name** — `<service>.<aggregate>.<event-name>` (`order-service.order.confirmed`) или single topic с разными eventType в payload.
    - **Partition key** — обычно aggregate id (Long → toString). Должен сохранять ordering для одного агрегата.
    - **Money / critical** — двойная защита: outbox + idempotent consumer + Idempotency-Key для downstream HTTP. Failure rate threshold ниже.
-   - **Retry strategy** — стандарт: 3-4 attempts с exponential backoff (1s, 10s, 100s, 1000s) → DLQ.
-   - **Idempotency** — нужен ли `processed_event` таблица для consumer? **Да для критичных, опционально для analytics.**
+   - **Retry strategy** — один вариант на сервис: retry-топики (`@RetryableTopic`, 3–4 попытки, 1s → 10s → 100s) либо `DefaultErrorHandler` с backoff в контейнере (3 попытки 1s → 2s → 4s, `addNotRetryableExceptions` для контрактных ошибок) → DLQ топиком или таблицей `kafka_errors`. Что уже выбрано в проекте — тому и следуй.
+   - **Idempotency** — нужен ли `processed_event` таблица для consumer? **Да для критичных, опционально для analytics.** Для потока снимков состояния с `updatedAt` — stale-guard в агрегате как задокументированное отступление, не dedup.
+   - **Справочники** — если по топику летят справочные данные, обязателен налив через API источника (`kafka/reference-data-backfilled-via-api`): retention короче жизни реплики.
 
-4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Произведи код.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
    ### 4.1. KafkaSettings (`@ConfigurationProperties`)
 
@@ -72,7 +73,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        properties:
          spring.json.trusted.packages: ru.example.events.*
      listener:
-       ack-mode: MANUAL_IMMEDIATE
+       ack-mode: MANUAL_IMMEDIATE   # либо RECORD — R-KFK-CONS-2
        missing-topics-fatal: true
 
    app.kafka:
@@ -90,7 +91,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ### 4.2. Event-record
 
    ```java
-   // core/<bc>/domain/event/OrderConfirmedEvent.java
+   // core/domain/event/OrderConfirmedEvent.java
    public record OrderConfirmedEvent(
        UUID eventId,
        String eventType,
@@ -238,41 +239,29 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   ### 4.6. Custom exceptions для retry/no-retry разделения
+   ### 4.6. Классификация retry/no-retry — по семействам, без своей иерархии
+
+   Отдельных `RetryableException`/`NonRetryableException` нет (`error-handling/retry-semantics-by-kind`): доменные `sealed`-семейства и ошибки контракта сообщения — детерминированы и не повторяются; семейства внешних систем (`*ClientException`) остаются повторяемыми — их серверный / недоступность / таймаут виды проходят backoff, клиентский вид повторится ограниченно и уйдёт в DLQ.
 
    ```java
-   // core/<bc>/exception/RetryableException.java
-   public abstract class RetryableException extends RuntimeException {
-       protected RetryableException(String msg, Throwable cause) { super(msg, cause); }
-   }
-
-   public class TransientServiceException extends RetryableException { ... }   // 5xx, IOException
-
-   public abstract class NonRetryableException extends RuntimeException {
-       protected NonRetryableException(String msg) { super(msg); }
-   }
-
-   public class ValidationException extends NonRetryableException { ... }      // 4xx, contract issues
+   // bootstrap/.../KafkaConsumerConfiguration.java
+   DefaultErrorHandler handler = new DefaultErrorHandler(recoverer, new ExponentialBackOffWithMaxRetries(3));
+   handler.addNotRetryableExceptions(
+       HubConnectionException.class,      // доменное семейство: повтор ничего не изменит
+       DeserializationException.class,    // контракт сообщения
+       IllegalArgumentException.class);
+   handler.setCommitRecovered(true);
    ```
 
 5. **Самопроверка перед выдачей** (`R-KFK-*`):
    - Producer: `enable.idempotence: true`, `acks: all`, partition key явный, нет direct send из `@Transactional` с DB.
-   - Consumer: `groupId` уникальный per-purpose, manual ack, `auto-offset-reset: earliest`, listener idempotent через `processed_event`.
-   - Outbox: для domain events — через outbox-relay, не direct send.
-   - Retry topic: `@RetryableTopic` с явным max-attempts и backoff; `@DltHandler` для DLQ.
+   - Consumer: `groupId` уникальный per-purpose, ack только после записи (`RECORD` или `MANUAL_IMMEDIATE`), `auto-offset-reset: earliest`, listener idempotent через `processed_event`; для справочников — налив через API.
+   - Outbox: для domain events — через outbox (appender в репозитории), relay — use case, `published_at` только после ack брокера.
+   - Retry: `@RetryableTopic` с явным max-attempts и `@DltHandler`, либо `DefaultErrorHandler` с ограниченным backoff, `addNotRetryableExceptions` и `setCommitRecovered(true)`; DLQ — топик или `kafka_errors` с метрикой и retention.
    - Event-design: имя в past tense, `eventId` UUID v7, версионированный `eventType`, без PII в payload.
-   - Config: `@Validated KafkaSettings`, `trusted.packages` explicit (не `*`), `missing-topics-fatal: true`.
+   - Config: `@Validated KafkaSettings`, десериализация в явный тип (`trusted.packages` explicit или `StringDeserializer` + `readValue`), `missing-topics-fatal: true`, `allow.auto.create.topics: false`, свои топики — `KafkaAdmin.NewTopics` + `topic-defaults`, имена — `#{@kafkaTopicNamesConfiguration.x}` с префиксом окружения.
 
-6. **Структура вывода:**
-   1. **Решения** — сценарий (producer/consumer/both), outbox vs direct, retry-стратегия, idempotency.
-   2. **Дерево новых файлов** — config, settings, event-records, listener, processed_event DDL.
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для существующих файлов** — `application.yml`, `bootstrap/build.gradle.kts` (`spring-kafka`).
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew compileJava`, `docker-compose up kafka`, `./gradlew test --tests *KafkaListenerTest`.
-      - **TODO для пользователя:** создать topics через `KafkaAdmin` или infra-скрипт (`order-confirmed`, `order-confirmed.retry-1m`, `order-confirmed.dlq`); настроить ACL'ы для service-account; alerts на `kafka_consumer_lag` для критичных топиков.
-      - Если outbox ещё нет — отдельно запустить `ucp-pg-runtime-design` с параметром `outbox`.
-   6. **Финальный шаг:** «после генерации запусти `ucp-kafka-review` для верификации; добавь интеграционный тест с `Testcontainers` Kafka».
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

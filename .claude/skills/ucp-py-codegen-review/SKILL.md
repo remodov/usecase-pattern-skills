@@ -1,18 +1,19 @@
 ---
 name: ucp-py-codegen-review
 lang: python
-description: Проверить contract/DB-first codegen FastAPI-сервиса по UCP (коды PYGEN-*) — схемы сгенерированы из OpenAPI (не руками), Pydantic v2 + StrEnum + snake/camelCase alias + ApiBaseModel, ORM из DBML через dbml2sql→Liquibase→sqlacodegen, Decimal для денег (не float), DateTime(timezone=True) (не naive), PG_ENUM(create_type=False), миграции Liquibase (единственный источник DDL). Вызывается на ревью schemas/*.py, models.py, openapi.yaml, schema.dbml, команд генерации, Liquibase changelog.
+description: Ревью contract/DB-first codegen FastAPI-сервиса по UCP (требования codegen/*) — схемы сгенерированы из OpenAPI, Pydantic v2 с alias, ORM из DBML через Liquibase, Decimal для денег, tz-aware время.
+when_to_use: Ревью schemas/*.py, models.py, openapi.yaml, schema.dbml, команд генерации, changelog Liquibase.
 allowed-tools: Read Glob Grep
 ---
 
 # Ревью codegen-пайплайна (Python / contract+DB-first)
 
-Ты проверяешь генерацию артефактов против `backend/python/codegen/codegen-rules.md` (`PYGEN-*`).
-Формат findings — `shared/review-finding-format.md` (`RFF-*`).
+Ты проверяешь генерацию артефактов против `backend/python/codegen/spec.md` (`PYGEN-*`).
+Формат findings — `shared/review-format/spec.md` (`review-format/*`).
 
 ## Процесс ревью
 
-1. **Прочитай** `.claude/docs/backend/python/codegen/codegen-rules.md` (`PYGEN-*`) и `.claude/docs/shared/review-finding-format.md`. Связанные: `R-API-*`, `R-SQLA-MODEL-*`, `PG-T-*`, `PG-M-*`.
+1. **Прочитай** `.claude/docs/backend/python/codegen/spec.md` (`PYGEN-*`) и `.claude/docs/shared/review-format/spec.md`. Связанные: `R-API-*`, `R-SQLA-MODEL-*`, `PG-T-*`, `PG-M-*`.
 
 2. **Определи объект:** `<pkg>/schemas/*.py`, `<pkg>/adapters/out/persistence/models.py`, `doc/openapi.yaml`, `doc/schema.dbml`, команды генерации (Makefile/justfile/scripts), Liquibase changelog.
 
@@ -23,7 +24,7 @@ allowed-tools: Read Glob Grep
 
 4. **Частые реальные дефекты** (приоритет): `Mapped[float]` для денег; `DateTime` без tz с доклейкой только на сериализации; `class X(str, Enum)` вместо `StrEnum`; пропущенный `dbml2sql`; схемы/модели, написанные руками при наличии контракта/DBML (дрейф); OpenAPI-версия и пути артефактов рассинхронены с реальными.
 
-5. **Выдай findings** по `RFF-*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-codegen-design`.
+5. **Выдай findings** по `review-format/*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-codegen-design`.
 
 ## Что не входит
 

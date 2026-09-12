@@ -1,17 +1,17 @@
 ---
 name: ucp-validation-design
-description: Сгенерировать кастомный Jakarta Validation constraint, validation group или cross-field-валидатор для Java/Spring (коды R-VLD-*) — пара @<DomainTerm> + Validator, размещение common/ vs core/<bc>/validation/, isValid(null)=true.
+description: Сгенерировать кастомный Jakarta Validation constraint, validation group или cross-field-валидатор для Java/Spring (требования validation/*) — пара @<DomainTerm> + Validator, размещение common/ vs core/validation/, isValid(null)=true.
 when_to_use: Когда стандартных Jakarta-аннотаций недостаточно. Триггеры — «нужен constraint для X», «custom validator», «cross-field валидация», «validation group».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Validation — проектирование custom constraints
 
-Ты генерируешь кастомные Jakarta Validation constraints, validation groups, cross-field-валидаторы по Validation Style Guide. Цель — корректная пара annotation + validator, которая проходит `ucp-validation-review` без findings.
+Ты генерируешь кастомные Jakarta Validation constraints, validation groups, cross-field-валидаторы по требованиям `validation/*`. Цель — корректная пара annotation + validator, которая проходит `ucp-validation-review` без findings.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/validation/validation-rules.md` — общий контракт (`R-VLD-*`) **и Java-реализацию** `.claude/docs/backend/validation/java/validation-style-guide.md` (Jakarta + OpenAPI-first — конкретика для Java-кода). Опционально `.claude/docs/backend/rest-api/rest-api-rules.md` `R-ERR-5`/`R-ERR-6` для понимания, как ошибка попадёт в violations.
+1. **Прочитай** `.claude/docs/backend/validation/spec.md` — общий контракт (`R-VLD-*`) **и Java-реализацию** `.claude/docs/backend/validation/references/java/implementation.md` (Jakarta + OpenAPI-first — конкретика для Java-кода). Опционально `.claude/docs/backend/rest-api/spec.md` `rest-api/validation-errors-list-violations`/`rest-api/validation-errors-list-violations` для понимания, как ошибка попадёт в violations.
 
 2. **Уточни тип constraint:**
    - **Field-level custom** (`@RussianPhone`, `@VatNumber`) — валидирует одно поле по нестандартному формату.
@@ -21,7 +21,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 3. **Уточни параметры:**
    - **Имя:** `@<DomainTerm>` (`@RussianPhone`, `@VatNumber`). Без префиксов `Valid`/`Check`/`Is`. На русском только если термин не имеет английского эквивалента.
-   - **Расположение:** доменно-специфичный → `core/<bc>/validation/` (часть domain-vocabulary); общий технический → `common/validation/`.
+   - **Расположение:** доменно-специфичный → `core/validation/` (часть domain-vocabulary); общий технический → `common/validation/`.
    - **Тип валидируемого значения:** `String`, `BigDecimal`, `LocalDate`, `<X>Request` для cross-field.
    - **Default message:** на русском, для пользователя. С `{value}`/`{min}`/`{max}` плейсхолдерами если параметры аннотации участвуют.
    - **Параметры аннотации:** ничего лишнего. Если для разных кейсов — разные значения, добавь `int min() default 0;` и подобные.
@@ -31,7 +31,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ### 4.1. Field-level custom constraint
 
    ```java
-   // common/validation/RussianPhone.java (либо core/<bc>/validation/)
+   // common/validation/RussianPhone.java (либо core/validation/)
    package <pkg>.common.validation;
 
    import jakarta.validation.Constraint;
@@ -82,7 +82,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ### 4.2. Validation group
 
    ```java
-   // core/<bc>/validation/OnCreate.java
+   // core/validation/OnCreate.java
    /**
     * Применяется при создании нового экземпляра ресурса.
     * Поля, помеченные groups = OnCreate.class, обязательны для POST.
@@ -166,6 +166,8 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    Если правило сводится к `@NotBlank + @Size(max=100) + @Pattern(...)` без custom-логики — **просто навешай эти аннотации на поле DTO**. Не создавай `@OrderName` annotation, который объединяет их. Composition есть в Jakarta (`@OverridesAttribute`), но он **не одобряется** этим стандартом — теряется явность правил для читателя кода.
 
+4a. **Проверь происхождение данных.** Если объект приходит из системы-владельца и сервис держит его копию (справочник по шине, наливка через API), проверки формы на него **не вешаются**: копия сохраняется как пришла, проверяются идентификатор и метка версии (`validation/replica-is-stored-as-received`). Jakarta-аннотации — для того, что сервис принимает от клиента.
+
 5. **Самопроверка перед выдачей** (`R-VLD-CC-*`, `R-VLD-XF-*`, `R-VLD-GRP-*`):
    - Annotation interface + ConstraintValidator implementation — **обязательно пара**, в одном пакете.
    - `@Target({ FIELD, PARAMETER, RECORD_COMPONENT })` для field-level (RECORD_COMPONENT нужен для record-полей в Java 16+).
@@ -175,27 +177,18 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - `default message()` на русском.
    - `isValid(null, ctx)` возвращает `true` для field-level (композируется с `@NotNull`/`@NotBlank`).
    - Имя без префиксов `Valid`/`Check`/`Is`.
-   - Расположение: доменное → `core/<bc>/validation/`; общее → `common/validation/`.
+   - Расположение: доменное → `core/validation/`; общее → `common/validation/`.
    - Validator stateless (без `@Autowired`-полей с runtime-state).
    - Для cross-field — `addPropertyNode(<field>)` чтобы ошибка прицепилась к конкретному полю в violations.
 
-6. **Структура вывода:**
-   1. **Решения** — тип constraint (field/group/cross-field), имя, расположение (`core/<bc>/validation/` или `common/validation/`), message.
-   2. **Дерево новых файлов** — путь к annotation + validator.
-   3. **Каждый файл — отдельный code block** с путём в заголовке.
-   4. **Пример использования** на DTO — отдельный code block с полем/классом, где аннотация применяется. Покажи композицию с standard-аннотациями (`@NotBlank @RussianPhone`).
-   5. **Заметки по реализации:**
-      - Команды проверки: `./gradlew compileJava`, `./gradlew test --tests *<X>ValidatorTest`.
-      - Sample unit-тест validator-а: 3 кейса (valid, invalid, null → true).
-      - **TODO:** message-bundle для i18n (`{key}` в message + `messages_ru.properties`).
-   6. **Финальный шаг:** «после генерации запусти `ucp-validation-review` для верификации; добавь использование на конкретный DTO через PR».
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 
-- Не пишет DTO. Структура входных DTO определяется OpenAPI YAML (см. `R-VLD-OAS-2`).
+- Не пишет DTO. Структура входных DTO определяется OpenAPI YAML (см. `validation/generation-carries-constraints`).
 - Не модифицирует контроллеры — добавление `@Valid` на параметре делается отдельным шагом (это часть `ucp-pattern-design` или `ucp-api-design`).
-- Не пишет `@RestControllerAdvice` для маппинга в ProblemDetails — стандартный обработчик из Spring + `R-ERR-5` уже это покрывает.
-- Не модифицирует generated DTO из openapi-generator (`R-VLD-OAS-X1`).
+- Не пишет `@RestControllerAdvice` для маппинга в ProblemDetails — стандартный обработчик из Spring + `rest-api/validation-errors-list-violations` уже это покрывает.
+- Не модифицирует generated DTO из openapi-generator (`validation/generated-artifacts-immutable`).
 - Не пишет domain invariants в Aggregate — это `ucp-ddd-tactical-design`.
 
 После — обязательно `ucp-validation-review` для верификации.

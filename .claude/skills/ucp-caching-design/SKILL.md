@@ -1,17 +1,17 @@
 ---
 name: ucp-caching-design
-description: Сгенерировать кеш-обвязку Spring Cache + Redis по Caching Style Guide (коды R-CACHE-*) — RedisCacheManager с per-cache TTL, JSON-сериализация, CacheSettings, @Cacheable/@CacheEvict, @EventListener-invalidation, паттерн cache-aside/write-through.
+description: Сгенерировать кеш-обвязку Spring Cache + Redis по требованиям `caching/*` — RedisCacheManager с per-cache TTL, JSON-сериализация, CacheSettings, @Cacheable/@CacheEvict, @EventListener-invalidation, паттерн cache-aside/write-through.
 when_to_use: Триггеры — «закешируй X», «нужен Redis-кеш для Y», «настрой CacheManager». При добавлении кеша или настройке cache-backend.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Caching — проектирование
 
-Ты генерируешь кеш-обвязку (CacheManager + CacheSettings + `@Cacheable`/`@CacheEvict`-аннотации + invalidation handlers) по Caching Style Guide. Цель — кеш, который проходит `ucp-caching-review` без findings.
+Ты генерируешь кеш-обвязку (CacheManager + CacheSettings + `@Cacheable`/`@CacheEvict`-аннотации + invalidation handlers) по требованиям `caching/*`. Цель — кеш, который проходит `ucp-caching-review` без findings.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/caching/caching-rules.md` (правила `R-CACHE-*`). Опционально — `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` для PII), `backend/validation/validation-rules.md` (`R-VLD-CFG-*` для config).
+1. **Прочитай** `.claude/docs/backend/caching/spec.md` (правила `R-CACHE-*`). Опционально — `backend/auth-patterns/spec.md` (`auth-patterns/no-pii-in-logs-and-events` для PII), `backend/validation/spec.md` (`R-VLD-CFG-*` для config).
 
 2. **Уточни параметры:**
    - **Что кешируем** — конкретный read-метод. Имя cache (slug-style: `user-profiles`, `currencies`, `feature-flags`).
@@ -36,7 +36,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    | Hot key, нельзя cache miss | refresh-ahead | `@Scheduled` каждые `TTL × 0.7` секунд |
    | Money / balance | cache-aside, **короткий** TTL | TTL ≤ 30s + `@CacheEvict` на каждом write |
 
-4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Произведи код.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
    ### 4.1. `CacheSettings` (`@ConfigurationProperties`)
 
@@ -240,23 +240,15 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - `@EnableCaching` + явный CacheManager-bean (не silent NoOp).
    - Нет PII в plain-ключе.
 
-6. **Структура вывода:**
-   1. **Решения** — что кешируется, какой паттерн (cache-aside/write-through/refresh-ahead), какой TTL и почему.
-   2. **Дерево новых файлов** — `CacheSettings.java`, `CacheConfiguration.java`, изменения в Service/Handler.
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для existing-файлов** — `application.yml` (cache config + Redis), `bootstrap/build.gradle.kts` (`spring-boot-starter-data-redis`, `spring-boot-starter-cache`).
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew compileJava`, `docker-compose up redis`, `./gradlew test --tests *CacheTest`.
-      - **TODO для пользователя:** настроить Redis в `application-prod.yml` (cluster mode, password); добавить alert на `cache_gets_total{result=miss} / cache_gets_total > 0.3` (hit rate < 70%); проверить что значения сериализуемы Jackson (нет циклических ссылок).
-   6. **Финальный шаг:** «после генерации запусти `ucp-caching-review` для верификации; добавь интеграционный тест с `Testcontainers` Redis».
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 
 - HTTP `Cache-Control` headers — это `ucp-api-design` (REST API).
-- JWT JWK кеш — встроен в Spring Security (`AUTH-5`), отдельной обвязки не нужно.
+- JWT JWK кеш — встроен в Spring Security (`auth-patterns/token-validated-by-library`), отдельной обвязки не нужно.
 - DB query cache — `ucp-pg-runtime-design` (если materialized views).
 - Resilience cache-as-fallback — `ucp-integration-design` использует cache в fallback-методах, генерация cache-инфры — этот скилл.
-- Кеш доменного агрегата целиком — нарушает `R-CACHE-WHERE-X2`, скилл откажется генерировать.
+- Кеш доменного агрегата целиком — нарушает `caching/cache-projections-not-aggregates`, скилл откажется генерировать.
 
 После — обязательно `ucp-caching-review` для верификации.
 

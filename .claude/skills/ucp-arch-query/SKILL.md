@@ -2,7 +2,7 @@
 name: ucp-arch-query
 lang: any
 track: any
-description: Read-only навигация по архитектурному корпусу architecture/ (коды R-ARCH-*) — кто публикует событие X, какие сервисы трогают Y, через какие BP проходит Z, сервисы по tier, context-map. Ничего не меняет в файлах.
+description: Read-only навигация по архитектурному корпусу architecture/ (требования arch/*) — кто публикует событие X, какие сервисы трогают Y, через какие BP проходит Z, сервисы по tier, context-map. Ничего не меняет в файлах.
 when_to_use: Триггеры — «кто публикует», «какие сервисы», «через какие BP», «найди в архитектуре». Только из корня architecture/.
 allowed-tools: Read Glob Grep Bash(yq*) Bash(jq*) Bash(grep*) Bash(ls*) Bash(cat*) Bash(find*)
 ---

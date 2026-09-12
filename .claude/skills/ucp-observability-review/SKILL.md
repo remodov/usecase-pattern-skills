@@ -1,22 +1,25 @@
 ---
 name: ucp-observability-review
-description: Ревью наблюдаемости Java/Spring-сервиса (коды R-OBS-*) — structured logging с MDC без PII, Micrometer-метрики, OpenTelemetry tracing, Actuator health-checks, context propagation, SLO и alerts.
+description: Ревью наблюдаемости Java/Spring-сервиса (требования observability/*) — structured logging с MDC без PII, Micrometer-метрики, OpenTelemetry tracing, Actuator health-checks, context propagation, SLO и alerts.
 when_to_use: Изменения в logback*.xml, MetricsConfig/OtelConfig/HealthIndicator/MdcFilter, management/logging-блоках application.yml.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью observability
 
-Ты ревьюишь логирование, метрики, tracing, health-checks и context propagation в Java/Spring-сервисе на соответствие Observability Style Guide.
+Ты ревьюишь логирование, метрики, tracing, health-checks и context propagation в Java/Spring-сервисе на соответствие требованиям `observability/*`.
 
 ## Зависимости
 
-- **`.claude/docs/backend/observability/observability-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
-- Парные: `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `backend/rest-api/rest-api-rules.md` (`R-HDR-4` — traceparent), `backend/resilience/resilience-rules.md` (`R-RES-OBS-*` — CB metrics), `backend/caching/caching-rules.md` (`R-CACHE-OBS-*`), `backend/kafka/kafka-rules.md` (`R-KFK-OBS-*` — consumer lag).
+- **`.claude/docs/backend/observability/spec.md`** — индекс всех правил (полный текст с примерами — `references/<lang>/implementation.md`). Подгруппы: `R-OBS-LOG-*` (logging), `R-OBS-MTR-*` (metrics), `R-OBS-TRC-*` (tracing), `R-OBS-HC-*` (health checks), `R-OBS-CFG-*` (config), `R-OBS-CTX-*` (MDC), `R-OBS-SLO-*` (SLO/alerts).
+- Парные: `backend/auth-patterns/spec.md` (`auth-patterns/no-pii-in-logs-and-events` — PII в логах ЗАПРЕЩЕНО, главное правило observability ↔ security), `backend/rest-api/spec.md` (`rest-api/trace-context-header` — traceparent), `backend/resilience/spec.md` (`R-RES-OBS-*` — CB metrics), `backend/caching/spec.md` (`R-CACHE-OBS-*`), `backend/kafka/spec.md` (`R-KFK-OBS-*` — consumer lag).
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/observability/observability-rules.md`. Цитируй конкретные коды (`R-OBS-LOG-X1`, `R-OBS-CTX-X1`).
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/observability/spec.md`. Цитируй конкретные коды (`observability/no-pii-in-logs`, `observability/context-set-at-edge-and-cleared`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*Logback*`, `logback*.xml`, `*MetricsConfig*`, `*OtelConfig*`, `*HealthIndicator*`, `*MdcFilter*`.
@@ -25,7 +28,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Любой код с `log.info/warn/error/debug`, `MeterRegistry`, `Tracer`, `MDC`, `@WithSpan`.
 
 3. **Прогон по подгруппам:**
-   - **`R-OBS-LOG-*`** — JSON в prod-профиле, `@Slf4j` Lombok, `{}` placeholders (не concat), уровни (ERROR/WARN/INFO правильно), MDC fields в каждой записи, нет PII (см. `AUTH-16`), нет `System.out`/`printStackTrace`, ERROR с stack trace через 2-arg, нет full request body.
+   - **`R-OBS-LOG-*`** — JSON в prod-профиле, `@Slf4j` Lombok, `{}` placeholders (не concat), уровни (ERROR/WARN/INFO правильно), MDC fields в каждой записи, нет PII (см. `auth-patterns/no-pii-in-logs-and-events`), нет `System.out`/`printStackTrace`, ERROR с stack trace через 2-arg, нет full request body.
    - **`R-OBS-MTR-*`** — Micrometer + Prometheus registry; стандартные dimensions через `management.metrics.tags`; RED/USE auto-метрики; custom business metrics через MeterRegistry; tags низкой cardinality (не user_id/request_id); `/actuator/prometheus` не публично без auth.
    - **`R-OBS-TRC-*`** — OTel auto-инструментация; traceparent propagation; manual spans с try-finally; span attributes без PII; sampling 1-10% (не 100%); trace-id в MDC через OTel appender.
    - **`R-OBS-HC-*`** — separate liveness/readiness; custom HealthIndicator per external system с TTL; нет business-state в health; liveness не зависит от внешних систем; нет business-операций в health-probe; `/actuator/info` с git sha + version.
@@ -34,26 +37,26 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - **`R-OBS-SLO-*`** — SLO defined для critical endpoints; multi-window burn rate alerts; error budget; alerts с runbook'ами; не alert на каждый ERROR.
 
 4. **Ищи паттерны-нарушения:**
-   - `log.info("Email: {}", user.getEmail())` или `log.error("PII: {}", customer)` — `R-OBS-LOG-X1` + `AUTH-16` критическое.
-   - `System.out.println` / `e.printStackTrace()` / `System.err.println` — `R-OBS-LOG-X2`.
-   - `log.info("Message " + value)` (string-concat) — `R-OBS-LOG-X3`.
-   - `log.error("Failed: " + e.getMessage())` без передачи `e` как exception arg — `R-OBS-LOG-X4`.
-   - `log.info("Body: {}", request)` где request содержит PII — `R-OBS-LOG-X1` + `R-OBS-LOG-X5`.
-   - `Counter.builder("...").tag("user_id", userId)` или `Tag.of("request_id", id)` — `R-OBS-MTR-X1` (cardinality explosion).
-   - `MeterRegistry meterRegistry = ...` без явного Prometheus registry в config — `R-OBS-MTR-X3`.
-   - `management.endpoints.web.exposure.include: '*'` или `prometheus` без network policy — `R-OBS-MTR-X4` / `R-OBS-CFG-X3`.
-   - `otel.traces.sampler.arg: 1.0` в `application-prod.yml` — `R-OBS-TRC-X1`.
-   - `span.setAttribute("customer.email", ...)` или span с PII — `R-OBS-TRC-X2`.
-   - `var span = tracer.spanBuilder(...).startSpan(); ... business logic ... span.end();` без try/finally — `R-OBS-TRC-X3`.
-   - `@Async` без custom TaskDecorator с MDC propagation — `R-OBS-CTX-X3` / `R-OBS-TRC-X4`.
-   - HealthIndicator делает `restTemplate.exchange(...)` каждый запрос (без TTL-кеша) — `R-OBS-HC-X3` / `R-RES-HC-X1`.
-   - `if (orderCount > 1000) return Health.down()` — `R-OBS-HC-X1`.
-   - liveness probe возвращает DOWN при недоступности БД — `R-OBS-HC-X2`.
-   - `application-prod.yml` exposes `env`, `heapdump`, `threaddump`, `loggers` без security — `R-OBS-CFG-X1`.
-   - Один port для business + actuator (`management.server.port` отсутствует) — `R-OBS-CFG-X2`.
-   - `MDC.put("requestId", ...)` без `MDC.clear()` в `finally` — `R-OBS-CTX-X1` (security incident — leaked context).
-   - `MDC.put` в Service / Handler / Controller (не в filter) — `R-OBS-CTX-X2`.
-   - Alerts на каждый ERROR в логах без burn-rate — `R-OBS-SLO-X1`.
+   - `log.info("Email: {}", user.getEmail())` или `log.error("PII: {}", customer)` — `observability/no-pii-in-logs` + `auth-patterns/no-pii-in-logs-and-events` критическое.
+   - `System.out.println` / `e.printStackTrace()` / `System.err.println` — `observability/no-direct-stdout-logging`.
+   - `log.info("Message " + value)` (string-concat) — `observability/parameterized-log-messages`.
+   - `log.error("Failed: " + e.getMessage())` без передачи `e` как exception arg — `observability/parameterized-log-messages`.
+   - `log.info("Body: {}", request)` где request содержит PII — `observability/no-pii-in-logs` + `observability/no-pii-in-logs`.
+   - `Counter.builder("...").tag("user_id", userId)` или `Tag.of("request_id", id)` — `observability/low-cardinality-labels` (cardinality explosion).
+   - `MeterRegistry meterRegistry = ...` без явного Prometheus registry в config — `observability/metrics-are-exported`.
+   - `management.endpoints.web.exposure.include: '*'` или `prometheus` без network policy — `observability/management-endpoints-restricted` / `observability/management-endpoints-restricted`.
+   - `otel.traces.sampler.arg: 1.0` в `application-prod.yml` — `observability/sampling-strategy`.
+   - `span.setAttribute("customer.email", ...)` или span с PII — `observability/manual-spans-are-closed`.
+   - `var span = tracer.spanBuilder(...).startSpan(); ... business logic ... span.end();` без try/finally — `observability/manual-spans-are-closed`.
+   - `@Async` без custom TaskDecorator с MDC propagation — `observability/context-propagated-to-async` / `observability/context-propagated-to-async`.
+   - HealthIndicator делает `restTemplate.exchange(...)` каждый запрос (без TTL-кеша) — `observability/health-check-is-technical` / `resilience/cached-health-probe-per-system`.
+   - `if (orderCount > 1000) return Health.down()` — `observability/health-check-is-technical`.
+   - liveness probe возвращает DOWN при недоступности БД — `observability/liveness-and-readiness-split`.
+   - `application-prod.yml` exposes `env`, `heapdump`, `threaddump`, `loggers` без security — `observability/management-endpoints-restricted`.
+   - Один port для business + actuator (`management.server.port` отсутствует) — `observability/separate-management-port`.
+   - `MDC.put("requestId", ...)` без `MDC.clear()` в `finally` — `observability/context-set-at-edge-and-cleared` (security incident — leaked context).
+   - `MDC.put` в Service / Handler / Controller (не в filter) — `observability/context-set-at-edge-and-cleared`.
+   - Alerts на каждый ERROR в логах без burn-rate — `observability/burn-rate-alerting`.
 
 5. **При ревью logback-spring.xml:**
    - `<springProfile name="prod">` использует `LogstashEncoder` или `EcsEncoder`.
@@ -69,11 +72,11 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `logging.level.root: INFO` в prod profile.
    - `management.endpoint.health.probes.enabled: true` для liveness/readiness.
 
-7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-*`).
+7. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-format/spec.md` (`review-format/*`).
 
-8. **Доменные ориентиры серьёзности** (`RFF-12`):
+8. **Доменные ориентиры серьёзности** (`review-format/severity-scale-is-shared`):
    - **Критично:**
-     - PII в логах / span-attributes / metrics (`R-OBS-LOG-X1`, `R-OBS-TRC-X2`) — security incident, GDPR/PII-compliance.
+     - PII в логах / span-attributes / metrics (`observability/no-pii-in-logs`, `observability/manual-spans-are-closed`) — security incident, GDPR/PII-compliance.
      - MDC без `MDC.clear()` — leaked context cross-request, чужой userId в логах другого пользователя.
      - High-cardinality metric tags — Prometheus OOM.
      - liveness зависит от внешних систем — restart loop в K8s.
@@ -95,7 +98,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 - Resilience4j metrics — `ucp-resilience-review` (`R-RES-OBS-*`).
 - Cache hit rate metrics — `ucp-caching-review` (`R-CACHE-OBS-*`).
 - Kafka consumer lag — `ucp-kafka-review` (`R-KFK-OBS-*`).
-- PII detection in code (вне логов/spans) — `ucp-auth-review` (`AUTH-16`).
+- PII detection in code (вне логов/spans) — `ucp-auth-review` (`auth-patterns/no-pii-in-logs-and-events`).
 - Alerting rules в Prometheus/Grafana — это infra-уровень, не codified в этом скилле.
 - Service Mesh observability (Istio sidecar metrics) — отдельная тема.
 

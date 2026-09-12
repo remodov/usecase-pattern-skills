@@ -2,7 +2,7 @@
 name: ucp-arch-bp-design
 lang: any
 track: any
-description: Спроектировать новый бизнес-процесс (BP-NN) — cross-service сценарий с orchestrator/choreography, sequence-диаграммой, точками отказа и компенсациями (коды R-ARCH-BP-*) — файл BP-NN-<slug>.md, обновление _index.md и карточек сервисов.
+description: Спроектировать новый бизнес-процесс (BP-NN) — cross-service сценарий с orchestrator/choreography, sequence-диаграммой, точками отказа и компенсациями (требования arch/*) — файл BP-NN-<slug>.md, обновление _index.md и карточек сервисов.
 when_to_use: Триггеры — «новый процесс», «BP-NN», «cross-service сценарий», «нужна saga для Y». Только из корня architecture/.
 allowed-tools: Read Write Edit Glob Grep Bash(yq*) Bash(jq*) Bash(grep*) Bash(ls*) Bash(cat*) Bash(find*)
 ---
@@ -28,8 +28,8 @@ test -f services/_registry.yaml && test -f docs/business-processes/_index.md || 
 - **`services/*/README.md`** — карточки сервисов (для проверки доступных UC, обновления back-ref'ов).
 - **`docs/01-context-map.md`** — связи между BC.
 - **Стиль-гайды:**
-  - `.claude/docs/shared/arch/arch-rules.md` — правила `R-ARCH-BP-*`.
-  - `.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md` — `R-DIST-SAGA-*` (orchestration vs choreography), `R-DIST-COMP-*` (compensation), `R-DIST-IDEM-*` (idempotency для money-шагов).
+  - `.claude/docs/shared/arch/spec.md` — правила `R-ARCH-BP-*`.
+  - `.claude/docs/backend/distributed-patterns/spec.md` — `R-DIST-SAGA-*` (orchestration vs choreography), `R-DIST-COMP-*` (compensation), `R-DIST-IDEM-*` (idempotency для money-шагов).
 - **Парные скиллы:**
   - `ucp-arch-consistency-review` — запускать после для проверки `R-ARCH-BP-*`.
   - `ucp-arch-impact` — если меняются существующие UC.
@@ -53,7 +53,7 @@ test -f services/_registry.yaml && test -f docs/business-processes/_index.md || 
 2. **Цель** — что должно быть истинным в конце процесса (без техники): «заказ создан, средства списаны, оба уведомлены».
 3. **Участники-сервисы** — выбрать из существующих в `_registry.yaml`. Если нужен новый сервис → останови, рекомендуй `/ucp-arch-design` сначала.
 4. **Orchestration vs choreography** — по `R-DIST-SAGA-*`: orchestration рекомендуется для complex (4+ шагов) и при branching; choreography для simple (2-3 шага). Обоснование обязательно.
-5. **Идемпотентность money-шагов** — если есть платежи/refund'ы — `Idempotency-Key` обязателен (`R-DIST-IDEM-4`).
+5. **Идемпотентность money-шагов** — если есть платежи/refund'ы — `Idempotency-Key` обязателен (`distributed/money-double-protection`).
 6. **Точки отказа** — для каждого шага что может пойти не так и как реагировать.
 7. **Компенсации** — для каждой точки отказа: rollback, или явная пометка «нет компенсации, пользователь видит ошибку» с обоснованием.
 
@@ -74,7 +74,7 @@ test -f services/_registry.yaml && test -f docs/business-processes/_index.md || 
 
 Таблица «🔴 Точки отказа»: где может упасть → что сделать.
 
-Правила компенсаций (`R-ARCH-BP-4` / `R-DIST-COMP-*`):
+Правила компенсаций (`arch/failure-points-have-compensation` / `R-DIST-COMP-*`):
 - Семантическое state-change, **НЕ** `DELETE`.
 - Идемпотентны — повторный вызов compensation возвращает тот же результат.
 - Audit trail — компенсация фиксируется в БД.
@@ -82,7 +82,7 @@ test -f services/_registry.yaml && test -f docs/business-processes/_index.md || 
 
 ### Шаг 5: Mapping шагов на UC сервисов
 
-Для каждого шага BP, исполняемого сервисом (актор-действия как «Buyer нажимает» исключаются — `R-ARCH-BP-2`):
+Для каждого шага BP, исполняемого сервисом (актор-действия как «Buyer нажимает» исключаются — `arch/process-step-matches-service-use-case`):
 - Прочитай `services/<участник>/README.md` секцию «Use Cases».
 - Найди UC, соответствующий шагу.
 - Если UC найден — заполни (имя + ссылка на спеку).

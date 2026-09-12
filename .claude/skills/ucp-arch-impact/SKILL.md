@@ -41,10 +41,10 @@ git log -1 --format=%ar services/
 - **`docs/business-processes/_index.md`** + **`BP-NN-*.md`** — бизнес-процессы.
 - **`docs/adr/*.md`** — архитектурные решения.
 - **`contracts/events/_index.md`** (опционально) — реестр событий.
-- **Cross-references в style guides:**
-  - `.claude/docs/backend/distributed-patterns/distributed-patterns-rules.md` — `R-DIST-EC-*` (eventual consistency, expand-contract).
-  - `.claude/docs/backend/kafka/kafka-rules.md` — `R-KFK-EV-*` (event versioning, schema evolution).
-  - `.claude/docs/backend/rest-api/rest-api-rules.md` — `R-API-*` (REST contract changes, deprecation).
+- **Cross-references в требованияхs:**
+  - `.claude/docs/backend/distributed-patterns/spec.md` — `R-DIST-EC-*` (eventual consistency, expand-contract).
+  - `.claude/docs/backend/kafka/spec.md` — `R-KFK-EV-*` (event versioning, schema evolution).
+  - `.claude/docs/backend/rest-api/spec.md` — `R-API-*` (REST contract changes, deprecation).
 - **Парные скиллы:**
   - `ucp-arch-query` — read-only «что есть» сейчас.
   - `ucp-arch-consistency-review` — запустить после применения изменения для проверки `R-ARCH-*`.

@@ -1,20 +1,20 @@
 ---
 name: ucp-go-api-design
 lang: go
-description: Спроектировать REST API-эндпоинт/ресурс на Go code-first (net/http + chi) по контракту (коды R-URL/MTH/RSP/ERR/OAS-*) — kebab-case URL + /api/v1, query camelCase, JSON без null в 2xx, go-playground/validator + violations, problem+json (RFC 9457).
+description: Спроектировать REST API-эндпоинт/ресурс на Go code-first (net/http + chi) по контракту (требования rest-api/*) — kebab-case URL + /api/v1, query camelCase, JSON без null в 2xx, go-playground/validator + violations, problem+json (RFC 9457).
 when_to_use: Триггеры — «спроектируй эндпоинт X», «REST-ресурс Y на Go/chi», «OpenAPI для Z на Go». При создании chi-роутеров, request/response-структур, error-renderer.
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*)
 ---
 
 # REST API — проектирование (Go / net/http + chi, code-first)
 
-Ты проектируешь REST-контракт по **общему контракту** `backend/rest-api/rest-api-rules.md` и **Go-реализации**
-`backend/rest-api/go/rest-api-style-guide.md`. Go **code-first**: структуры + chi-роутер → OpenAPI генерируется
+Ты проектируешь REST-контракт по **общему контракту** `backend/rest-api/spec.md` и **Go-реализации**
+`backend/rest-api/references/go/implementation.md`. Go **code-first**: структуры + chi-роутер → OpenAPI генерируется
 постфактум (`swaggo/swag`) или синхронизируется ревью. Принцип: **структуры Go = источник контракта**.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Go-style-guide (большинство правил — протокольного уровня, общие для всех языков).
+1. **Прочитай** требования `go-style/*` (большинство правил — протокольного уровня, общие для всех языков).
    Коды правил — в обосновании, **не** в комментариях кода. Смежные доки: `backend/validation/go/...` (validator + violations),
    `backend/error-handling/go/...` (apperr + httperr.Write + problem+json), `backend/usecase-pattern/go/...` (роутер → UseCase).
 
@@ -39,16 +39,16 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
    `traceparent` через OTel middleware (`otelhttp.NewMiddleware`); `operationId` camelCase + `tags` + `summary`
    на каждом маршруте в аннотациях `swaggo/swag` или в ручной OpenAPI-спеке.
 
-7. **Самопроверка** (§чек-лист из `go/rest-api-style-guide.md`) + предложи `ucp-go-api-review`.
+7. **Самопроверка** (§чек-лист из `go/implementation.md`) + предложи `ucp-go-api-review`.
    Валидация входа — `ucp-go-validation-design`. Обработка ошибок — `ucp-go-error-handling-design`.
 
 ## Антипаттерны, которые НЕ генерировать
 
-- trailing slash / заглавные / snake_case / глаголы в CRUD-пути (`R-URL-X1/X2`/`R-MTH-X1`); >2 уровня вложенности (`R-NEST-X1`); версия в query (`R-VER-X2`).
-- comma-separated query-массивы (`R-QRY-X3`); `page=0` (`R-QRY-X2`); бизнес-логика в query (`R-QRY-X4`).
-- `null`-поля / `*T`-указатели в response-структурах в 2xx (`R-RSP-X1/X2`); envelope для единичного ресурса (`R-RSP-X4`); `nullable: true` (`R-RSP-X3`).
-- `Content-Type: application/json` для ошибки (`R-ERR-X1`); HTTP 422 вместо 400 для валидации (`R-ERR-X3`); stack/SQL в 500 (`R-ERR-X4`); `X-`-префикс заголовка (`R-HDR-X1`).
-- разные структуры ошибок в разных хендлерах вместо единого `httperr.Write` (`R-PRIN-2`).
+- trailing slash / заглавные / snake_case / глаголы в CRUD-пути (`R-URL-X1/X2`/`rest-api/methods-match-semantics`); >2 уровня вложенности (`rest-api/nesting-max-two-levels`); версия в query (`rest-api/version-in-path`).
+- comma-separated query-массивы (`rest-api/arrays-as-repeated-parameters`); `page=0` (`rest-api/pagination-forms`); бизнес-логика в query (`rest-api/filters-ranges-and-search`).
+- `null`-поля / `*T`-указатели в response-структурах в 2xx (`R-RSP-X1/X2`); envelope для единичного ресурса (`rest-api/single-resource-is-flat`); `nullable: true` (`rest-api/no-nulls-in-successful-response`).
+- `Content-Type: application/json` для ошибки (`rest-api/error-body-follows-standard`); HTTP 422 вместо 400 для валидации (`rest-api/error-status-codes-limited`); stack/SQL в 500 (`rest-api/no-internals-in-error-body`); `X-`-префикс заголовка (`rest-api/headers-standard-and-prefixed`).
+- разные структуры ошибок в разных хендлерах вместо единого `httperr.Write` (`rest-api/contract-is-predictable`).
 - `float64` для денег; `json.Marshal` без `omitempty` на response-полях.
 
 После работы скилла — обязательно `ucp-go-api-review`.

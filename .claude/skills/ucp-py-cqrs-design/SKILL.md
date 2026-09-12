@@ -1,20 +1,20 @@
 ---
 name: ucp-py-cqrs-design
 lang: python
-description: Спроектировать CQRS-разделение в FastAPI-сервисе (Python) по UCP (коды R-CQRS-*) — маркеры Command/Query (Уровень 2) или полный split (Уровень 3: <X>ViewRepository, read-DTO), read-model через outbox+Kafka, idempotent consumer.
+description: Спроектировать CQRS-разделение в FastAPI-сервисе (Python) по UCP (требования cqrs/*) — маркеры Command/Query (Уровень 2) или полный split (Уровень 3: <X>ViewRepository, read-DTO), read-model через outbox+Kafka, idempotent consumer.
 when_to_use: Триггеры — «CQRS для X», «read-модель Y», «вынести чтение в проекцию». При добавлении read-проекций.
 allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 ---
 
 # CQRS — проектирование (Python / FastAPI + SQLAlchemy)
 
-Ты проектируешь CQRS по **контракту** `backend/cqrs/cqrs-rules.md` (`R-CQRS-*`) и **Python-реализации** `backend/cqrs/python/cqrs-style-guide.md`.
+Ты проектируешь CQRS по **контракту** `backend/cqrs/spec.md` (`R-CQRS-*`) и **Python-реализации** `backend/cqrs/references/python/implementation.md`.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Python-style-guide. Коды в обосновании, не в коде. Связанные: `backend/usecase-pattern/python/...` (`Command`/`Query`/Handler/UoW), `backend/python/sqlalchemy/sqlalchemy-rules.md` (`R-SQLA-QRY-5` ViewRepository), `kafka` (outbox sync), `ddd-tactical` (агрегат на write-side).
+1. **Прочитай** требования `python-style/*`. Коды в обосновании, не в коде. Связанные: `backend/usecase-pattern/python/...` (`Command`/`Query`/Handler/UoW), `backend/python/sqlalchemy/spec.md` (`sqlalchemy/view-repository-for-projections` ViewRepository), `kafka` (outbox sync), `ddd-tactical` (агрегат на write-side).
 
-2. **Реши уровень** (`R-CQRS-WHEN-*`/`R-CQRS-TIER-*`): Уровень 2 → lightweight (маркеры + read-only сессия, один Repository); Уровень 3 → `<X>ViewRepository` + read-DTO; event-driven → отдельная read-таблица/Redis/ES + outbox. Не вводи полный split без доказанной read-нагрузки (`R-CQRS-WHEN-X1`). Назови выбор.
+2. **Реши уровень** (`R-CQRS-WHEN-*`/`R-CQRS-TIER-*`): Уровень 2 → lightweight (маркеры + read-only сессия, один Repository); Уровень 3 → `<X>ViewRepository` + read-DTO; event-driven → отдельная read-таблица/Redis/ES + outbox. Не вводи полный split без доказанной read-нагрузки (`cqrs/lightweight-first-full-on-evidence`). Назови выбор.
 
 3. **Command side** (`R-CQRS-CMD-*`): `@dataclass(frozen=True)` `Command[R]`; меняет один агрегат; handler load→доменный метод→save→commit через UoW; возвращает минимум (id/статус/`None`), не read-DTO.
 
@@ -26,10 +26,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Полный CQRS/разделение БД без боли (`R-CQRS-WHEN-X1/X2`); маркеры без enforcement (`R-CQRS-TIER-X1`).
-- Read-DTO из command (`R-CQRS-CMD-X2`); SELECT-for-later-update в command (`R-CQRS-CMD-X1`); несколько агрегатов в одном UoW без саги (`R-CQRS-CMD-X3`).
-- Write в query-handler (`R-CQRS-QRY-X1`); загрузка агрегата целиком ради read-DTO (`R-CQRS-QRY-X2`); агрегат наружу из query (`R-CQRS-QRY-X3`).
-- Sync UPDATE read-model в command-UoW (`R-CQRS-SYNC-X1`); PG-триггеры (`R-CQRS-SYNC-X2`); schema-coupled events (`R-CQRS-SYNC-X3`); bidirectional sync (`R-CQRS-RM-X3`).
+- Полный CQRS/разделение БД без боли (`R-CQRS-WHEN-X1/X2`); маркеры без enforcement (`cqrs/split-matches-maturity-level`).
+- Read-DTO из command (`cqrs/command-returns-minimum`); SELECT-for-later-update в command (`cqrs/command-handler-does-not-query`); несколько агрегатов в одном UoW без саги (`cqrs/command-changes-one-aggregate`).
+- Write в query-handler (`cqrs/query-is-read-only`); загрузка агрегата целиком ради read-DTO (`cqrs/read-via-projection-not-aggregate`); агрегат наружу из query (`cqrs/query-returns-read-model`).
+- Sync UPDATE read-model в command-UoW (`cqrs/read-model-synced-by-events`); PG-триггеры (`cqrs/read-model-synced-by-events`); schema-coupled events (`cqrs/events-not-coupled-to-write-schema`); bidirectional sync (`cqrs/projection-has-no-logic-or-backflow`).
 
 После работы скилла — обязательно `ucp-py-cqrs-review`.
 

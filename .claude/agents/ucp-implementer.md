@@ -66,9 +66,9 @@ tools: Read, Write, Edit, Bash, Glob, Grep, NotebookEdit
 - **MapStruct** для маппинга между слоями (DTO ↔ entity ↔ domain), кроме persistence-слоя (там plain Java mapper).
 - **jOOQ** для persistence, генерируется (не handcrafted POJO).
 - **Bean Validation** на DTO + `@Validated` на контроллере (не if-проверки в use case).
-- **Стиль кода** — `.claude/docs/java-style-guide.md` (правила `JS-N.M`).
-- **Тесты** — `.claude/docs/test-strategy.md` (правила `TS-N`): синхронно, PostgreSQL + WireMock через Testcontainers, события через Outbox, время/UUID детерминированные через `@MockitoBean`.
-- **Архитектура** — `.claude/docs/hexagonal-style-guide.md`, `.claude/docs/usecase-pattern-style-guide.md`.
+- **Стиль кода** — `.claude/docs/backend/java/java-style/spec.md` (требования `java-style/*`).
+- **Тесты** — `.claude/docs/backend/java/test-strategy/spec.md` (требования `test-strategy/*`): синхронно, PostgreSQL + WireMock через Testcontainers, события через Outbox, время/UUID детерминированные через `@MockitoBean`.
+- **Архитектура** — `.claude/docs/backend/hexagonal/spec.md`, `.claude/docs/backend/usecase-pattern/spec.md`.
 
 При коллизии общего правила (`JS-*`) и доменного guide'а (`R-JOOQ-*`, `R-HEX-*`, `R-VLD-*` и т.д.) — **побеждает доменный**. Если домен требует нарушить `JS-*` — отметь это в commit-message.
 

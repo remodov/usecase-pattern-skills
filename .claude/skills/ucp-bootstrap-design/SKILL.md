@@ -1,6 +1,6 @@
 ---
 name: ucp-bootstrap-design
-description: Спроектировать или починить bootstrap Spring Boot UCP-сервиса (коды BS-*) — профили local/integration-test/production, бины clock/UUID, SecurityConfig per profile, Liquibase, jOOQ codegen, гейтинг Kafka-листенеров, Jackson event-payload.
+description: Спроектировать или починить bootstrap Spring Boot UCP-сервиса — профили local/integration-test/production, бины clock/UUID, SecurityConfig per profile, Liquibase, jOOQ codegen, гейтинг Kafka-листенеров, Jackson event-payload.
 when_to_use: Новый сервис без bootstrap, либо bootRun падает: UnsatisfiedDependencyException, fetch JWK-set, пустые outbox-payload, JdbcTemplate/JPA вместо jOOQ.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) Bash(curl*)
 ---
@@ -21,25 +21,25 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` (полный текст с примерами конфигов и gradle-сниппетами — `backend/java/spring-bootstrap/spring-bootstrap-style-guide.md`, открывай точечно по разделу). У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 3 дополнительно прочитай `backend/usecase-pattern/usecase-pattern-rules.md` для раскладки модулей.
+1. **Прочти индекс правил** `.claude/docs/backend/java/spring-bootstrap/spec.md` (полный текст с примерами конфигов и gradle-сниппетами — `backend/java/spring-bootstrap/references/implementation.md`, открывай точечно по разделу). У каждого правила есть код `BS-N`; цитируй их в дизайне и review-заметках. На проектах Уровня 3 дополнительно прочитай `backend/usecase-pattern/spec.md` для раскладки модулей.
 
 2. **Диагностируй: это починка или с нуля.** Для починки сначала запусти и прочитай реальную ошибку:
    ```bash
    ./gradlew :bootstrap:bootRun --args='--spring.profiles.active=local'
    ```
-   `Quickstart-чеклист` (§7 style guide) перечисляет самые частые сбои в порядке. Не рефактори весь bootstrap, пока не подтвердил конкретный симптом.
+   `Quickstart-чеклист` в справочнике реализации перечисляет самые частые сбои в порядке. Не рефактори весь bootstrap, пока не подтвердил конкретный симптом.
 
-3. **Проверь или создай три файла-профиля.** По `BS-2`:
+3. **Проверь или создай три файла-профиля.** По `spring-bootstrap/three-profiles-only`:
    - `application.yml` — production-дефолты (плейсхолдеры для IdP / Kafka / Catalog OK; реальные значения через ENV).
    - `application-local.yml` — оверрайды для локальной разработки (Postgres из docker-compose, `kafka.listener.auto-startup: false`, dev-port URL внешних сервисов).
    - `application-integration-test.yml` — оверрайды для `@SpringBootTest` (URL стабов WireMock, cron-расписания «никогда», auto-startup off).
 
    Не дублируй весь конфиг в profile-файлах — только оверрайды. Если видишь один и тот же ключ в трёх файлах с одним значением — удали из профиля.
 
-4. **Зарегистрируй production-бины для каждого core service-интерфейса.** По `BS-5/BS-6`: любой `core/service/*`-интерфейс (`DateTimeService`, `UuidGenerator` и т.п.) нуждается в не-test-бине. Положи их в `bootstrap/.../config/ServiceBeansConfig`, всё под `@ConditionalOnMissingBean`, чтобы `@MockitoBean` мог переопределить в тестах:
+4. **Определи источник времени сервиса** (`spring-bootstrap/time-source-is-single-and-swappable`). При статическом `DateTimeUtil` в core бинов времени нет — проверь усечение до микросекунд и `resetClock()` в базовом тесте. При бинах — **зарегистрируй production-бины для каждого core service-интерфейса.** По `BS-5/BS-6`: любой `core/service/*`-интерфейс (`DateTimeService`, `UuidGenerator` и т.п.) нуждается в не-test-бине. Положи их в `bootstrap/.../config/ServiceBeansConfig`, всё под `@ConditionalOnMissingBean`, чтобы `@MockitoBean` мог переопределить в тестах:
    ```java
    @Bean @ConditionalOnMissingBean
-   public DateTimeService dateTimeService(Clock clock) { return () -> Instant.now(clock); }
+   public DateTimeService dateTimeService(Clock clock) { return () -> Instant.now(clock).truncatedTo(ChronoUnit.MICROS); }
    ```
    Это причина №1 «сервис не стартует» — интерфейс есть, тесты работают, потому что `@MockitoBean` даёт бин, а в проде ничего нет.
 
@@ -50,9 +50,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
    Три маленьких класса — это правильно. Не пытайся сделать один универсальный конфиг, переключающийся через ENV; система профилей Spring уже даёт тебе гейтинг.
 
-6. **Гейтуй Kafka-листенеры по профилю.** По `BS-13`: и в `local`, и в `integration-test` ставь `spring.kafka.listener.auto-startup: false`. Консьюмеры на `@KafkaListener` стартуют только когда явно возобновлены. В тестах вызывай `consumer.onMessage(record)` напрямую с собранным руками `ConsumerRecord` — намного проще, чем embedded broker.
+6. **Гейтуй Kafka-листенеры по профилю.** По `spring-bootstrap/service-starts-without-broker`: и в `local`, и в `integration-test` ставь `spring.kafka.listener.auto-startup: false`. Консьюмеры на `@KafkaListener` стартуют только когда явно возобновлены. В тестах вызывай `consumer.onMessage(record)` напрямую с собранным руками `ConsumerRecord` — намного проще, чем embedded broker.
 
-7. **Добавь Jackson visibility-кастомайзер, если события используют record-style accessors.** По `BS-16`: типичный сабкласс `DomainEvent` объявляет поля и выставляет их через `customerId()`-style accessors. Дефолтная видимость Jackson их игнорирует; outbox-payload получается только с base-class-полями. Добавь `JacksonConfig`:
+7. **Добавь Jackson visibility-кастомайзер, если события используют record-style accessors.** По `spring-bootstrap/event-serialization-sees-record-fields`: типичный сабкласс `DomainEvent` объявляет поля и выставляет их через `customerId()`-style accessors. Дефолтная видимость Jackson их игнорирует; outbox-payload получается только с base-class-полями. Добавь `JacksonConfig`:
    ```java
    @Bean
    public Jackson2ObjectMapperBuilderCustomizer objectMapperCustomizer() {
@@ -71,7 +71,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
    - **Используй сгенерированные POJO и enum-ы** (`<service>.generated.tables.pojos.*Pojo`, `<service>.generated.enums.*`) напрямую в репозиториях, сервисах, мапперах DTO контроллеров. Ручные классы `Notification` / `Channel` / `NotificationStatus`, дублирующие layout строки — удали.
    - **Колонки VARCHAR с фиксированными значениями → Postgres ENUM-типы.** Добавь отдельный ChangeSet `v-1.x/enum-types.yaml`, который создаёт enum и `ALTER`-ит колонку под него. Тогда jOOQ codegen сгенерирует Java-enum автоматически — никакого `forcedType`, никакого ручного enum.
    - **Сгенерированные классы не модифицируются.** Если на enum'е нужны методы (`isTerminal()`, `canRetry()`) — встрой проверку на use-sites или положи хелперы в utility-класс. Не редактируй сгенерированный код, он будет перезатёрт.
-   - **Исключение** (`BS-20`): DTO внешних API (`UserContact` из REST-клиента, OpenAPI-сгенерированные DTO, Kafka-payload-ы) остаются ручными — они не из твоей БД.
+   - **Исключение** (`spring-bootstrap/external-dtos-are-handcrafted`): DTO внешних API (`UserContact` из REST-клиента, OpenAPI-сгенерированные DTO, Kafka-payload-ы) остаются ручными — они не из твоей БД.
 
    При починке сервиса с ручными POJO / enum миграция механическая: добавь плагин, добавь `v-1.x/enum-types.yaml` для любых VARCHAR-enum-колонок, запусти `regenerate`, удали ручные классы, search-and-replace импорты, тесты должны пройти после переименования типов.
 
@@ -80,11 +80,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
     docker compose up -d postgres
     ./gradlew :bootstrap:bootRun --args='--spring.profiles.active=local'
     ```
-    Плюс матрица профилей (`BS-2`). Если в README не сказано, какой профиль использовать для локальной разработки — следующий dev, склонировавший репо, потратит час на отладку JWK-fetch-сбоя.
+    Плюс матрица профилей (`spring-bootstrap/three-profiles-only`). Если в README не сказано, какой профиль использовать для локальной разработки — следующий dev, склонировавший репо, потратит час на отладку JWK-fetch-сбоя.
 
-11. **Не цитируй коды правил в комментариях исходников** (`JS-7.3` в `backend/java/java-style/java-rules.md`). В сгенерированных Java/YAML-файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.п. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
+11. **Не цитируй коды правил в комментариях исходников** (`java-style/no-rule-codes-or-history-in-code` в `backend/java/java-style/spec.md`). В сгенерированных Java/YAML-файлах — никаких `// BS-7`, `// BS-13`, `# BS-10` и т.п. Соответствие правилу выражается через имена / структуру / аннотации. Комментарий уместен только когда WHY неочевиден из кода — и без цитаты правила.
 
-12. **Lombok + MapStruct + OpenAPI-generator — обязательны в build с самого старта** (`JS-6.6`, `R-LAY-3`, style guide §12.2). Пропиши в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
+12. **Lombok + MapStruct + OpenAPI-generator — обязательны в build с самого старта** (`java-style/generation-setup-is-uniform`, `usecase-pattern/explicit-mapper-between-layers`, `validation/controller-implements-generated-contract`). Пропиши в `build.gradle.kts` каждого модуля (или в `subprojects { ... }`):
 
     ```kotlin
     plugins {
@@ -125,7 +125,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
     tasks.named("compileJava") { dependsOn("openApiGenerate") }
     ```
 
-    Без этого downstream-скиллы упадут: `ucp-pattern-design` генерит `@RequiredArgsConstructor`-handler-ы (`JS-6.1`), `@Mapper`-интерфейсы (`R-LAY-3`) и `Controller implements <Tag>Api` (§12.2) — все три annotation/codegen-цепочки должны работать с первой компиляции.
+    Без этого downstream-скиллы упадут: `ucp-pattern-design` генерит `@RequiredArgsConstructor`-handler-ы (`java-style/boilerplate-is-generated`), `@Mapper`-интерфейсы (`usecase-pattern/explicit-mapper-between-layers`) и `Controller implements <Tag>Api` (`validation/controller-implements-generated-contract`) — все три annotation/codegen-цепочки должны работать с первой компиляции.
 
 13. **Создай (или обнови) корневой `CLAUDE.md`.** Каждый UCP-сервис обязан нести в корне репозитория `CLAUDE.md` — always-loaded память для AI-агента. Нет файла — создай; есть — обнови соответствующий блок, не дублируя то, что и так выводится из кода. Минимальный обязательный контент:
 
@@ -158,6 +158,36 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
     ```
 
     Держи `CLAUDE.md` коротким (always-loaded): только то, что неочевидно из кода/структуры.
+
+## Гейты проекта
+
+Каталог — `.claude/docs/_meta/project-gates.md`. Эти проверки методология
+определяет сама, и генерируешь их **ты**: пока их нет в проекте, требования,
+которые на них ссылаются, фактически держатся ревью.
+
+Сгенерируй четыре скрипта и привяжи их к общей задаче проверки, в CI — джобами `ddl:check`, `config:check`, `manifest:check`, `test:lint`:
+
+| Скрипт | Что читает | Что делает |
+| --- | --- | --- |
+| `ddl-check` | файлы миграций | разбирает объявления таблиц, колонок, индексов и ограничений; проверяет типы, именование, безопасность изменений |
+| `config-check` | конфигурацию по профилям | сверяет значения, от которых зависит поведение под отказом: брокер, кеш, пул, обслуживание, остановка, устойчивость |
+| `manifest-check` | манифесты развёртывания | сверяет бюджет остановки, паузу перед ней, раздельные пробы, правила обновления, запуск не от суперпользователя |
+| `test-lint` | исходники тестов | ловит ожидания, обращения к настоящим часам, контейнеры брокера в подготовке, подмену портов в интеграционных тестах |
+
+Полный перечень проверок каждого скрипта — таблицы каталога. Каждая строка
+таблицы называет требование, которое проверка закрывает: **проверка без
+требования не заводится**, требование без проверки остаётся с гейтом `ревью`.
+
+Сверх этого заведи структурные правила из раздела каталога «Структурные
+проверки, которые заводит bootstrap» — по одному тесту на требование, имя теста
+повторяет требование: `QueryHandlersDoNotWriteTest`, `NoRetryAtEdgeTest`,
+`NoCacheOnAuthorizationTest`, `NoExternalCallInTransactionTest`,
+`ScheduledMethodsAreGuardedTest`. Связь «упавший тест → нарушенное требование»
+должна читаться из имени, без похода в конфигурацию.
+
+Проверка, которую сервис не может пройти сразу, заводится **с файлом
+исключений** — по образцу подавлений анализаторов: причина и срок. Отключать
+проверку целиком нельзя.
 
 ## Вывод
 

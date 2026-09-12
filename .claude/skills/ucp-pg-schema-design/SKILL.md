@@ -1,64 +1,64 @@
 ---
 lang: any
 name: ucp-pg-schema-design
-description: Сгенерировать Liquibase changeset для нового агрегата (коды PG-T-*, PG-N-*) — CREATE TABLE с правильными типами (bigint IDENTITY, numeric для денег, timestamptz, uuid, text, JSONB для VO), FK с CASCADE-стратегией, индексы, audit-колонки.
+description: Сгенерировать Liquibase changeset для нового агрегата (требования pg-types/*, pg-naming/*) — CREATE TABLE с правильными типами (bigint IDENTITY, numeric, timestamptz, uuid, text, JSONB), FK с CASCADE, индексы, audit-колонки.
 when_to_use: После ucp-ddd-tactical-design, до ucp-jooq-design. Триггеры — «сделай DDL для агрегата X», «нужна миграция под Order».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Schema — проектирование
 
-Ты генерируешь Liquibase changeset для нового агрегата по `backend/pg-types/pg-types-rules.md` (`PG-T-*`) и `backend/pg-naming/pg-naming-rules.md` (`PG-N-*`). Цель — DDL, который сразу проходит `ucp-pg-schema-review` без findings.
+Ты генерируешь Liquibase changeset для нового агрегата по `backend/pg-types/spec.md` (`PG-T-*`) и `backend/pg-naming/spec.md` (`PG-N-*`). Цель — DDL, который сразу проходит `ucp-pg-schema-review` без findings.
 
 ## Инструкции
 
-1. **Прочитай style guide'ы:**
-   - `.claude/docs/backend/pg-types/pg-types-rules.md` — выбор типов колонок (`PG-T-*`).
-   - `.claude/docs/backend/pg-naming/pg-naming-rules.md` — naming convention (`PG-N-*`).
-   - `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, VO.
-   - `.claude/docs/backend/pg-migrations/pg-migrations-rules.md` `PG-M-*` — лёгкая часть (для нового агрегата это просто `CREATE TABLE`, без expand-contract).
+1. **Прочитай требования:**
+   - `.claude/docs/backend/pg-types/spec.md` — выбор типов колонок (`PG-T-*`).
+   - `.claude/docs/backend/pg-naming/spec.md` — naming convention (`PG-N-*`).
+   - `.claude/docs/backend/ddd-tactical/spec.md` — для понимания Aggregate Root, Entity, VO.
+   - `.claude/docs/backend/pg-migrations/spec.md` `PG-M-*` — лёгкая часть (для нового агрегата это просто `CREATE TABLE`, без expand-contract).
 
 2. **Уточни параметры:**
    - **Aggregate Root** — имя (`Order`), Java-поля и их типы (включая VO). Если домен ещё не написан — это для `ucp-ddd-tactical-design`.
    - **Child entities** в агрегате — `OrderItem`, `OrderShipment`. Каждый = отдельная таблица с FK на parent.
    - **Value Objects** — `Money`, `Address`, `DeliveryWindow`. Решение для каждого: inline-колонки (`amount`, `currency`) или JSONB (`address` как полный объект).
-   - **Enum'ы** — `OrderStatus`, `PaymentMethod`. PG-enum vs textual + CHECK (`PG-T-051`).
-   - **Связь PK** — `bigint IDENTITY` (`PG-T-010`–`PG-T-012`) или `uuid v7` (`PG-T-040`–`PG-T-043`)?
-     - `bigint IDENTITY` — дефолт. Дешевле, быстрее (`PG-T-043`).
+   - **Enum'ы** — `OrderStatus`, `PaymentMethod`. PG-enum vs textual + CHECK (`pg-types/enum-vs-reference-table`).
+   - **Связь PK** — `bigint IDENTITY` (`pg-types/pk-bigint-identity`–`pg-types/pk-bigint-identity`) или `uuid v7` (`pg-types/uuid-is-uuid-type`–`pg-types/uuid-only-when-justified`)?
+     - `bigint IDENTITY` — дефолт. Дешевле, быстрее (`pg-types/uuid-only-when-justified`).
      - `uuid v7` — если нужно генерить ID на стороне приложения до INSERT (event sourcing, distributed insert).
    - **Запросные сценарии** — какие фильтры из `<X>Filter`? Какие сортировки? → определяет индексы.
-   - **Soft-delete нужен?** Если да — `deleted_at timestamptz` (`PG-N-031`).
+   - **Soft-delete нужен?** Если да — `deleted_at timestamptz` (`pg-naming/soft-delete-keeps-moment`).
 
 3. **Принципы выбора типов:**
 
    | Поле в Java | PG-тип | Правило |
    |---|---|---|
-   | `Long id` (PK) | `bigint GENERATED ALWAYS AS IDENTITY` | `PG-T-010`, `PG-T-012` |
-   | `UUID id` (PK) — если нужен | `uuid` | `PG-T-040`, `PG-T-041` (v7) |
-   | `Money amount` | `numeric(19, 2)` | `PG-T-013` |
-   | `BigDecimal rate` (проценты) | `numeric(p, s)` под точность | `PG-T-013` |
-   | `OffsetDateTime createdAt` | `timestamptz` | `PG-T-030`, `PG-T-031` |
+   | `Long id` (PK) | `bigint GENERATED ALWAYS AS IDENTITY` | `pg-types/pk-bigint-identity`, `pg-types/pk-bigint-identity` |
+   | `UUID id` (PK) — если нужен | `uuid` | `pg-types/uuid-is-uuid-type`, `pg-types/uuid-v7-for-keys` (v7) |
+   | `Money amount` | `numeric(19, 2)` | `pg-types/money-is-numeric` |
+   | `BigDecimal rate` (проценты) | `numeric(p, s)` под точность | `pg-types/money-is-numeric` |
+   | `OffsetDateTime createdAt` | `timestamptz` | `pg-types/business-time-is-timestamptz`, `pg-types/time-mapping-keeps-zone` |
    | `LocalDate dateOf` | `date` | |
-   | `String name` (без бизнес-ограничения) | `text` | `PG-T-020` |
-   | `String code` (точно `varchar(N)` по бизнесу) | `varchar(N)` | `PG-T-021` |
-   | `boolean isActive` | `boolean` | `PG-T-016` |
-   | `OrderStatus` (Java enum) | PG enum либо `text` + CHECK | `PG-T-050`–`PG-T-052` |
-   | `Address` (Value Object с 5+ полями) | `jsonb` | (custom; `PG-T-070`+) |
+   | `String name` (без бизнес-ограничения) | `text` | `pg-types/text-by-default` |
+   | `String code` (точно `varchar(N)` по бизнесу) | `varchar(N)` | `pg-types/varchar-when-domain-rule` |
+   | `boolean isActive` | `boolean` | `pg-types/boolean-is-boolean` |
+   | `OrderStatus` (Java enum) | PG enum либо `text` + CHECK | `pg-types/boolean-is-boolean`–`pg-types/typed-enum-in-code` |
+   | `Address` (Value Object с 5+ полями) | `jsonb` | (custom; `pg-types/array-for-simple-scalars`+) |
    | `Address` (VO с 2-3 полями) | inline-колонки | (для индексируемости) |
    | `Map<String, String> metadata` | `jsonb` | |
    | `List<String> tags` | `text[]` | |
 
 4. **Принципы naming (`PG-N-*`):**
    - Таблицы — единственное число, snake_case (`order`, не `orders`). Кроме junction (`order_item`).
-   - PK всегда `id` (`PG-N-020`).
-   - FK — `<parent>_id` (`PG-N-021`): `customer_id`, `order_id`.
-   - Boolean — префикс `is_` / `has_` / `can_` (`PG-N-022`).
-   - Время — глагол + `_at` для `timestamptz`, `_on` для `date` (`PG-N-023`): `created_at`, `birth_on`.
-   - Деньги — суффикс по назначению (`PG-N-024`): `total_amount`, `tax_amount`, `discount_percent`.
-   - Длительности — суффикс с единицей (`PG-N-025`): `timeout_seconds`, `delay_minutes`.
-   - Перечисления — без префикса/суффикса (`PG-N-026`): `status`, `priority`.
-   - Audit (`PG-N-030`): `created_at timestamptz NOT NULL DEFAULT now()`, `updated_at timestamptz`.
-   - Soft-delete (`PG-N-031`): `deleted_at timestamptz NULL`, не `is_deleted`.
+   - PK всегда `id` (`pg-naming/pk-named-id`).
+   - FK — `<parent>_id` (`pg-naming/fk-column-names-parent`): `customer_id`, `order_id`.
+   - Boolean — префикс `is_` / `has_` / `can_` (`pg-naming/boolean-column-prefix`).
+   - Время — глагол + `_at` для `timestamptz`, `_on` для `date` (`pg-naming/time-column-suffix`): `created_at`, `birth_on`.
+   - Деньги — суффикс по назначению (`pg-naming/money-column-suffix`): `total_amount`, `tax_amount`, `discount_percent`.
+   - Длительности — суффикс с единицей (`pg-naming/duration-unit-in-name`): `timeout_seconds`, `delay_minutes`.
+   - Перечисления — без префикса/суффикса (`pg-naming/enum-column-plain-name`): `status`, `priority`.
+   - Audit (`pg-naming/audit-columns-set`): `created_at timestamptz NOT NULL DEFAULT now()`, `updated_at timestamptz`.
+   - Soft-delete (`pg-naming/soft-delete-keeps-moment`): `deleted_at timestamptz NULL`, не `is_deleted`.
 
 5. **Произведи Liquibase changeset.** Формат — YAML (более читабельный, чем XML). Структура по `migrations/db/changelog/v-1.x/`:
 
@@ -146,15 +146,15 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 6. **Решения по индексам:**
    - PK — автоматически индексируется.
-   - FK — **обязательно** отдельный индекс (`PG-T-044` для UUID, общая практика для всех FK).
-   - Поля из `<X>Filter` — индексировать. Композитные индексы под типичные запросы (см. `backend/pg-indexes/pg-indexes-rules.md`).
+   - FK — **обязательно** отдельный индекс (`pg-types/index-fk-under-uuid-pk` для UUID, общая практика для всех FK).
+   - Поля из `<X>Filter` — индексировать. Композитные индексы под типичные запросы (см. `backend/pg-indexes/spec.md`).
    - Если есть `status` + сортировка по `created_at` → composite `(status, created_at DESC)`.
    - Soft-delete (`deleted_at`) — partial index `WHERE deleted_at IS NULL` если большинство запросов «активные».
 
 7. **Решения по child-таблицам агрегата:**
    - Каждая child-Entity → отдельная таблица с FK на parent (`order_id` BIGINT NOT NULL).
    - `ON DELETE CASCADE` если child не существует без parent (типично для агрегата).
-   - Индекс по `<parent>_id` — для multiset eager-fetch в `Jooq<X>Repository` (`R-JOOQ-MS-3`).
+   - Индекс по `<parent>_id` — для multiset eager-fetch в `Jooq<X>Repository` (`jooq/nested-collections-in-one-query`).
 
 8. **Решения по Value Objects:**
    - **Inline-колонки** (`address_street`, `address_city`, `address_zip`):
@@ -163,7 +163,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - **JSONB** (`address jsonb`):
      - Если 4+ полей и фильтрация по ним не нужна.
      - Если структура VO может меняться (forward-compat).
-     - Цена: `PG-W-030` — горячие поля + holod в одном JSONB провоцируют full re-write при UPDATE.
+     - Цена: `pg-runtime/toast-large-values-separately` — горячие поля + holod в одном JSONB провоцируют full re-write при UPDATE.
 
 9. **Самопроверка перед выдачей.** Пройди по `PG-T-*` / `PG-N-*`:
    - PK = `bigint IDENTITY` (или `uuid` v7 если обосновано).
@@ -178,15 +178,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Boolean — `is_*` / `has_*` / `can_*`.
    - Enum как `text` + CHECK (forward-compat) или PG-enum (если ровный список фиксирован).
 
-10. **Структура вывода:**
-    1. **Решения** — таблица «Java тип → PG тип → правило»; решения по VO (inline vs JSONB), enum (text+CHECK vs PG-enum), PK (bigint vs uuid).
-    2. **Дерево новых файлов** — путь к changeset.
-    3. **Каждый changeset — отдельный code block** с путём.
-    4. **Patch master changelog** (`migrations/db/changelog-master.yaml`) с include.
-    5. **Заметки по реализации:**
-       - Команды: `./gradlew liquibaseUpdate`, `./gradlew generateJooq`.
-       - **TODO:** автор changeset (поле `author`), unique business key (если применимо), partial-index'ы (если soft-delete).
-    6. **Финальный шаг:** «после `liquibaseUpdate` запусти `ucp-pg-schema-review db/changelog/v-1.0/0042-create-order.yaml` для верификации, потом `ucp-jooq-design` для генерации `JooqOrderRepository`».
+10. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

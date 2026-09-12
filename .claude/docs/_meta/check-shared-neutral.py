@@ -36,12 +36,15 @@ DENY = re.compile(
 )
 
 problems = []
-for rules in sorted(DOCS.glob("**/*-rules.md")):
+# Мигрированные домены живут в spec.md, немигрированные — в <domain>-rules.md.
+# Нейтральность спрашивается с обоих, кроме языковых доменов (они и ЕСТЬ биндинг).
+for rules in sorted([*DOCS.glob("**/*-rules.md"), *DOCS.glob("**/spec.md")]):
     concern = rules.parent.name
     # frontend/e2e single-stack concern'ы — это сам биндинг (React+TS / Playwright),
     # framework-токены там легитимны; в neutral-check не входят (как LANGSPECIFIC).
     relp = rules.relative_to(DOCS).as_posix()
-    if "/java/" in relp or "/python/" in relp or concern.startswith(("fe-","e2e-")) or concern=="_meta":
+    if any(f"/{lang}/" in relp for lang in ("java", "python", "go", "node")) \
+            or concern.startswith(("fe-", "e2e-")) or concern == "_meta":
         continue
     in_header = True
     for i, line in enumerate(rules.read_text(encoding="utf-8").splitlines(), 1):

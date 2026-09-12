@@ -6,7 +6,8 @@
 #   ./install.sh [PROJECT_DIR]
 #
 # Если PROJECT_DIR не указан, используется текущая директория.
-# Скрипт создаёт симлинки на .claude/skills/* и .claude/docs/*.md из этого репо
+# Скрипт создаёт симлинки на .claude/skills/*, .claude/docs/**/*.md и на
+# always-loaded ядро языка (.claude/rules/ucp-<lang>-core.md) из этого репо
 # в указанный проект. Симлинки означают, что обновления в этом репо
 # автоматически прилетят в проект — без ручного re-копирования.
 # Дополнительно — регистрирует GitLab MCP, если есть токен.
@@ -14,9 +15,13 @@
 # Профиль скиллов (опционально) — чтобы не тащить все ~45 ucp-* скиллов в проект,
 # которому нужна часть (меньше скилл-описаний в always-loaded контексте каждой
 # сессии):
+#   UCP_PROFILE=auto  ./install.sh ~/proj   # по стеку проекта (по умолчанию): concern включается по
+#                                            # маркеру в зависимостях/раскладке; review — всегда, design — по UCP_DESIGN
 #   UCP_PROFILE=rest  ./install.sh ~/proj   # REST/UCP-сервис: spec+pattern+api+auth+jooq+pg+validation+test+java-style
 #   UCP_PROFILE=data  ./install.sh ~/proj   # data-heavy: pg-*+jooq+caching+observability+java-style
-#   UCP_PROFILE=full  ./install.sh ~/proj   # всё (по умолчанию)
+#   UCP_PROFILE=full  ./install.sh ~/proj   # всё
+#   UCP_DESIGN=all|chain                     # design-скиллы для всех concern'ов (по умолчанию) или только для цепочки
+#   UCP_CONCERNS_ON='kafka caching' UCP_CONCERNS_OFF='cqrs'   # ручные поправки к auto-срезу
 #   UCP_SKILLS='ucp-pattern-* ucp-api-* ucp-jooq-*'  ./install.sh ~/proj   # произвольный набор глобов
 # UCP_SKILLS перекрывает UCP_PROFILE. Реви-пары устанавливаются вместе со своими
 # design-скиллами автоматически (для glob 'ucp-api-*' попадут и design, и review).
@@ -87,8 +92,10 @@ while [ $# -gt 0 ]; do
       cat <<USAGE
 Использование: install.sh [--wizard] [--check] [PROJECT_DIR]
 
-Без флагов: устанавливает скиллы / docs / agents / hooks в PROJECT_DIR
+Без флагов: устанавливает скиллы / docs / rules / agents / hooks в PROJECT_DIR
 (симлинками), мерж settings.json, managed-блоки в CLAUDE.md и .gitignore.
+rules — always-loaded ядро языка (.claude/rules/ucp-<lang>-core.md): грузится
+в каждую сессию проекта без вызова скилла.
 По умолчанию PROJECT_DIR = текущая директория.
 
   --wizard, -w  Интерактивный режим: спрашивает специализацию (track), язык и
@@ -104,9 +111,15 @@ while [ $# -gt 0 ]; do
   UCP_LANG      java (по умолчанию) | python | node | go — язык сервиса. Режет
                 скиллы по frontmatter-метке lang: (any|java|python|node|go) и доки
                 по подпапке <concern>/<lang>/. Пример: UCP_LANG=go ./install.sh ./go-svc
-  UCP_PROFILE   full (по умолчанию) | rest | data — набор скиллов (ось стека,
-                ортогональна UCP_LANG; композируются).
-  UCP_SKILLS    Глоб-паттерн поверх UCP_PROFILE (например 'ucp-pattern-* ucp-api-*').
+  UCP_PROFILE   auto (по умолчанию) | full | rest | data — набор скиллов. auto —
+                срез по стеку: concern включается по маркеру в проекте (Kafka,
+                ShedLock, Redis, OAuth2, PostgreSQL, architecture/, docs/spec …),
+                review-скиллы включённого concern'а ставятся всегда. Срез пишется
+                таблицей в managed-блок CLAUDE.md и печатается в --check.
+  UCP_DESIGN    all (по умолчанию) | chain — design-скиллы для всех включённых
+                concern'ов или только для цепочки ucp-new-service.
+  UCP_CONCERNS_ON / UCP_CONCERNS_OFF  ручные поправки к auto-срезу (через пробел).
+  UCP_SKILLS    Глоб-паттерн поверх всего (например 'ucp-pattern-* ucp-api-*').
 USAGE
       exit 0
       ;;
@@ -137,22 +150,28 @@ run_wizard() {
     echo "2) Язык backend:"
     select UCP_LANG in java python node go; do [ -n "$UCP_LANG" ] && break; done
   else
-    echo "  ⚠ для '$UCP_TRACK' своих скиллов пока нет — поставятся только кросс-трековые (spec/arch/meta/install); ось зарезервирована, authoring-contract §10."
+    echo "  ℹ для '$UCP_TRACK' ставятся скиллы своего трека плюс кросс-трековые (spec/arch/meta/install)."
   fi
 
   echo
-  echo "3) Профиль: full=всё · rest=REST/UCP-сервис · data=data-heavy:"
-  select UCP_PROFILE in full rest data; do [ -n "$UCP_PROFILE" ] && break; done
+  echo "3) Профиль: auto=по стеку проекта · full=всё · rest=REST/UCP-сервис · data=data-heavy:"
+  select UCP_PROFILE in auto full rest data; do [ -n "$UCP_PROFILE" ] && break; done
+  UCP_DESIGN=all
+  if [ "$UCP_PROFILE" = auto ]; then
+    echo
+    echo "4) Design-генераторы: all=для всех включённых concern'ов · chain=только цепочка ucp-new-service (review ставится всегда):"
+    select UCP_DESIGN in all chain; do [ -n "$UCP_DESIGN" ] && break; done
+  fi
 
   echo
   echo "Эквивалент команды:"
-  echo "  UCP_TRACK=$UCP_TRACK UCP_LANG=$UCP_LANG UCP_PROFILE=$UCP_PROFILE ./install.sh \"$_dir\""
+  echo "  UCP_TRACK=$UCP_TRACK UCP_LANG=$UCP_LANG UCP_PROFILE=$UCP_PROFILE UCP_DESIGN=$UCP_DESIGN ./install.sh \"$_dir\""
   printf "Установить? [Y/n]: "
   read -r _ok
   case "${_ok:-Y}" in [Nn]*) echo "Отменено."; exit 0 ;; esac
 
   POSITIONAL=("$_dir")
-  export UCP_TRACK UCP_LANG UCP_PROFILE
+  export UCP_TRACK UCP_LANG UCP_PROFILE UCP_DESIGN
 }
 
 if [ "$WIZARD" = true ]; then run_wizard; fi
@@ -185,14 +204,20 @@ if [ -n "${UCP_SKILLS:-}" ]; then
   SKILL_GLOBS="$UCP_SKILLS"
   SKILL_PROFILE_LABEL="custom: $UCP_SKILLS"
 else
-  case "${UCP_PROFILE:-full}" in
+  case "${UCP_PROFILE:-auto}" in
+    auto) SKILL_GLOBS='__AUTO__' ;;
     full) SKILL_GLOBS='*' ;;
     rest) SKILL_GLOBS="ucp-spec-* ucp-${_tok}pattern-* ucp-${_tok}api-* ucp-${_tok}auth-* ucp-${_tok}bootstrap-* $_persist ucp-pg-* ucp-${_tok}validation-* ucp-${_tok}error-handling-* ucp-${_tok}test-* $_style" ;;
     data) SKILL_GLOBS="ucp-pg-* $_persist ucp-${_tok}caching-* ucp-${_tok}observability-* ucp-${_tok}bootstrap-* $_style" ;;
-    *) echo "ERROR: неизвестный UCP_PROFILE='$UCP_PROFILE' (full|rest|data или используйте UCP_SKILLS)" >&2; exit 1 ;;
+    *) echo "ERROR: неизвестный UCP_PROFILE='$UCP_PROFILE' (auto|full|rest|data или используйте UCP_SKILLS)" >&2; exit 1 ;;
   esac
-  SKILL_PROFILE_LABEL="${UCP_PROFILE:-full}"
+  SKILL_PROFILE_LABEL="${UCP_PROFILE:-auto}"
 fi
+UCP_DESIGN="${UCP_DESIGN:-all}"
+case "$UCP_DESIGN" in
+  all|chain) ;;
+  *) echo "ERROR: неизвестный UCP_DESIGN='$UCP_DESIGN' (all|chain)" >&2; exit 1 ;;
+esac
 
 # --- специализация: UCP_TRACK — вторая ось (authoring-contract §10). Режет скиллы
 # по frontmatter `track:` (backend default; any — кросс-трековое, ставится всегда).
@@ -231,9 +256,144 @@ if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   exit 1
 fi
 
+# --- срез по стеку (UCP_PROFILE=auto). Concern включается по маркеру в проекте:
+# зависимости в build-файлах, классы в исходниках, раскладка каталогов. Review-скилл
+# включённого concern'а ставится всегда — это сетка; design — по UCP_DESIGN
+# (all — для всех, chain — только концерны цепочки ucp-new-service). Ручные
+# поправки — UCP_CONCERNS_ON / UCP_CONCERNS_OFF; UCP_SKILLS перекрывает всё.
+# Результат — таблица SLICE_ROWS: попадает в managed-блок CLAUDE.md и в --check,
+# чтобы пропуск скилла был видимым решением с причиной, а не тишиной.
+SLICE_ROWS=""
+SLICE_ON=""
+SLICE_OFF=""
+CHAIN_CONCERNS=" spec ddd-tactical bootstrap pattern api auth persistence pg-schema pg-migration test "
+_persist_design="${_persist%\*}design"
+_persist_review="${_persist%\*}review"
+
+_build_text() {
+  find "$PROJECT_DIR" -maxdepth 4 \( -name 'build.gradle' -o -name 'build.gradle.kts' -o -name 'settings.gradle' \
+    -o -name 'settings.gradle.kts' -o -name 'pom.xml' -o -name 'libs.versions.toml' -o -name 'pyproject.toml' \
+    -o -name 'requirements*.txt' -o -name 'package.json' -o -name 'go.mod' \) \
+    -not -path '*/node_modules/*' -not -path '*/.git/*' -not -path '*/build/*' -not -path '*/target/*' -print0 2>/dev/null \
+    | xargs -0 cat 2>/dev/null
+}
+has_dep() { printf '%s' "$BUILD_TEXT" | grep -qiE -- "$1"; }
+has_src() {
+  grep -rlE --include='*.java' --include='*.kt' --include='*.py' --include='*.ts' --include='*.go' \
+    --exclude-dir=node_modules --exclude-dir=build --exclude-dir=target --exclude-dir=.git -m1 -- "$1" "$PROJECT_DIR" 2>/dev/null | head -1 | grep -q .
+}
+is_chain() { case "$CHAIN_CONCERNS" in *" $1 "*) return 0 ;; esac; return 1; }
+# decide <key> <detected 0|1> <marker-text>  → печатает "on|why" или "off|why"
+decide() {
+  local key="$1" det="$2" marker="$3"
+  case " ${UCP_CONCERNS_OFF:-} " in *" $key "*) printf 'off|выключен вручную (UCP_CONCERNS_OFF)'; return ;; esac
+  case " ${UCP_CONCERNS_ON:-} " in *" $key "*) printf 'on|включён вручную (UCP_CONCERNS_ON)'; return ;; esac
+  # новый проект без build-файлов: ставим всё, кроме ручных и кроме arch — его признак раскладочный, не стековый
+  if [ "$GREENFIELD" = 1 ] && [ "$det" != manual ] && [ "$key" != arch ]; then printf 'on|новый проект без build-файлов — ставим всё, срез пересчитается при следующем install.sh'; return; fi
+  case "$det" in
+    1) printf 'on|%s' "$marker" ;;
+    manual) printf 'off|только вручную: UCP_CONCERNS_ON=%s' "$key" ;;
+    *) case "$key" in spec) printf 'off|%s' "$marker" ;; *) printf 'off|нет маркера: %s' "$marker" ;; esac ;;
+  esac
+}
+# add_concern <key> <detected 0|1|manual> <marker-text> <design-glob|-> <review-glob|-> [extra-globs...]
+add_concern() {
+  local key="$1" det="$2" marker="$3" dglob="$4" rglob="$5"; shift 5
+  local decision state why skills=""
+  decision="$(decide "$key" "$det" "$marker")"
+  state="${decision%%|*}"; why="${decision#*|}"
+  if [ "$state" = on ]; then
+    if [ "$dglob" != - ]; then
+      if [ "$UCP_DESIGN" = all ] || is_chain "$key"; then skills="$skills $dglob"; else why="$why; design не ставится (UCP_DESIGN=chain)"; fi
+    fi
+    [ "$rglob" != - ] && skills="$skills $rglob"
+    for g in "$@"; do skills="$skills $g"; done
+    SKILL_GLOBS="$SKILL_GLOBS$skills"
+    SLICE_ON="$SLICE_ON $key"
+    SLICE_ROWS="$SLICE_ROWS
+| $key | ✓ | $why |"
+  else
+    SLICE_OFF="$SLICE_OFF $key"
+    SLICE_ROWS="$SLICE_ROWS
+| $key | — | $why |"
+  fi
+}
+detect_slice() {
+  BUILD_TEXT="$(_build_text)"
+  GREENFIELD=0; [ -z "$BUILD_TEXT" ] && GREENFIELD=1
+  SKILL_GLOBS="ucp-install ucp-${_tok}new-service ucp-fe-* ucp-e2e-*"
+  local d
+  # всегда: ядро методологии
+  add_concern pattern 1 'всегда — ядро методологии' "ucp-${_tok}pattern-design" "ucp-${_tok}pattern-review"
+  add_concern ddd-tactical 1 'всегда — ядро методологии' "ucp-${_tok}ddd-tactical-design" "ucp-${_tok}ddd-tactical-review"
+  add_concern bootstrap 1 'всегда — скелет и гейты сервиса' "ucp-${_tok}bootstrap-design" -
+  add_concern test 1 'всегда' "ucp-${_tok}test-design" "ucp-${_tok}test-review"
+  add_concern style 1 'всегда' - "${_style%\*}review"
+  add_concern error-handling 1 'всегда' "ucp-${_tok}error-handling-design" "ucp-${_tok}error-handling-review"
+  add_concern security 1 'всегда — SAST-обвязка любого сервиса' "ucp-${_tok}security-design" "ucp-${_tok}security-review"
+  add_concern shutdown 1 'всегда' - "ucp-${_tok}shutdown-review"
+  # по раскладке
+  if [ -d "$PROJECT_DIR/docs/spec" ]; then
+    add_concern spec 1 'docs/spec/ — источник правды по сервису' - - 'ucp-spec-*'
+  elif [ -d "$PROJECT_DIR/openspec" ]; then
+    add_concern spec 0 'проект ведёт спеки в openspec/, docs/spec/ нет — спековые скиллы UCP не нужны' - - 'ucp-spec-*'
+  else
+    add_concern spec 1 'спека — вход цепочки ucp-new-service (docs/spec/ появится первым шагом)' - - 'ucp-spec-*'
+  fi
+  d=0; [ -f "$PROJECT_DIR/architecture/services/_registry.yaml" ] && d=1
+  add_concern arch "$d" 'architecture/services/_registry.yaml' - - 'ucp-arch-*'
+  d=0; if [ -d "$PROJECT_DIR/core" ] && ls -d "$PROJECT_DIR"/*adapter* >/dev/null 2>&1; then d=1; elif has_dep 'include\("?:?(core|.*-adapter)'; then d=1; fi
+  add_concern hexagonal "$d" 'модули core/ и *-adapter/' "ucp-${_tok}hexagonal-design" "ucp-${_tok}hexagonal-review"
+  # по зависимостям / исходникам
+  d=0; has_dep 'spring-boot-starter-web|webflux|fastapi|flask|django|express|nestjs|gin-gonic|chi|openapi' && d=1
+  add_concern api "$d" 'web-стек или OpenAPI-генерация' "ucp-${_tok}api-design" "ucp-${_tok}api-review"
+  d=0; has_dep 'jakarta\.validation|spring-boot-starter-validation|pydantic|class-validator|go-playground/validator' && d=1
+  add_concern validation "$d" 'библиотека валидации' "ucp-${_tok}validation-design" "ucp-${_tok}validation-review"
+  d=0; has_dep 'jooq|sqlalchemy|typeorm|sqlc|jdbc|hibernate|jpa|prisma|gorm|pgx' && d=1
+  add_concern persistence "$d" 'слой хранения (jOOQ / SQLAlchemy / TypeORM / sqlc …)' "$_persist_design" "$_persist_review"
+  d=0; has_dep 'postgres|liquibase|flyway|alembic|psycopg|asyncpg' && d=1
+  add_concern pg-schema "$d" 'PostgreSQL и миграции' 'ucp-pg-schema-design' 'ucp-pg-schema-review'
+  add_concern pg-migration "$d" 'PostgreSQL и миграции' 'ucp-pg-migration-design' 'ucp-pg-migration-review'
+  add_concern pg-runtime "$d" 'PostgreSQL и миграции' 'ucp-pg-runtime-design' 'ucp-pg-runtime-review' 'ucp-pg-explain-review'
+  d=0; has_dep 'usecase-pattern' && d=1; { [ "$d" = 0 ] && has_src 'UseCaseQuery|UseCaseCommand'; } && d=1
+  add_concern cqrs "$d" 'библиотека usecase-pattern / маркеры Command и Query' "ucp-${_tok}cqrs-design" "ucp-${_tok}cqrs-review"
+  d=0; has_dep 'spring-kafka|kafka-clients|org\.apache\.kafka|aiokafka|kafkajs|confluent|segmentio/kafka|sarama' && d=1
+  add_concern kafka "$d" 'зависимость Kafka' "ucp-${_tok}kafka-design" "ucp-${_tok}kafka-review"
+  d=0; has_dep 'shedlock|quartz|celery|apscheduler|node-cron|robfig/cron|gocron' && d=1; { [ "$d" = 0 ] && has_src '@Scheduled\('; } && d=1
+  add_concern scheduler "$d" 'ShedLock / Quartz / @Scheduled / cron-библиотека' "ucp-${_tok}scheduler-design" "ucp-${_tok}scheduler-review"
+  d=0; ls -d "$PROJECT_DIR"/*-out-adapter >/dev/null 2>&1 && d=1; { [ "$d" = 0 ] && has_src 'RestClient|WebClient|RestTemplate|FeignClient|httpx\.|axios|net/http'; } && d=1
+  add_concern integration "$d" 'out-adapter или HTTP-клиент в исходниках' "ucp-${_tok}integration-design" "ucp-${_tok}integration-review"
+  d=0; has_dep 'resilience4j|tenacity|opossum|cockatiel|gobreaker|failsafe' && d=1
+  add_concern resilience "$d" 'библиотека устойчивости (Resilience4j …)' "ucp-${_tok}resilience-design" "ucp-${_tok}resilience-review"
+  d=0; has_dep 'spring-security|spring-boot-starter-security|oauth2|passport|fastapi\.security|jose|jwt' && d=1
+  add_concern auth "$d" 'Spring Security / OAuth2 / JWT' "ucp-${_tok}auth-design" "ucp-${_tok}auth-review"
+  d=0; has_dep 'micrometer|opentelemetry|actuator|logbook|prometheus|structlog|pino' && d=1
+  add_concern observability "$d" 'Micrometer / OpenTelemetry / Actuator / Logbook' "ucp-${_tok}observability-design" "ucp-${_tok}observability-review"
+  d=0; has_dep 'spring-boot-starter-cache|redis|caffeine|lettuce|jedis|cachetools|ioredis' && d=1
+  add_concern caching "$d" 'Redis / Caffeine / Spring Cache' "ucp-${_tok}caching-design" "ucp-${_tok}caching-review"
+  d=0; has_dep 'kafka-streams|flink|spring-cloud-stream|faust' && d=1
+  add_concern streaming "$d" 'Kafka Streams / Flink / Spring Cloud Stream' "ucp-${_tok}streaming-design" "ucp-${_tok}streaming-review"
+  add_concern distributed manual '' "ucp-${_tok}distributed-design" "ucp-${_tok}distributed-review"
+  add_concern payment-integration manual '' "ucp-${_tok}payment-integration-design" "ucp-${_tok}payment-integration-review"
+  add_concern meta manual '' - 'ucp-meta-review'
+  SKILL_PROFILE_LABEL="auto ($(echo $SLICE_ON | wc -w | tr -d ' ') concern'ов включено, $(echo $SLICE_OFF | wc -w | tr -d ' ') выключено)"
+}
+
+if [ "$SKILL_GLOBS" = '__AUTO__' ]; then
+  detect_slice
+fi
+print_slice() {
+  if [ -n "$SLICE_ROWS" ]; then
+    echo "  Срез по стеку (UCP_DESIGN=$UCP_DESIGN):"
+    printf '%s\n' "$SLICE_ROWS" | sed -n 's/^| \([^|]*\) | \([^|]*\) | \(.*\) |$/    \2 \1 — \3/p'
+  fi
+}
+
 # --- --check: диагностика без модификаций ---
 if [ "$CHECK_MODE" = true ]; then
   echo "==> Проверка установки UCP-скиллов в $PROJECT_DIR"
+  echo
+  print_slice
   echo
   PROBLEMS=0
 
@@ -272,6 +432,16 @@ if [ "$CHECK_MODE" = true ]; then
   check_dir "$PROJECT_DIR/.claude/docs"   "Docs (style-guides)" r
   check_dir "$PROJECT_DIR/.claude/agents" "Agents"
   check_dir "$PROJECT_DIR/.claude/hooks"  "Hooks"
+
+  # .claude/rules — always-loaded ядро языка; проверяем, только если в репо есть
+  # <lang>-core.md для выбранного языка (иначе пустая rules/ — не проблема).
+  expected_cores=0
+  while IFS= read -r core; do
+    case "/${core#"$SKILLS_DIR"/.claude/docs/}" in */"$UCP_LANG"/*) expected_cores=$((expected_cores + 1)) ;; esac
+  done < <(find "$SKILLS_DIR/.claude/docs" -name '*-core.md' 2>/dev/null)
+  if [ "$expected_cores" -gt 0 ]; then
+    check_dir "$PROJECT_DIR/.claude/rules" "Rules (always-loaded ядро)"
+  fi
 
   # CLAUDE.md managed block
   if [ -f "$PROJECT_DIR/CLAUDE.md" ] && grep -qF "<!-- BEGIN ucp-skills" "$PROJECT_DIR/CLAUDE.md"; then
@@ -357,12 +527,13 @@ PY
   fi
 fi
 
-mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/hooks"
+mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/rules" "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/hooks"
 
 # Skills — симлинк ucp-* скиллов по выбранному профилю (по умолчанию — все).
 # Сначала чистим существующие ucp-* симлинки, указывающие в этот репо, — иначе
 # при смене профиля (full -> rest) останутся stale-симлинки на лишние скиллы.
 echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/ (трек: $UCP_TRACK, язык: $UCP_LANG, профиль: $SKILL_PROFILE_LABEL)"
+print_slice
 for old in "$PROJECT_DIR"/.claude/skills/ucp-*; do
   [ -L "$old" ] || continue
   case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/skills/*) rm "$old" ;; esac
@@ -537,6 +708,36 @@ done < <(find "$SKILLS_DIR/.claude/docs" -name '*.md' | sort)
 # Прунинг папок, опустевших после смены языка/профиля (напр. backend/error-handling/python/).
 find "$PROJECT_DIR/.claude/docs" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
+# Rules — always-loaded ядро языка. Claude Code грузит `.claude/rules/*.md` при
+# старте каждой сессии с приоритетом CLAUDE.md, поэтому базовые решения
+# методологии (раскладка, чистота core, команды/запросы, фабрики, исключения,
+# время) попадают в контекст без вызова скилла. Источник — файл
+# `.claude/docs/<track>/<lang>/<lang>-core.md` этого репо; в проект идёт симлинк
+# `.claude/rules/ucp-<lang>-core.md`. Без frontmatter `paths:` — грузится всегда.
+echo
+echo "==> Подключаю always-loaded ядро в $PROJECT_DIR/.claude/rules/"
+for old in "$PROJECT_DIR"/.claude/rules/ucp-*; do
+  [ -L "$old" ] || continue
+  case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/docs/*) rm "$old" ;; esac
+done
+RULE_COUNT=0
+while IFS= read -r core; do
+  rel="${core#"$SKILLS_DIR"/.claude/docs/}"
+  case "/$rel" in
+    */java/*)   [ "$UCP_LANG" = java ]   || continue ;;
+    */python/*) [ "$UCP_LANG" = python ] || continue ;;
+    */node/*)   [ "$UCP_LANG" = node ]   || continue ;;
+    */go/*)     [ "$UCP_LANG" = go ]     || continue ;;
+  esac
+  name="ucp-$(basename "$core")"
+  ln -sfn "$core" "$PROJECT_DIR/.claude/rules/$name"
+  RULE_COUNT=$((RULE_COUNT + 1))
+  echo "    ✓ $name → $rel"
+done < <(find "$SKILLS_DIR/.claude/docs" -name '*-core.md' | sort)
+if [ "$RULE_COUNT" -eq 0 ]; then
+  echo "    (ядра для языка $UCP_LANG в репо пока нет)"
+fi
+
 # CLAUDE.md — точка входа для Claude в проекте-потребителе. install.sh
 # управляет блоком между маркерами BEGIN ucp-skills / END ucp-skills:
 # создаёт файл, дописывает блок, либо in-place заменяет существующий блок.
@@ -555,6 +756,29 @@ if [ ! -f "$CLAUDE_TEMPLATE" ]; then
 fi
 
 CLAUDE_BLOCK_CONTENT="$(cat "$CLAUDE_TEMPLATE")"
+SLICE_SECTION="### Установленный срез
+
+Срез посчитан \`install.sh\` ($(date +%Y-%m-%d)): профиль \`$SKILL_PROFILE_LABEL\`, \`UCP_DESIGN=$UCP_DESIGN\`,
+язык \`$UCP_LANG\`, трек \`$UCP_TRACK\`. Спеки всех доменов стоят в \`.claude/docs/\` независимо
+от среза — выключен только упакованный скилл, не правила: для concern'а без скилла
+читай его \`spec.md\` напрямую. Поменять срез: \`UCP_CONCERNS_ON\` / \`UCP_CONCERNS_OFF\`
+и повторный \`install.sh\`."
+if [ -n "$SLICE_ROWS" ]; then
+  SLICE_SECTION="$SLICE_SECTION
+
+| Concern | Стоит | Почему |
+|---|---|---|$SLICE_ROWS"
+fi
+case " $SLICE_ON " in *" arch "*)
+  SLICE_SECTION="$SLICE_SECTION
+
+Архитектурный репозиторий: \`architecture/\` с \`services/_registry.yaml\` — платформенный
+уровень; скиллы \`ucp-arch-*\` работают только из его корня, спеки сервисов туда
+зеркалируются через \`/ucp-arch-sync\`. «Новый сервис» из \`architecture/\` — это
+\`/ucp-arch-design\`, из директории сервиса — \`/ucp-new-service\`." ;;
+esac
+CLAUDE_BLOCK_CONTENT="${CLAUDE_BLOCK_CONTENT/$END_MARKER/$SLICE_SECTION
+$END_MARKER}"
 manage_block "$CLAUDE_MD" "$BEGIN_MARKER" "$END_MARKER" "$CLAUDE_BLOCK_CONTENT"
 
 # .gitignore — managed-блок. install.sh раскладывает в $PROJECT_DIR/.claude/
@@ -569,10 +793,12 @@ GITIGNORE_END_MARKER="# END ucp-skills"
 GITIGNORE_BLOCK="$(cat <<'EOF'
 # BEGIN ucp-skills (managed by claude-code-java/install.sh)
 # Папки .claude/docs/, .claude/agents/, .claude/hooks/ принадлежат install.sh
-# целиком — свои файлы туда не клади (.claude/skills/ остаётся открытым для
-# custom-скиллов; .claude/settings.json пользовательский, install.sh только
-# управляет в нём блоком hooks через идемпотентный python-мерж).
+# целиком — свои файлы туда не клади (.claude/skills/ и .claude/rules/ остаются
+# открытыми для своих скиллов и правил — install.sh трогает там только ucp-*;
+# .claude/settings.json пользовательский, install.sh только управляет в нём
+# блоком hooks через идемпотентный python-мерж).
 .claude/skills/ucp-*
+.claude/rules/ucp-*
 .claude/docs/
 .claude/agents/
 .claude/hooks/
@@ -591,7 +817,7 @@ CLAUDE_BIN="$(command -v claude 2>/dev/null || true)"
 echo
 echo "==> Регистрирую GitLab MCP для $PROJECT_DIR"
 
-GITLAB_API_URL_DEFAULT="https://gitlab.mosmetro.tech/api/v4"
+GITLAB_API_URL_DEFAULT="https://gitlab.com/api/v4"
 GITLAB_API_URL="${GITLAB_API_URL:-$GITLAB_API_URL_DEFAULT}"
 GITLAB_TOKEN_FILE="${GITLAB_TOKEN_FILE:-$HOME/.config/usecase-pattern-skills/gitlab-token}"
 
@@ -632,11 +858,12 @@ else
 fi
 
 echo
-echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов, $HOOK_COUNT хуков и $DOC_COUNT style-guide-ов подключены к $PROJECT_DIR."
+echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов, $HOOK_COUNT хуков, $DOC_COUNT style-guide-ов и $RULE_COUNT always-loaded ядер подключены к $PROJECT_DIR."
 echo
 echo "Проверка:"
 echo "    ls -la $PROJECT_DIR/.claude/skills"
 echo "    ls -la $PROJECT_DIR/.claude/docs"
+echo "    ls -la $PROJECT_DIR/.claude/rules"
 echo
 echo "─────────────────────────────────────────────────────────────────────"
 echo "ОПЦИОНАЛЬНО: плагины Claude Code, которые улучшают ucp-spec-design"

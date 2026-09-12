@@ -1,27 +1,30 @@
 ---
 name: ucp-resilience-review
-description: Ревью защиты Java/Spring-сервиса от отказов внешних систем (коды R-RES-*) — per-system isolation OkHttpClient/pool/bulkhead, @CircuitBreaker/@Bulkhead/@Retry на out-adapter методах, retry только при идемпотентности, HealthIndicator per-system с TTL.
+description: Ревью защиты Java/Spring-сервиса от отказов внешних систем — per-system isolation OkHttpClient/pool/bulkhead, @CircuitBreaker/@Bulkhead/@Retry на out-adapter методах, retry только при идемпотентности, HealthIndicator per-system с TTL.
 when_to_use: Ревью out-adapter, *ClientConfig, application.yml с resilience4j-блоком, новых HTTP-клиентов.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью resilience
 
-Ты ревьюишь Java/Spring-код out-adapter'ов, *ClientConfig классы, application.yml с resilience4j-конфигом — на соответствие Resilience Style Guide. Главные точки контроля: per-system isolation, аннотации resilience на adapter-методах, retry-policy с учётом идемпотентности, bulkhead semaphore, sleep-loop в sync-handler'ах, связка с OpenAPI generator.
+Ты ревьюишь Java/Spring-код out-adapter'ов, *ClientConfig классы, application.yml с resilience4j-конфигом — на соответствие требованиям `resilience/*`. Главные точки контроля: per-system isolation, аннотации resilience на adapter-методах, retry-policy с учётом идемпотентности, bulkhead semaphore, sleep-loop в sync-handler'ах, связка с OpenAPI generator.
 
 ## Зависимости
 
-- **`.claude/docs/backend/resilience/resilience-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Каждое нарушение цитируется кодом из подгрупп: `R-RES-WHERE-*` (где какая защита), `R-RES-ISO-*` (per-system isolation), `R-RES-TO-*` (timeouts), `R-RES-CB-*` (circuit breaker), `R-RES-RE-*` (retry), `R-RES-BH-*` (bulkhead), `R-RES-FB-*` (fallback), `R-RES-CFG-*` (конфигурация), `R-RES-OAS-*` (связка с OpenAPI generator), `R-RES-HC-*` (health checks), `R-RES-ASYNC-*` (async и polling), `R-RES-OBS-*` (observability).
-- Парные документы: `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` для idempotency-зависимого retry), `backend/rest-api/rest-api-rules.md` (`R-OAS-*` для OpenAPI-first).
+- **`.claude/docs/backend/resilience/spec.md`** — индекс всех правил (полный текст с примерами — `references/<lang>/implementation.md`). Каждое нарушение цитируется кодом из подгрупп: `R-RES-WHERE-*` (где какая защита), `R-RES-ISO-*` (per-system isolation), `R-RES-TO-*` (timeouts), `R-RES-CB-*` (circuit breaker), `R-RES-RE-*` (retry), `R-RES-BH-*` (bulkhead), `R-RES-FB-*` (fallback), `R-RES-CFG-*` (конфигурация), `R-RES-OAS-*` (связка с OpenAPI generator), `R-RES-HC-*` (health checks), `R-RES-ASYNC-*` (async и polling), `R-RES-OBS-*` (observability).
+- Парные документы: `backend/auth-patterns/spec.md` (`auth-patterns/money-commands-need-idempotency-key` для idempotency-зависимого retry), `backend/rest-api/spec.md` (`R-OAS-*` для OpenAPI-first).
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/resilience/resilience-rules.md`. Цитируй конкретные коды правил (`R-RES-CB-1`, `R-RES-OAS-X1`), не префикс.
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/resilience/spec.md`. Цитируй конкретные коды правил (`resilience/breaker-on-adapter-method`, `resilience/breaker-on-adapter-method`), не префикс.
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на недавно изменённые файлы в `*-out-adapter/`, `common-client-config/`.
    - Найди новые/изменённые `*ClientConfig`, `*ClientAdapter`, `application*.yml` с `resilience4j` блоком, `*HealthIndicator`.
-   - Найди файлы с `Thread.sleep` — кандидаты на нарушение `R-RES-ASYNC-X1`.
+   - Найди файлы с `Thread.sleep` — кандидаты на нарушение `resilience/no-long-synchronous-waits`.
    - Найди файлы с импортами `io.github.resilience4j.*` — место аннотаций.
 
 3. **Прогон по подгруппам кодов.** Проверяй каждое применимое правило:
@@ -29,7 +32,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - **`R-RES-ISO-*`** — каждая внешняя система имеет свой `OkHttpClient` / `RestClient` bean с собственным pool/dispatcher, не shared. Имена beans/instances совпадают с system name.
    - **`R-RES-TO-*`** — connectTimeout < readTimeout < callTimeout, обоснования отклонений от типовых в yml-комментариях.
    - **`R-RES-CB-*`** — `@CircuitBreaker(name = "<system>")` на public-методе adapter (не на generated client, не на helper, не на репозитории), sliding-window count-based, failure rate 50% (30% для критичных), wait 30s, half-open 3 calls, slow-call threshold = readTimeout/2.
-   - **`R-RES-RE-*`** — retry только при идемпотентности (GET либо `Idempotency-Key` per `AUTH-19`); не на 4xx; exp backoff обязателен; not Spring-Retry; in-memory <5s vs task-queue >30s.
+   - **`R-RES-RE-*`** — retry только при идемпотентности (GET либо `Idempotency-Key` per `auth-patterns/money-commands-need-idempotency-key`); не на 4xx; exp backoff обязателен; not Spring-Retry; in-memory <5s vs task-queue >30s.
    - **`R-RES-BH-*`** — `@Bulkhead(name = "<system>")` semaphore-based (не thread-pool); maxConcurrent = pool × 0.8 (срабатывает раньше pool exhaustion); maxWait 100ms.
    - **`R-RES-FB-*`** — fallback допустим для cached read / default для read / async-mode (queue + 202 Accepted) для write; не для money с null/zero; не silent success; не каскадный fallback без своего CB.
    - **`R-RES-CFG-*`** — конфиг через `application.yml` с `configs.default` и `instances.<name>` (Spring Cloud Config friendly), не через `@Bean CircuitBreakerConfig.custom()`.
@@ -39,45 +42,45 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - **`R-RES-OBS-*`** — `resilience4j-micrometer` подключён, metrics не отключены, OTel-spans содержат `circuit_breaker.state`.
 
 4. **При ревью кода ищи паттерны-нарушения:**
-   - `OkHttpClient.Builder().build()` без явных timeouts — `R-RES-TO-X1`.
-   - Один `OkHttpClient` bean / один `Dispatcher` для нескольких систем — `R-RES-ISO-X1`.
-   - `@CircuitBreaker(name = "default")` или без `name` — `R-RES-CB-X3`.
-   - `@CircuitBreaker` на `*Repository` / `*Service` / handler без HTTP — `R-RES-CB-X1`.
-   - `@Retry` без `@CircuitBreaker` или без `enable-exponential-backoff` — `R-RES-RE-X3`.
-   - `@Retryable` (Spring-Retry) на adapter-методе — `R-RES-RE-X4`.
-   - Custom `try { ... } catch { failures.incrementAndGet(); ... }` — `R-RES-CB-X2`.
-   - `Thread.sleep` в коде adapter / handler / use-case — `R-RES-ASYNC-X1` или `R-RES-ASYNC-X2`.
-   - `@CircuitBreaker` или `@Retry` непосредственно на generated `*Api` interface — `R-RES-OAS-X1`.
-   - `<X>Api` сгенерирован Retrofit2 для нового сервиса — `R-RES-OAS-2` (предложить `spring-restclient`).
+   - `OkHttpClient.Builder().build()` без явных timeouts — `resilience/timeout-hierarchy`.
+   - Один `OkHttpClient` bean / один `Dispatcher` для нескольких систем — `resilience/client-per-external-system`.
+   - `@CircuitBreaker(name = "default")` или без `name` — `resilience/instance-names-match-system`.
+   - `@CircuitBreaker` на `*Repository` / `*Service` / handler без HTTP — `resilience/no-protection-around-local-operations`.
+   - `@Retry` без `@CircuitBreaker` или без `enable-exponential-backoff` — `resilience/retry-with-backoff-and-limit`.
+   - `@Retryable` (Spring-Retry) на adapter-методе — `resilience/retry-with-backoff-and-limit`.
+   - Custom `try { ... } catch { failures.incrementAndGet(); ... }` — `resilience/no-custom-breaker`.
+   - `Thread.sleep` в коде adapter / handler / use-case — `resilience/no-long-synchronous-waits` или `resilience/no-long-synchronous-waits`.
+   - `@CircuitBreaker` или `@Retry` непосредственно на generated `*Api` interface — `resilience/breaker-on-adapter-method`.
+   - `<X>Api` сгенерирован Retrofit2 для нового сервиса — `resilience/client-generated-from-contract` (предложить `spring-restclient`).
    - Public-метод out-adapter возвращает generated DTO (`SberRegisterResponse`, etc.) — `R-RES-OAS-X3`.
-   - `HealthIndicator.health()` без кеша / делает business-операцию — `R-RES-HC-X1` / `R-RES-HC-X2`.
-   - Fallback-метод возвращает `Money.ZERO` / `null` / пустую коллекцию для money-результата — `R-RES-FB-X1`.
+   - `HealthIndicator.health()` без кеша / делает business-операцию — `resilience/cached-health-probe-per-system` / `resilience/cached-health-probe-per-system`.
+   - Fallback-метод возвращает `Money.ZERO` / `null` / пустую коллекцию для money-результата — `resilience/fallback-does-not-fake-success`.
    - В `application.yml` `resilience4j.circuitbreaker.instances` отсутствует / пуст, при этом аннотации в коде — конфиг разъехался.
-   - `management.metrics.enable.resilience4j: false` — `R-RES-OBS-X1`.
+   - `management.metrics.enable.resilience4j: false` — `resilience/resilience-state-is-observable`.
 
 5. **При ревью `*ClientConfig` / `application.yml`:**
    - На каждую внешнюю систему — отдельный bean OkHttpClient/RestClient с уникальным `@Qualifier` или `@Bean(name)`.
    - Connection pool sizing: `maxConcurrent × 1.2`. Total всех систем ≤ HikariCP / 2.
    - Configs `resilience4j.{circuitbreaker,bulkhead,retry}.instances.<system>` определены с `base-config: default`.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-1`..`RFF-16`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`R-RES-CB-1`, `R-RES-OAS-X1`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-format/spec.md` (`review-format/*`). Read-проверка строки обязательна. В качестве `<КодПравила>` — конкретный код (`resilience/breaker-on-adapter-method`, `resilience/breaker-on-adapter-method`).
 
-7. **Доменные ориентиры серьёзности** (`RFF-12`):
+7. **Доменные ориентиры серьёзности** (`review-format/severity-scale-is-shared`):
    - **Критично** — нарушения, ведущие к регрессу под нагрузкой или денежным багам:
-     - shared OkHttp pool на разные системы (`R-RES-ISO-X1`)
-     - `@Retry` на write без Idempotency-Key (`R-RES-RE-X1`) — может списать дважды
-     - sleep-loop в sync-handler (`R-RES-ASYNC-X1`) — исчерпает thread-pool
-     - тихий fallback с success для money (`R-RES-FB-X1`, `R-RES-FB-X2`)
-     - аннотации на generated interface (`R-RES-OAS-X1`) — затрутся
-     - отсутствие CB на adapter-методе outbound (`R-RES-CB-1`)
+     - shared OkHttp pool на разные системы (`resilience/client-per-external-system`)
+     - `@Retry` на write без Idempotency-Key (`resilience/retry-only-when-safe`) — может списать дважды
+     - sleep-loop в sync-handler (`resilience/no-long-synchronous-waits`) — исчерпает thread-pool
+     - тихий fallback с success для money (`resilience/fallback-does-not-fake-success`, `resilience/fallback-does-not-fake-success`)
+     - аннотации на generated interface (`resilience/breaker-on-adapter-method`) — затрутся
+     - отсутствие CB на adapter-методе outbound (`resilience/breaker-on-adapter-method`)
    - **Предупреждение** — отклонения от конвенций:
-     - `name = "default"` вместо per-system (`R-RES-CB-X3`)
-     - thread-pool bulkhead вместо semaphore (`R-RES-BH-X1`)
-     - sync-probe без кеша в HealthIndicator (`R-RES-HC-X1`)
-     - Retrofit2 для нового сервиса (`R-RES-OAS-2`)
+     - `name = "default"` вместо per-system (`resilience/instance-names-match-system`)
+     - thread-pool bulkhead вместо semaphore (`resilience/bulkhead-is-semaphore-based`)
+     - sync-probe без кеша в HealthIndicator (`resilience/cached-health-probe-per-system`)
+     - Retrofit2 для нового сервиса (`resilience/client-generated-from-contract`)
    - **Замечание** — стилистика:
-     - timeouts отличаются от типовых без комментария-обоснования (`R-RES-TO-2`)
-     - программный `CircuitBreakerConfig.custom()` вместо yml (`R-RES-CFG-X1`)
+     - timeouts отличаются от типовых без комментария-обоснования (`resilience/timeout-hierarchy`)
+     - программный `CircuitBreakerConfig.custom()` вместо yml (`resilience/declarative-configuration`)
 
 ## Что не входит
 

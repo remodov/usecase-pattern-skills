@@ -1,19 +1,19 @@
 ---
 name: ucp-py-api-design
 lang: python
-description: Спроектировать REST API-эндпоинт/ресурс на Python/FastAPI code-first (коды R-URL/MTH/QRY/FLD/RSP/ERR/OAS-*) — kebab-case URL + /api/v1, query camelCase, JSON camelCase без null в 2xx, Pydantic-DTO, problem+json (RFC 9457), operation_id + tags.
+description: Спроектировать REST API-эндпоинт/ресурс на Python/FastAPI code-first (требования rest-api/*) — kebab-case URL + /api/v1, query camelCase, JSON camelCase без null в 2xx, Pydantic-DTO, problem+json (RFC 9457), operation_id + tags.
 when_to_use: Триггеры — «спроектируй эндпоинт X», «REST-ресурс Y на FastAPI», «OpenAPI для Z». При создании эндпоинтов и Pydantic-DTO.
 allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 ---
 
 # REST API — проектирование (Python / FastAPI, code-first)
 
-Ты проектируешь REST-контракт по **контракту** `backend/rest-api/rest-api-rules.md` и **Python-реализации**
-`backend/rest-api/python/rest-api-style-guide.md`. FastAPI **code-first**: Pydantic-модели + декораторы → OpenAPI генерируется.
+Ты проектируешь REST-контракт по **контракту** `backend/rest-api/spec.md` и **Python-реализации**
+`backend/rest-api/references/python/implementation.md`. FastAPI **code-first**: Pydantic-модели + декораторы → OpenAPI генерируется.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Python-style-guide (бо́льшая часть правил протокольная — идентична). Коды в обосновании, не в коде. Связанные: `backend/validation/python/...` (Pydantic-DTO, OAS-инверсия), `backend/error-handling/python/...` (problem+json handler), `backend/usecase-pattern/python/...` (роутер→Dispatcher).
+1. **Прочитай** требования `python-style/*` (бо́льшая часть правил протокольная — идентична). Коды в обосновании, не в коде. Связанные: `backend/validation/python/...` (Pydantic-DTO, OAS-инверсия), `backend/error-handling/python/...` (problem+json handler), `backend/usecase-pattern/python/...` (роутер→Dispatcher).
 
 2. **URL/методы/версии** (`R-URL/MTH/NEST/ACT/VER-*`): kebab-case, без trailing-slash (`redirect_slashes=False`), `APIRouter(prefix="/api/v1")`; метод=декоратор + `status_code`; action всегда `POST` (`/orders/{id}/confirm`); ≤2 уровня вложенности.
 
@@ -29,10 +29,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 
 ## Антипаттерны, которые НЕ генерировать
 
-- trailing-slash / заглавные / глаголы в CRUD-пути (`R-URL-X1/X2`/`R-MTH`); >2 уровня вложенности (`R-NEST-X1`); версия в query (`R-VER-X2`).
-- CSV-массивы в query (`R-QRY-X3`); `page=0` (`R-QRY-X2`); бизнес-логика в query (`R-QRY-X4`).
-- `null`/`""` в 2xx (`R-RSP-X1/X2`); envelope для единичного ресурса (`R-RSP-X4`); `nullable: true` (`R-RSP-X3`).
-- `application/json` для ошибки (`R-ERR-X1`); дефолтный 422 вместо 400+problem+json; stack/SQL в 500 (`R-ERR-X4`); `X-`-префикс заголовка (`R-HDR-X1`); контракт как голый `dict` (`R-OAS`/`R-VLD-OAS-X5`).
+- trailing-slash / заглавные / глаголы в CRUD-пути (`R-URL-X1/X2`/`R-MTH`); >2 уровня вложенности (`rest-api/nesting-max-two-levels`); версия в query (`rest-api/version-in-path`).
+- CSV-массивы в query (`rest-api/arrays-as-repeated-parameters`); `page=0` (`rest-api/pagination-forms`); бизнес-логика в query (`rest-api/filters-ranges-and-search`).
+- `null`/`""` в 2xx (`R-RSP-X1/X2`); envelope для единичного ресурса (`rest-api/single-resource-is-flat`); `nullable: true` (`rest-api/no-nulls-in-successful-response`).
+- `application/json` для ошибки (`rest-api/error-body-follows-standard`); дефолтный 422 вместо 400+problem+json; stack/SQL в 500 (`rest-api/no-internals-in-error-body`); `X-`-префикс заголовка (`rest-api/headers-standard-and-prefixed`); контракт как голый `dict` (`R-OAS`/`validation/controller-implements-generated-contract`).
 
 После работы скилла — обязательно `ucp-py-api-review`.
 

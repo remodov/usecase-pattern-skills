@@ -1,43 +1,43 @@
 ---
 name: ucp-jooq-design
-description: Сгенерировать persistence-слой на jOOQ (Java) из доменного <X>Repository по jOOQ Style Guide (коды R-JOOQ-*) — Jooq<X>Repository с DSLContext + multiset, <X>DomainRecordMapper, <X>FilterConditionBuilder, Jooq<X>ViewRepository, SelectMode.
+description: Сгенерировать persistence-слой на jOOQ (Java) из доменного <X>Repository по требованиям `jooq/*` — Jooq<X>Repository с DSLContext + multiset, <X>DomainRecordMapper, <X>FilterConditionBuilder, Jooq<X>ViewRepository, SelectMode.
 when_to_use: После ucp-ddd-tactical-design (есть Aggregate и Repository-интерфейс). Триггеры — «сделай репозиторий для X», «нужна jooq-имплементация Y».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # jOOQ Repository — проектирование
 
-Ты генерируешь persistence-имплементацию на jOOQ для домен-уровневого `<X>Repository` интерфейса по jOOQ Style Guide. Цель — сервис получает `Jooq<X>Repository` + mapper + (опционально) filter-builder и view-репозиторий, проходящие `ucp-jooq-review` без findings.
+Ты генерируешь persistence-имплементацию на jOOQ для домен-уровневого `<X>Repository` интерфейса по требованиям `jooq/*`. Цель — сервис получает `Jooq<X>Repository` + mapper + (опционально) filter-builder и view-репозиторий, проходящие `ucp-jooq-review` без findings.
 
 ## Инструкции
 
-1. **Прочитай style guide'ы** в порядке:
-   - `.claude/docs/backend/java/jooq/jooq-rules.md` — главный (правила `R-JOOQ-*`).
-   - `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
-   - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` §2 — для Уровня 3 (`core/` ↔ `persistence/`).
-   - `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` `PG-L-040`/`PG-L-041` — для locking-синтаксиса (FOR UPDATE / SKIP LOCKED).
+1. **Прочитай требования** в порядке:
+   - `.claude/docs/backend/java/jooq/spec.md` — главный (правила `R-JOOQ-*`).
+   - `.claude/docs/backend/ddd-tactical/spec.md` — для понимания Aggregate Root, Entity, Value Object: что из агрегата ложится в одну таблицу, что в child-таблицы.
+   - `.claude/docs/backend/usecase-pattern/spec.md` §2 — для Уровня 3 (`core/` ↔ `persistence/`).
+   - `.claude/docs/backend/pg-runtime/spec.md` `pg-runtime/row-lock-inside-transaction`/`pg-runtime/row-lock-inside-transaction` — для locking-синтаксиса (FOR UPDATE / SKIP LOCKED).
 
 2. **Подтверди наличие зависимостей.** Проверь `bootstrap/build.gradle.kts` на:
-   - `spring-boot-starter-jooq` (`BS-17`).
-   - `nu.studer.jooq` plugin (или собственный плагин `jooq-postgresql-generator-plugin` если уже есть в проекте — см. `R-JOOQ-CFG-2`).
+   - `spring-boot-starter-jooq` (`spring-bootstrap/single-persistence-mechanism`).
+   - `nu.studer.jooq` plugin (или собственный плагин `jooq-postgresql-generator-plugin` если уже есть в проекте — см. `jooq/codegen-from-live-schema`).
    - Generated POJO в `<pkg>.jooq.tables` (запусти `./gradlew generateJooq` если нет).
    Если codegen не настроен — это повод вызвать `ucp-bootstrap-design` сначала, не пиши руками.
 
 3. **Уточни параметры из описания пользователя:**
    - **Aggregate Root и его структура.** Имя (`Order`, `Receipt`), child-сущности (`OrderItem` через `multiset`), value objects, enum'ы. Если домен ещё не написан — это для `ucp-ddd-tactical-design`, не для этого скилла.
-   - **`<X>Repository` интерфейс в `core/<bc>/domain/repository/`.** Если ещё нет — либо пользователь пишет вместе с тобой (быстрый набросок), либо сначала `ucp-ddd-tactical-design`. Из интерфейса берёшь сигнатуры методов.
-   - **Filter-объект (`<X>Filter`).** Сколько полей? Есть ли cross-table EXISTS-условия? `<X>Filter` ≤ 3 простых полей → inline-предикаты в репозитории. > 3 полей или EXISTS → отдельный `<X>FilterConditionBuilder` (`R-JOOQ-FLT-1`).
-   - **Read-проекции:** есть ли отдельный `<X>ViewRepository` интерфейс, отличающийся от `<X>Repository`? Тогда `Jooq<X>ViewRepository` — отдельный класс (`R-JOOQ-VIEW-1`). Иначе — пропускаем.
+   - **`<X>Repository` интерфейс в `core/port/out/repository/`.** Если ещё нет — либо пользователь пишет вместе с тобой (быстрый набросок), либо сначала `ucp-ddd-tactical-design`. Из интерфейса берёшь сигнатуры методов.
+   - **Filter-объект (`<X>Filter`).** Сколько полей? Есть ли cross-table EXISTS-условия? `<X>Filter` ≤ 3 простых полей → inline-предикаты в репозитории. > 3 полей или EXISTS → отдельный `<X>FilterConditionBuilder` (`jooq/filters-extracted-to-builder`).
+   - **Read-проекции:** есть ли отдельный `<X>ViewRepository` интерфейс, отличающийся от `<X>Repository`? Тогда `Jooq<X>ViewRepository` — отдельный класс (`jooq/view-repository-separate`). Иначе — пропускаем.
    - **Mapper стратегия:**
      - Простые DTO ↔ POJO (нет assemble-логики, нет ручных enum-конверсий, нет JSONB-парсинга) → MapStruct interface.
-     - Aggregate с children, ручная реконструкция через `assembleAggregate(...)`, JSONB-парсинг, custom enum mapping → **Plain Java** `@Component` (`R-JOOQ-MAP-1`).
+     - Aggregate с children, ручная реконструкция через `assembleAggregate(...)`, JSONB-парсинг, custom enum mapping → **Plain Java** `@Component` (`jooq/mapper-is-explicit-class`).
    - **SelectMode сценарии:** какие методы могут быть с `FOR UPDATE` (write-handler с pessimistic-lock) или `SKIP LOCKED` (scheduler / outbox)? Read-only query-handler — всегда `NO_LOCK` (default).
 
-4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Произведи код.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
    ### 4.1. Доменный `<X>Repository` (если ещё нет)
    ```java
-   // core/<bc>/domain/repository/<X>Repository.java
+   // core/port/out/repository/<X>Repository.java
    public interface OrderRepository {
        Optional<Order> findById(Long id, SelectMode mode);
        PaginationView<Order> findAll(OrderFilter filter, int page, int size);
@@ -47,7 +47,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ```
 
    ### 4.2. `SelectMode` и `PaginationView` (если ещё нет в core/)
-   Эти классы — общие для всех агрегатов проекта. Создай в `core/<bc>/domain/repository/`, если не существуют:
+   Эти классы — общие для всех агрегатов проекта. `SelectMode` — в `core/port/out/`, `PaginationView` — в `core/view/`; создай, если не существуют:
    ```java
    public enum SelectMode {
        NO_LOCK, FOR_UPDATE, FOR_UPDATE_SKIP_LOCKED
@@ -145,7 +145,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   Static imports в начале файла (`R-JOOQ-QRY-1`):
+   Static imports в начале файла (`jooq/type-safe-query-building`):
    ```java
    import static org.jooq.impl.DSL.*;
    import static <pkg>.adapter.out.postgres.SelectMultisetAliasKeys.*;
@@ -155,7 +155,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    ### 4.4. `<X>DomainRecordMapper.java`
 
-   Plain Java (если есть assemble-логика, enum-translation, JSONB) — **`R-JOOQ-MAP-1`**:
+   Plain Java (если есть assemble-логика, enum-translation, JSONB) — **`jooq/mapper-is-explicit-class`**:
    ```java
    @Component
    @RequiredArgsConstructor
@@ -215,7 +215,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   `FilterConditionHelper` (`R-JOOQ-FLT-4`) — общий для всех фильтров проекта. Создай в `persistence/src/main/java/<pkg>/adapter/out/postgres/`, если не существует:
+   `FilterConditionHelper` (`jooq/filters-extracted-to-builder`) — общий для всех фильтров проекта. Создай в `persistence/src/main/java/<pkg>/adapter/out/postgres/`, если не существует:
    ```java
    public final class FilterConditionHelper {
        public static <T> Condition andIfNotNull(Condition c, T value, Function<T, Condition> mapper) {
@@ -232,7 +232,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ```
 
    ### 4.6. `SelectMultisetAliasKeys` (если ещё нет в `persistence/`)
-   Общий — все alias-ключи мульти-сетов проекта в одном месте (`R-JOOQ-MS-1`):
+   Общий — все alias-ключи мульти-сетов проекта в одном месте (`jooq/nested-collections-in-one-query`):
    ```java
    public final class SelectMultisetAliasKeys {
        public static final String ITEMS = "items";
@@ -244,7 +244,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    ### 4.7. `Jooq<X>ViewRepository.java` (если есть `<X>ViewRepository` интерфейс с read-проекциями)
 
-   Отдельный класс — не подмешивай view-методы к основному `Jooq<X>Repository` (`R-JOOQ-VIEW-X1`):
+   Отдельный класс — не подмешивай view-методы к основному `Jooq<X>Repository` (`jooq/view-repository-separate`):
    ```java
    @Repository
    @RequiredArgsConstructor
@@ -254,7 +254,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
        @Override
        public PaginationView<OrderSummary> findSummaries(OrderFilter filter, int page, int size) {
-           // read-DTO `OrderSummary` — record в core/<bc>/domain/repository/view/
+           // read-DTO `OrderSummary` — record в core/view/
            // Без full multiset, без heavy joins. Минимально что нужно UI.
            ...
        }
@@ -272,19 +272,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - UPDATE через `dslContext.update().set().where()`, не через `record.store()`.
    - Filter условие начинается с `noCondition()`.
    - Mapper — Plain Java если есть assemble-логика; MapStruct только если оба типа POJO без custom-логики.
-   - Generated POJO/Record не уходит из public-метода (`R-JOOQ-MAP-X1`).
+   - Generated POJO/Record не уходит из public-метода (`jooq/repository-speaks-domain-types`).
    - На `Jooq<X>Repository` нет `@Transactional` — это handler-граница.
    - View-методы не подмешаны к основному репозиторию (если read-проекция нужна — отдельный `<X>ViewRepository`).
 
-6. **Структура вывода:**
-   1. **Решения по входным параметрам:** какой mapper-вариант (Plain Java vs MapStruct), есть ли `<X>FilterConditionBuilder`, нужен ли `<X>ViewRepository`. Объяснение каждого выбора одной строкой.
-   2. **Дерево новых файлов** — компактное.
-   3. **Каждый файл — отдельный code block** с путём в заголовке.
-   4. **Заметки по реализации:**
-      - Команды проверки: `./gradlew compileJava`, `./gradlew test --tests *JooqOrderRepositoryTest`.
-      - Сниппет интеграционного теста (через Testcontainers PG, `BaseIntegrationTest` из `ucp-test-design`) — happy-path для одного из методов.
-      - Список **TODO для пользователя:** Liquibase-changeset для агрегата (если ещё нет) — это для `ucp-pg-schema-design` отдельным шагом; индексы под фильтрацию (`ucp-pg-explain-review`).
-   5. **Финальный шаг:** «после этого запусти `ucp-jooq-review persistence/.../<x>/`» для верификации.
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

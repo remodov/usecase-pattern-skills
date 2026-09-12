@@ -1,55 +1,56 @@
 ---
 name: ucp-integration-design
-description: Сгенерировать скелет outbound-интеграции с внешней системой на Java/Spring (коды R-RES-*) — port в core/, client-generator с openapi-generator (spring-restclient), out-adapter с CB/Bulkhead/Retry, Mapper, HealthIndicator, exception hierarchy.
+description: Сгенерировать скелет outbound-интеграции с внешней системой на Java/Spring — port в core/, client-generator с openapi-generator (spring-restclient), out-adapter с CB/Bulkhead/Retry, Mapper, HealthIndicator, exception hierarchy.
 when_to_use: Триггеры — «сделай адаптер для X», «новый клиент к Y», «подключаем интеграцию с Z». При новом outbound-клиенте или внешней системе.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Outbound-интеграция — проектирование
 
-Ты проектируешь и генерируешь полный скелет outbound-интеграции с внешней системой по Resilience Style Guide. Цель — сервис получает законченный, рабочий, проходящий `ucp-resilience-review` модуль для интеграции, не «сборную солянку из 7 ручных шагов».
+Ты проектируешь и генерируешь полный скелет outbound-интеграции с внешней системой по требованиям `resilience/*`. Цель — сервис получает законченный, рабочий, проходящий `ucp-resilience-review` модуль для интеграции, не «сборную солянку из 7 ручных шагов».
 
 ## Инструкции
 
-1. **Прочитай style guide'ы** в порядке:
-   - `.claude/docs/backend/resilience/resilience-rules.md` — главный (правила `R-RES-*`).
-   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — `AUTH-19` для решения по retry.
-   - `.claude/docs/backend/rest-api/rest-api-rules.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
-   - `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` — `BS-*` для gradle multi-module setup.
-   - `.claude/docs/backend/usecase-pattern/usecase-pattern-rules.md` — на Уровне 3 для размещения port в `core/<bc>/port/out/`.
+1. **Прочитай требования** в порядке:
+   - `.claude/docs/backend/resilience/spec.md` — главный (правила `R-RES-*`).
+   - `.claude/docs/backend/auth-patterns/spec.md` — `auth-patterns/money-commands-need-idempotency-key` для решения по retry.
+   - `.claude/docs/backend/rest-api/spec.md` — `R-OAS-*` (OpenAPI для генерации clients), `R-HDR-*` (заголовки).
+   - `.claude/docs/backend/java/spring-bootstrap/spec.md` — `BS-*` для gradle multi-module setup.
+   - `.claude/docs/backend/usecase-pattern/spec.md` — на Уровне 3 для размещения port в `core/port/out/client/`.
 
 2. **Уточни параметры интеграции** (один по одному, если пользователь не дал):
    - **Имя системы** (slug): `twilio`, `yandex-pay`, `sber`, `fns-receipt`. Имя = идентификатор для всех артефактов: модули `<system>-client-generator`, `<system>-out-adapter`, beans `@Bean("<system>RestClient")`, R4J instances `<system>`.
    - **OpenAPI-спека:** URL внешней документации, путь к локальному YAML, либо «нет спеки → сгенерируй минимальную из описания операций». Если спеки нет — пометь как **TODO для пользователя**.
    - **Типы операций:**
-     - **Read-heavy** (GET-эквиваленты): `findOrder`, `getStatus`, `getCatalog` → idempotent, `@Retry` ОК (`R-RES-RE-1`).
-     - **Write с Idempotency-Key:** `register`, `confirmPayment` с заголовком `Idempotency-Key` (см. `AUTH-19`) → `@Retry` ОК.
-     - **Write без Idempotency-Key:** `createUser`, `sendSms` → `@Retry` ЗАПРЕЩЁН (`R-RES-RE-X1`), только CB+Bulkhead.
-     - **Long-running:** ответ `>30s` или требует polling → задача для async pattern (`R-RES-ASYNC-1`), не sync-вызов. Генерируется task-queue, не sleep-loop.
+     - **Read-heavy** (GET-эквиваленты): `findOrder`, `getStatus`, `getCatalog` → idempotent, `@Retry` ОК (`resilience/retry-only-when-safe`).
+     - **Write с Idempotency-Key:** `register`, `confirmPayment` с заголовком `Idempotency-Key` (см. `auth-patterns/money-commands-need-idempotency-key`) → `@Retry` ОК.
+     - **Write без Idempotency-Key:** `createUser`, `sendSms` → `@Retry` ЗАПРЕЩЁН (`resilience/retry-only-when-safe`), только CB+Bulkhead.
+     - **Long-running:** ответ `>30s` или требует polling → задача для async pattern (`resilience/async-calls-need-time-limit`), не sync-вызов. Генерируется task-queue, не sleep-loop.
    - **Критичность:**
-     - **Money / денежные операции** → CB failure rate `30%` (`R-RES-CB-3`), fallback = task-queue, **не** null/zero.
+     - **Money / денежные операции** → CB failure rate `30%` (`resilience/breaker-window-and-thresholds`), fallback = task-queue, **не** null/zero.
      - **Non-money** → CB failure rate `50%` (default).
-   - **Авторизация:** `none` (публичный API), `apiKey` (header `Authorization: <key>`), `bearer` (JWT/static), `oauth2-clientCredentials`, `mTLS`. См. `AUTH-13`/`AUTH-14`.
+   - **Авторизация:** `none` (публичный API), `apiKey` (header `Authorization: <key>`), `bearer` (JWT/static), `oauth2-clientCredentials`, `mTLS`. См. `auth-patterns/service-to-service-authenticated`/`auth-patterns/service-to-service-authenticated`.
 
-3. **Определи уровень зрелости проекта** (см. `backend/usecase-pattern/usecase-pattern-rules.md` §2). Outbound-интеграции с domain port в `core/` уместны на **Уровне 3** (DDD + Hexagonal). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>UseCaseHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
+3. **Определи уровень зрелости проекта** (см. `backend/usecase-pattern/spec.md` §2). Outbound-интеграции с domain port в `core/` уместны на **Уровне 3** (DDD + Hexagonal). На Уровне 1–2 — `<System>Client` инжектится в `<Operation>CommandHandler` напрямую, без port-абстракции. Если Уровень 1–2 — упрости вывод (без отдельного `<System>Port`-интерфейса).
 
-4. **Произведи код.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Произведи код.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
-   ### 4.1. Doменный port (`core/`, Уровень 3)
+   ### 4.1. Доменный port (`core/`, Уровень 3)
    ```
-   core/src/main/java/<pkg>/domain/port/out/<system>/
+   core/src/main/java/<pkg>/core/port/out/client/
      <System>Port.java           — interface с domain-методами
-     command/<Op>Command.java    — record
-     result/<Op>Result.java      — record
-     exception/<System>PortException.java   — abstract base, extends RuntimeException
+   core/src/main/java/<pkg>/core/port/out/
+     <Op>Command.java, <Op>Result.java — record'ы запроса и ответа порта (в эталоне: PartnerRequest, PartnerResponseDto)
+   core/src/main/java/<pkg>/core/exception/
+     <System>PortException.java  — abstract base, extends RuntimeException
    ```
 
    ### 4.2. Client-generator module
    - Создать gradle-модуль `<system>-client-generator/` с `build.gradle.kts`:
      - Плагин `org.openapi.generator`.
-     - `generatorName = "spring-restclient"` (`R-RES-OAS-2`). Для legacy-проектов на Retrofit2 — указать в комментарии «допустим `okhttp-gson`, но новый код — spring-restclient».
+     - `generatorName = "spring-restclient"` (`resilience/client-generated-from-contract`). Для legacy-проектов на Retrofit2 — указать в комментарии «допустим `okhttp-gson`, но новый код — spring-restclient».
      - `inputSpec = "$projectDir/src/main/resources/openapi/<system>.openapi.yaml"`.
-     - `outputDir = "$buildDir/generated/sources/openapi"` (не коммитится, `R-RES-OAS-3`).
+     - `outputDir = "$buildDir/generated/sources/openapi"` (не коммитится, `resilience/client-generated-from-contract`).
      - `apiPackage = "<pkg>.<system>.generated.api"`, `modelPackage = "<pkg>.<system>.generated.model"`.
      - `configOptions`: `useSpringBoot3 = true`, `useJakartaEe = true`.
    - В `src/main/resources/openapi/<system>.openapi.yaml`:
@@ -116,7 +117,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   **`<System>ClientAdapter.java`** (главный артефакт; правила `R-RES-CB-1`, `R-RES-OAS-1`):
+   **`<System>ClientAdapter.java`** (главный артефакт; правила `resilience/breaker-on-adapter-method`, `resilience/breaker-on-adapter-method`):
    ```java
    @Component
    @RequiredArgsConstructor
@@ -158,9 +159,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   **`<System>Mapper.java`** (`R-RES-OAS-4`):
+   **`<System>Mapper.java`** (`resilience/mapper-between-client-and-port`):
    - MapStruct interface (по умолчанию `@Mapper(componentModel = "spring")`).
-   - Если есть assemble-логика / enum-translation вручную — Plain Java class `@Component` (как в `R-JOOQ-MAP-1`).
+   - Если есть assemble-логика / enum-translation вручную — Plain Java class `@Component` (как в `jooq/mapper-is-explicit-class`).
    - **Никогда** не возвращай generated DTO из port-метода. Адаптер — последняя точка, где видны generated-типы.
 
    **`<System>HealthIndicator.java`** (`R-RES-HC-*`):
@@ -278,18 +279,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Fallback не возвращает `null`/`Money.ZERO` для money.
    - HealthIndicator имеет TTL-кеш и light probe.
    - Generated DTO не уходит из port-метода.
-   - В коде нет `Thread.sleep` — sync-цикл polling запрещён (`R-RES-ASYNC-X1`).
+   - В коде нет `Thread.sleep` — sync-цикл polling запрещён (`resilience/no-long-synchronous-waits`).
 
-6. **Структура вывода:**
-   1. **Решения по входным параметрам** — параграф: что выбрано (имя, retry yes/no, money yes/no, fallback strategy) и почему.
-   2. **Дерево новых файлов** — компактное отображение.
-   3. **Каждый файл — отдельный code block** с путём в заголовке.
-   4. **Patch для существующих файлов** — `application.yml`, `settings.gradle.kts`, `bootstrap/build.gradle.kts` — с явным «add» или «replace».
-   5. **Заметки по реализации:**
-      - Команды для проверки: `./gradlew :<system>-client-generator:openApiGenerate`, `./gradlew compileJava`.
-      - **TODO для пользователя:** реальная OpenAPI-спека (если phantom), значения env-переменных, прописать ENV в Vault/SealedSecrets (`AUTH-17`).
-      - Тесты (через `ucp-test-design` отдельным шагом): WireMock-стабы для adapter-методов + один happy-path интеграционный.
-   6. **Финальный шаг:** «после этого запусти `ucp-resilience-review <system>-out-adapter/`» для верификации.
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает этот скилл
 

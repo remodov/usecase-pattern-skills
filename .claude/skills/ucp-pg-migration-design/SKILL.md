@@ -1,37 +1,37 @@
 ---
 lang: any
 name: ucp-pg-migration-design
-description: Сгенерировать безопасные Liquibase changeset'ы для breaking changes PostgreSQL-схемы (коды PG-M-*) — expand-contract для RENAME/DROP COLUMN и ALTER TYPE, FK через NOT VALID + VALIDATE, CREATE INDEX CONCURRENTLY, lock_timeout в каждой фазе.
+description: Сгенерировать безопасные Liquibase changeset'ы для breaking changes PostgreSQL-схемы (требования pg-migrations/*) — expand-contract для RENAME/DROP COLUMN и ALTER TYPE, FK через NOT VALID, CREATE INDEX CONCURRENTLY, lock_timeout в каждой фазе.
 when_to_use: Триггеры — «переименовать колонку без даунтайма», «безопасный ALTER TYPE», «добавить FK constraint». Existing-схема, не новый агрегат.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Migration — проектирование
 
-Ты генерируешь expand-contract Liquibase changeset'ы для breaking changes existing-схемы по `backend/pg-migrations/pg-migrations-rules.md` (`PG-M-*`). Цель — миграция, которая **не ломает прод** под нагрузкой и совместима с предыдущей версией кода (N-1 правило, `PG-M-002`).
+Ты генерируешь expand-contract Liquibase changeset'ы для breaking changes existing-схемы по требованиям `backend/pg-migrations/spec.md`. Цель — миграция, которая **не ломает прод** под нагрузкой и совместима с предыдущей версией кода (N-1 правило, `pg-migrations/n-minus-one-compatibility`).
 
 Для нового агрегата (просто `CREATE TABLE`) — `ucp-pg-schema-design`, не этот скилл.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/pg-migrations/pg-migrations-rules.md` (правила `PG-M-*`) и опционально `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` (для понимания, какие операции `ACCESS EXCLUSIVE` влияют на trafic).
+1. **Прочитай** `.claude/docs/backend/pg-migrations/spec.md` (требования `pg-migrations/*`) и, для SQL-рецептов, `.claude/docs/backend/pg-migrations/references/recipes.md` и опционально `.claude/docs/backend/pg-runtime/spec.md` (для понимания, какие операции `ACCESS EXCLUSIVE` влияют на trafic).
 
 2. **Уточни параметры:**
    - **Тип breaking change.** Самые частые:
-     - `RENAME COLUMN` (`PG-M-040`) — 3 фазы.
-     - `DROP COLUMN` (`PG-M-060`) — 2 фазы.
-     - `ALTER TYPE` (`PG-M-050`) — 2-3 фазы (тип → теневая колонка → swap).
-     - `ADD COLUMN NOT NULL` (`PG-M-030`/`PG-M-031`) — 1-2 фазы (зависит от PG-версии).
-     - `ADD CONSTRAINT FK` (`PG-M-070`) — 2 фазы (`NOT VALID` + `VALIDATE`).
-     - `CREATE INDEX` (`PG-M-080`) — 1 фаза (`CONCURRENTLY` обязательно).
-     - `DROP / RENAME TABLE` (`PG-M-100`) — после полного перехода на новое имя.
-     - Удаление значения enum (`PG-M-090`) — теневой тип.
-     - `SET NOT NULL` через `CHECK NOT VALID + VALIDATE + SET NOT NULL` (`PG-M-031`).
+     - `RENAME COLUMN` (`pg-migrations/rename-column-expand-contract`) — 3 фазы.
+     - `DROP COLUMN` (`pg-migrations/drop-column-after-code`) — 2 фазы.
+     - `ALTER TYPE` (`pg-migrations/alter-type-rewrites-table`) — 2-3 фазы (тип → теневая колонка → swap).
+     - `ADD COLUMN NOT NULL` (`pg-migrations/add-column-not-null`/`pg-migrations/set-not-null-via-check`) — 1-2 фазы (зависит от PG-версии).
+     - `ADD CONSTRAINT FK` (`pg-migrations/fk-not-valid-then-validate`) — 2 фазы (`NOT VALID` + `VALIDATE`).
+     - `CREATE INDEX` (`pg-migrations/index-concurrently`) — 1 фаза (`CONCURRENTLY` обязательно).
+     - `DROP / RENAME TABLE` (`pg-migrations/table-drop-after-release`) — после полного перехода на новое имя.
+     - Удаление значения enum (`pg-migrations/enum-value-removal-via-shadow-type`) — теневой тип.
+     - `SET NOT NULL` через `CHECK NOT VALID + VALIDATE + SET NOT NULL` (`pg-migrations/set-not-null-via-check`).
    - **Текущая версия PG.** PG12+ — больше «дешёвых» операций. PG11- — больше expand-contract.
    - **Размер таблицы / нагрузка.** Маленькая (< 100K строк, low traffic) → можно срезать углы (single-changeset). Большая → строго expand-contract.
    - **Связанный код.** Какая версия кода работает «с обеими формами»? Какая «только с новой»? Это деплой-план: миграция → код-1 → миграция → код-2 → миграция.
 
-3. **Применяй expand-contract паттерн (`PG-M-010`):**
+3. **Применяй expand-contract паттерн (`pg-migrations/expand-contract-three-releases`):**
 
    **Phase 1 — EXPAND:** добавить новое, оставить старое. Старый код продолжает работать.
 
@@ -42,7 +42,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 4. **Шаблоны для каждого случая.**
 
    ### 4.1. RENAME COLUMN (`old_name` → `new_name`)
-   Нельзя одним коммитом без даунтайма. 3 фазы (`PG-M-040`):
+   Нельзя одним коммитом без даунтайма. 3 фазы (`pg-migrations/rename-column-expand-contract`):
 
    **Phase 1 — добавить `new_name`, синхронизировать через trigger:**
    ```yaml
@@ -87,7 +87,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              columnName: old_name
    ```
 
-   ### 4.2. DROP COLUMN (`PG-M-060`)
+   ### 4.2. DROP COLUMN (`pg-migrations/drop-column-after-code`)
    Дёшев на стороне БД, но требует, чтобы вся версия кода уже не трогала колонку.
 
    **Phase 1 — релиз кода, которая не пишет/не читает колонку.**
@@ -104,7 +104,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              columnName: <column>
    ```
 
-   ### 4.3. ALTER TYPE (`PG-M-050`)
+   ### 4.3. ALTER TYPE (`pg-migrations/alter-type-rewrites-table`)
    `ALTER TYPE` переписывает всю таблицу под `ACCESS EXCLUSIVE`. Для большой таблицы — теневая колонка + swap.
 
    **Phase 1 — добавить shadow-колонку, копировать batched:**
@@ -137,7 +137,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              columnName: <col>_old
    ```
 
-   ### 4.4. ADD CONSTRAINT FK (`PG-M-070`)
+   ### 4.4. ADD CONSTRAINT FK (`pg-migrations/fk-not-valid-then-validate`)
    `ADD CONSTRAINT ... NOT VALID` (мгновенно) + `VALIDATE` (медленно, без блокировки писателей):
 
    ```yaml
@@ -159,7 +159,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              sql: ALTER TABLE <child> VALIDATE CONSTRAINT <child>_<parent>_fk;
    ```
 
-   ### 4.5. SET NOT NULL (`PG-M-031`)
+   ### 4.5. SET NOT NULL (`pg-migrations/set-not-null-via-check`)
    PG12+ — через `CHECK NOT VALID + VALIDATE + SET NOT NULL`:
 
    ```yaml
@@ -189,7 +189,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
                ALTER TABLE <table> DROP CONSTRAINT <table>_<col>_not_null_chk;
    ```
 
-   ### 4.6. CREATE INDEX (`PG-M-080`)
+   ### 4.6. CREATE INDEX (`pg-migrations/index-concurrently`)
    В продакшене — **всегда** `CONCURRENTLY`:
 
    ```yaml
@@ -201,7 +201,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              sql: CREATE INDEX CONCURRENTLY <table>_<col>_idx ON <table> (<col>);
    ```
 
-   После — `VACUUM` для visibility map (`PG-V-061`):
+   После — `VACUUM` для visibility map (`pg-runtime/vacuum-analyze-after-bulk-change`):
    ```yaml
    - changeSet:
        id: <NNN>-vacuum-after-index
@@ -211,7 +211,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
              sql: VACUUM <table>;
    ```
 
-   ### 4.7. Удаление значения enum (`PG-M-090`)
+   ### 4.7. Удаление значения enum (`pg-migrations/enum-value-removal-via-shadow-type`)
    Нативно невозможно. Через теневой тип:
 
    ```yaml
@@ -235,10 +235,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ```
 
 5. **Решения по lock_timeout:**
-   - Каждый changeset с `ALTER TABLE` имеет `SET LOCAL lock_timeout = '3s'` (`PG-M-022`). Если не получили лок за 3s — миграция fail-fast, не блокирует traffic.
+   - Каждый changeset с `ALTER TABLE` имеет `SET LOCAL lock_timeout = '3s'` (`pg-migrations/lock-timeout-required`). Если не получили лок за 3s — миграция fail-fast, не блокирует traffic.
    - Для `CREATE INDEX CONCURRENTLY` — `lock_timeout` не нужен (CONCURRENTLY не берёт ACCESS EXCLUSIVE).
 
-6. **N-1 совместимость (`PG-M-002`):**
+6. **N-1 совместимость (`pg-migrations/n-minus-one-compatibility`):**
    - Каждая phase должна работать с **двумя версиями** кода: предыдущей и текущей.
    - Если миграция требует «код v2 уже зарелижен» — это explicit release-gate в комментарии changeset'а.
 
@@ -254,27 +254,14 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Удаление значения enum — через теневой тип, не `DROP VALUE` (его нет).
    - `down`-миграции **не пишутся** для phase 3 (нечего откатывать; rollback стратегия — forward fix).
 
-8. **Структура вывода:**
-   1. **Решения** — таблица «фаза → действие → деплой-gate». Объяснение каждой фазы одной строкой.
-   2. **Дерево changeset'ов** — пути к каждому файлу.
-   3. **Каждый changeset — отдельный code block** с путём.
-   4. **Patch master changelog** с include для каждого changeset.
-   5. **Деплой-план:**
-      - Шаг 1: применить changeset Phase 1 → проверить.
-      - Шаг 2: задеплоить версию кода Y → проверить смоук.
-      - Шаг 3: применить Phase 2 (если есть) → задеплоить код Z → ...
-      - Шаг N: применить Phase 3 (contract).
-   6. **Заметки по реализации:**
-      - Команды проверки: `./gradlew liquibaseUpdate`, посмотреть `pg_locks` после миграции.
-      - Backfill — отдельный shell/Java-job, не миграция.
-   7. **Финальный шаг:** «после каждой фазы запусти `ucp-pg-migration-review` для верификации lock-safety и `ucp-pg-runtime-review` если меняется поведение».
+8. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 
 - Не пишет `CREATE TABLE` для нового агрегата — это `ucp-pg-schema-design`.
 - Не пишет backfill-job (UPDATE миллионов строк) — это отдельный Java-код, координирует `ucp-pattern-design`.
 - Не модифицирует доменные классы / репозитории — это `ucp-ddd-tactical-design` / `ucp-jooq-design`.
-- Не делает `down` rollback'и — `PG-M-*` правило: forward fix, не rollback (на проде rollback миграции почти всегда не работает).
+- Не делает `down` rollback'и — `pg-migrations/no-down-migrations`: forward fix, не rollback (на проде rollback миграции почти всегда не работает).
 
 После каждой фазы — обязательно `ucp-pg-migration-review` для проверки lock-safety и expand-contract.
 

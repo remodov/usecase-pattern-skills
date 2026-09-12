@@ -18,7 +18,7 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 - **`.claude/docs/_meta/authoring-contract.md`** — контракт, против которого ревьюишь (источник правды по стилю).
 - **`.claude/docs/_meta/rule-code-registry.md`** — реестр префиксов (shared / per-lang).
-- **`.claude/docs/shared/review-finding-format.md`** — формат findings (`RFF-*`).
+- **`.claude/docs/shared/review-format/spec.md`** — формат findings (`review-format/*`).
 
 ## Инструкции
 
@@ -26,9 +26,13 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе `git diff` против main/master — изменения в `.claude/docs/**` и `.claude/skills/**`.
 
-3. **Прогон по правилам R-META-*** (ниже). Для каждой находки — формат по `RFF-*` (обязательна Read-проверка строки).
+3. **Прогон по правилам R-META-*** (ниже). Для каждой находки — формат по `review-format/*` (обязательна Read-проверка строки).
 
-   3a. **Сначала прогони D-гейт** (граница нейтральности, machine-check для `R-META-FMT-X1`):
+   3a. **Сначала прогони машинные гейты:** `python3 .claude/docs/_meta/spec_check.py` (форма требований,
+   адресация, гейты, синхронность сводных блоков, висячие ссылки) и `python3 -m unittest discover -s tools/tests`.
+   Все находки `spec_check.py` включи в отчёт как `R-META-FMT-*` / `R-META-LAYOUT-X*` по смыслу сообщения.
+
+   3b. **Затем D-гейт** (граница нейтральности, machine-check для `R-META-FMT-X1`):
    `python3 .claude/docs/_meta/check-shared-neutral.py` — он ловит framework-токены в shared rules-index
    (с учётом dual-illustration whitelist). Все его находки включи в отчёт как `R-META-FMT-X1`. Помни про
    классификацию kind (`authoring-contract` §11): для IMPL-SHAPED concern'ов остаточный mechanism-вокабуляр
@@ -39,20 +43,24 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ## Правила
 
 ### Раскладка и парность — `R-META-LAYOUT-*`
-- **R-META-LAYOUT-1.** Shared-concern: `<concern>/<concern>-rules.md` (индекс) + `<concern>/<lang>/<concern>-style-guide.md` на каждый язык (§2).
-- **R-META-LAYOUT-2.** Языко-специфичный concern (style/bootstrap/persistence-impl/test-strategy): пара `<lang>/...` без shared rules-index (§2).
-- **R-META-LAYOUT-3.** Standalone без пары (`review-finding-format`, `usecase-spec-template`) — плоско в корне docs/.
-- **R-META-LAYOUT-X1.** ❌ Гайд без парного rules-index (для shared) или без пары style-guide (§9).
+- **R-META-LAYOUT-1.** Мигрированный домен: `<domain>/spec.md` (требования) + `<domain>/references/` — по каталогу на язык у кросс-языкового домена, плоско у языкового (§3, §4). Домен перечислен в `_meta/migrated-domains.md`.
+- **R-META-LAYOUT-2.** Новый домен заводится сразу в форме `spec.md` + `references/`. Старой формы (`<concern>-rules.md` + `<lang>/<concern>-style-guide.md`) в корпусе больше нет (§2).
+- **R-META-LAYOUT-3.** Формат отчёта и формат спеки — такие же домены, как остальные: `shared/review-format/` и `shared/spec-format/` со своими `spec.md` и `references/`. Standalone-файлов в корне `docs/` не осталось.
+- **R-META-LAYOUT-X1.** ❌ `spec.md` и `<domain>-rules.md` в одном каталоге — два источника правды; ловится `spec_check.py` (§9).
+- **R-META-LAYOUT-X2.** ❌ Ссылка на `<domain>-rules.md` или `<domain>-style-guide.md` мигрированного домена — файла больше нет; ловится `spec_check.py` (§9).
 
-### Формат rules-index — `R-META-FMT-*`
-- **R-META-FMT-1.** Шапка-blockquote: что это, ссылки на per-language style-guide, конвенция кодов, сшивки (§3).
-- **R-META-FMT-2.** Разделы `## N.`, внутри `**MUST:**` / `**MUST NOT:**`, буллеты `- **<CODE>.** формулировка` (§3).
-- **R-META-FMT-3.** Конвенция кодов: `<PREFIX>-<N>` обязательно, `<PREFIX>-X<N>` антипаттерн (§5).
-- **R-META-FMT-X1.** ❌ Shared rules-index содержит framework-специфичные токены (аннотации, имена классов фреймворка) вместо нейтрального интента — должно уйти в per-language style-guide (§3, пример — `error-handling`).
+### Формат требования — `R-META-FMT-*`
+- **R-META-FMT-1.** Каркас `spec.md`: `# <Домен>`, `## Purpose`, `## Requirements`, дальше `### Requirement: <формулировка>` (§3).
+- **R-META-FMT-2.** У требования заполнены все поля: **ID**, **Гейт**, **Покрытие**, **Не ловит**; **Код** — если требование пришло из старого rules-индекса (§3).
+- **R-META-FMT-3.** Тело требования формулирует норму через SHALL / SHALL NOT; у требования есть хотя бы один `#### Scenario:` с **WHEN** и **THEN** (§3).
+- **R-META-FMT-4.** **ID** в форме `<область>/<имя>`, область равна имени каталога; **Код** — старый код или список через запятую, когда антипаттерн слит с положительной формулировкой (§3, §5).
+- **R-META-FMT-5.** **Гейт** — вид из закрытого словаря; у кросс-языкового домена назван каждый язык, у которого есть `references/<lang>/`. **Покрытие** считается по худшему языку; `ревью` машинным гейтом не считается (§3).
+- **R-META-FMT-X1.** ❌ `spec.md` кросс-языкового домена содержит framework-специфичные токены вместо нейтрального интента — реализация уходит в `references/<lang>/` (§3). У языкового домена это законно.
+- **R-META-FMT-X2.** ❌ **Не ловит** — прочерк или отписка при неполном покрытии. Поле обязано назвать нарушение, проходящее гейт (§3).
 
-### Языковой style-guide — `R-META-LANG-*`
-- **R-META-LANG-1.** Первая строка ссылается на shared rules-index («Реализация контракта `../<concern>-rules.md`») (§4).
-- **R-META-LANG-2.** Те же коды и разделы, что в shared rules; под кодом — реализация + PREFER/AVOID (§4).
+### Справочники — `R-META-LANG-*`
+- **R-META-LANG-1.** Шапка справочника ссылается на `../spec.md` и говорит, что требования адресуются `ID` (§4).
+- **R-META-LANG-2.** Те же ID и разделы, что в требованиях; под каждым — реализация на языке + PREFER/AVOID (§4).
 - **R-META-LANG-3.** В конце — «Чеклист подключения (<Lang>/<framework>)» (§4).
 
 ### Коды правил — `R-META-CODE-*`
@@ -63,18 +71,20 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ### Скиллы — `R-META-SKILL-*`
 - **R-META-SKILL-1.** Нейминг: bare `ucp-<concern>-{design,review}` = Java по умолчанию; другие языки — `ucp-<lang>-<concern>-{design,review}` (§6).
 - **R-META-SKILL-2.** Парность: каждый design имеет review (§6).
-- **R-META-SKILL-3.** Скилл читает shared rules-index + свой языковой style-guide, цитирует коды, on-demand-указатель на полный гайд (§6).
+- **R-META-SKILL-3.** Скилл мигрированного домена читает `<domain>/spec.md` (design — ещё и `references/<lang>/`) и цитирует `ID (Код)`; review-скилл проверяет, что обещанный требованием гейт включён в проекте (§6).
 - **R-META-SKILL-4.** SKILL.md: человекочитаемый текст по-русски, идентификаторы/тулы/коды — латиницей (§6).
 - **R-META-SKILL-5.** Frontmatter-метка `lang:` (`any`/`java`/`python`/`node`/`go`) проставлена корректно: agnostic (spec/arch/meta/new-service) → `any`; языковой скилл → свой язык; bare java-скилл — можно без метки (= java) (§6). Языковой скилл без метки или с чужим значением — нарушение.
 - **R-META-SKILL-6.** Листинг-бюджет: `description` ≤ 250 символов (суть: глагол + объект + стек-маркер + код-префикс), `when_to_use` ≤ 160 (триггер-фразы, файловый контекст); перечни подгрупп правил и cross-ref'ы — в теле SKILL.md, не во frontmatter (§6).
+- **R-META-SKILL-7.** Вывод по размеру вопроса: в SKILL.md нет секции «Структура вывода» с деревом файлов, полными файлами и «финальным шагом»; код примеров — в `references/`, не в скилле; база из ядра языка не пересказывается (§6).
 - **R-META-SKILL-X1.** ❌ design-скилл без парного review.
+- **R-META-SKILL-X2.** ❌ design-скилл предписывает форму ответа («каждый файл — отдельный code block», audit-таблица, «запусти review после генерации») или дублирует код справочника.
 
 ### Ось зрелости — `R-META-TIER-1`
 - **R-META-TIER-1.** Используется единый словарь уровней 0–3, не параллельные шкалы (§7).
 
 ## Формат вывода
 
-Список findings по `RFF-*` (с полем `Строка`, Read-проверкой), затем сводка `критично/важно/мелкое`
+Список findings по `review-format/*` (с полем `Строка`, Read-проверкой), затем сводка `критично/важно/мелкое`
 и вердикт: можно ли мёржить контрибуцию или нужны правки. Не вноси правки сам — только ревью.
 
 $ARGUMENTS

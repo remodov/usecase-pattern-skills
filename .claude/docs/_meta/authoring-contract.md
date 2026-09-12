@@ -10,78 +10,178 @@
 
 | Слой | Что | Где живёт |
 |---|---|---|
-| **Методология (язык-нейтральная)** | UCP-концепт, DDD-tactical, формат спеки + оси зрелости 0–3, REST-контракт, error/validation/security/observability **интент**, cqrs/saga/distributed/kafka **концепты**, все `pg-*` (это про сам PostgreSQL) | shared `backend/<concern>/<concern>-rules.md` |
-| **Языковой биндинг (реализация)** | как концепт реализуется: Java (Spring/jOOQ/Jakarta), Python (FastAPI/SQLAlchemy/Pydantic), Node (NestJS/TypeORM/class-validator), Go (net/http+chi/sqlc/validator). NB: парадигма может отличаться — в Go ошибки-значения вместо исключений; контракт даёт интент, биндинг — идиому | `backend/<concern>/<lang>/<concern>-style-guide.md` |
+| **Методология (язык-нейтральная)** | UCP-концепт, DDD-tactical, формат спеки и оси зрелости 0–3, REST-контракт, интент по ошибкам / валидации / безопасности / наблюдаемости, концепты cqrs / saga / distributed / kafka, все `pg-*` (это про сам PostgreSQL) | требования в `<домен>/spec.md` |
+| **Языковой биндинг (реализация)** | как концепт выглядит в коде: Java (Spring/jOOQ/Jakarta), Python (FastAPI/SQLAlchemy/Pydantic), Node (NestJS/TypeORM/class-validator), Go (net/http+chi/sqlc/validator). Парадигма может отличаться — в Go ошибки-значения вместо исключений; требование даёт интент, биндинг — идиому | `<домен>/references/<lang>/implementation.md` |
 
-Правило: **rules-index — общий контракт, style-guide — языковая реализация.**
+Правило: **требование — общий контракт, справочник — языковая реализация.**
+Требование язык-нейтрально; язык различают только поле **Гейт** и каталог
+справочников.
 
 ## 2. Раскладка docs/
 
 ```
 docs/                                       # сгруппировано по специализации (track)
-├── _meta/                                  # governance (контракт + реестр + check-shared-neutral.py)
-├── shared/                                 # кросс-трековое (track: any): arch/, review-finding-format.md, usecase-spec-template.md
+├── _meta/                                  # governance: контракт, реестры, проверки
+├── shared/                                 # кросс-трековое (track: any)
+│   ├── arch/                               #   платформенная согласованность
+│   ├── review-format/                      #   формат находки ревью
+│   ├── spec-format/                        #   формат Use Case спецификации
+│   └── spec-change/                        #   формат изменения спеки
 ├── backend/                                # backend-трек (ось lang)
-│   ├── <concern>/                          # язык-нейтральный shared-concern
-│   │   ├── <concern>-rules.md              #   SHARED индекс правил (один на все языки)
-│   │   ├── java/<concern>-style-guide.md   #   реализация Spring
-│   │   └── python/<concern>-style-guide.md #   реализация FastAPI
-│   ├── pg-*/                               # PostgreSQL (нейтрально, плоско)
-│   ├── java/<langspecific>/                # langspecific java: jooq, java-style, spring-bootstrap, test-strategy
-│   └── python/<langspecific>/              # langspecific python: sqlalchemy, python-style, python-bootstrap, python-test-strategy
-├── frontend/<concern>/<concern>-rules.md   # frontend-трек (React+TS, single-stack, плоско)
-└── e2e/...                                  # e2e-трек (Playwright) — каркас по запросу
+│   ├── <домен>/                            # кросс-языковой домен
+│   │   ├── spec.md                         #   требования, один файл на домен
+│   │   └── references/
+│   │       ├── java/implementation.md      #   реализация на Java
+│   │       └── python/implementation.md    #   реализация на Python
+│   ├── pg-*/                               # PostgreSQL: требования нейтральны,
+│   │                                       #   справочник плоско в references/
+│   ├── java/<домен>/                       # языковой домен: jooq, java-style,
+│   │   ├── spec.md                         #   spring-bootstrap, test-strategy —
+│   │   └── references/implementation.md    #   справочник без разбивки по языкам
+│   ├── java/java-core.md                   # always-loaded ядро языка: выжимка
+│   │                                       #   решений со ссылками на ID, ставится
+│   │                                       #   симлинком в .claude/rules/ проекта
+│   └── python/<домен>/                     # то же для python, node, go
+├── frontend/_index.md                      # правил нет: источник правды —
+│                                           #   openspec/specs проекта из шаблона
+└── e2e/                                    # зарезервирован
 ```
 
-**Что чисто языко-специфично** (нет shared rules-index, у каждого языка свой набор):
-`<lang>-style` (Java JS-* ↔ Python ruff/black/mypy), `bootstrap` (Spring ↔ FastAPI app-factory),
-persistence-impl (`jooq` ↔ `sqlalchemy`), `test-strategy` (JUnit+Testcontainers ↔ pytest+testcontainers-python).
+**Что языко-специфично** (нет кросс-языкового домена, у каждого языка свой):
+`<lang>-style`, `bootstrap`, слой хранения (`jooq` ↔ `sqlalchemy` ↔ `typeorm` ↔
+`sqlc`), `test-strategy`. Такой домен лежит под `<lang>/`, справочник в
+`references/` плоско.
 
-**Форма langspecific-concern'а — на выбор по объёму:** (а) пара `<concern>-rules.md` (индекс) + `<concern>-style-guide.md`
-(полный, как Java `jooq`/`java-style`); **либо** (б) **одиночный `<concern>-rules.md` с код-примерами внутри**
-(без отдельного style-guide) для компактных concern'ов — так сделаны Python `sqlalchemy`/`python-bootstrap`/
-`python-test-strategy`/`python-style`. Это сознательно допустимо; скилл тогда читает единственный rules-файл.
+**Что кросс-языково** (один `spec.md`, справочник на язык): rest-api,
+error-handling, validation, cqrs, distributed-patterns, kafka, caching,
+resilience, observability, security, usecase-pattern, ddd-tactical, все `pg-*`.
 
-**Что shared** (один rules-index + per-lang style-guide): rest-api, error-handling, validation, cqrs,
-distributed, kafka, caching, resilience, observability, security, usecase-pattern, ddd-tactical, **все pg-***
-(инструмент миграций — Liquibase для Java и Python; конкретика — в style-guide).
+**Имена файлов фиксированы**: требования — всегда `spec.md`, справочник
+реализации — `implementation.md`, сборник рецептов — `recipes.md`. Домен в имя
+не выносится: он уже в пути, а дубль ломает поиск по корпусу и разъезжается
+при переименовании.
 
-Всё выше — **backend-трек** (ось `lang`), живёт под `docs/backend/`. Для frontend/e2e и других специализаций
-есть вторая ось — `track` (см. **§10**); раскладка `docs/<track>/<concern>/...`. Кросс-трековое — в `docs/shared/`.
+Пустого `references/` быть не должно: каталог обещает примеры, и `spec_check.py`
+краснеет, если открывать нечего.
 
-## 3. Формат rules-index (`<concern>-rules.md`)
+**Ядро языка** (`<lang>/<lang>-core.md`) — единственный документ корпуса, который
+грузится в **каждую** сессию проекта: `install.sh` ставит его симлинком
+`.claude/rules/ucp-<lang>-core.md`, а Claude Code читает `.claude/rules/*.md` при
+старте с приоритетом `CLAUDE.md`. Поэтому ядро не вводит требований — оно
+пересказывает уже принятые решения и ссылается на их ID; каждый ID обязан
+существовать в индексе, объём — не больше 200 строк, frontmatter `paths:` не
+ставится (ядро грузится всегда, а не при открытии файлов). Новое решение сначала
+попадает в `spec.md`, и только потом — если оно нужно в каждой сессии — в ядро.
+Проверяет `tools/tests/test_java_core.py`.
 
-- Заголовок `# <Concern> — индекс правил (язык-нейтральный)` (для shared) или `# … — Python Style Guide` (для языкового).
-- Шапка-blockquote: что это, на какие per-language style-guide ссылаться, конвенция кодов, сшивки с другими гайдами.
-- Разделы `## N. <Раздел>` (совпадают между языками для одного concern).
-- Внутри — `**MUST:**` / `**MUST NOT:**`, буллеты `- **<CODE>.** однострочная формулировка.`
-- Интент формулируется **язык-нейтрально**; framework-токены — нейтральным концептом, конкретика — в style-guide.
-- Размер индекса — ~15–45% полного.
+Всё выше — **backend-трек** (ось `lang`). Для frontend/e2e и других
+специализаций есть вторая ось — `track` (см. **§10**); раскладка
+`docs/<track>/<домен>/...`. Кросс-трековое — в `docs/shared/`.
 
-## 4. Формат языкового style-guide (`<lang>/<concern>-style-guide.md`)
 
-- Заголовок `# <Concern> — <Lang> Style Guide (<стек>)`.
-- Первая строка — ссылка на shared rules-index: «Реализация контракта `../<concern>-rules.md`».
-- **Те же коды и разделы**, что в shared rules; под каждым кодом — реализация на языке + PREFER/AVOID.
-- В конце — «Чеклист подключения к новому сервису (<Lang>/<framework>)».
+## 3. Формат требования (`<domain>/spec.md`)
 
-## 5. Коды правил
+Домен описывается одним `spec.md`. Форма — openspec (та же, что в
+`<репозиторий шаблонов фронтенда>`), с одним отличием: у методологии нет своего кода,
+поэтому поле **Гейт** называет вид гейта, а не `file:line`.
 
-- **Общая таксономия для shared-concern'ов**: код `R-ERR-WHERE-X1` означает одно и то же на всех языках — меняется только реализация. Не плодить параллельные коды на язык для одного концепта.
-- **Языко-специфичные concern'ы** — свой префикс (`JS-*` Java style; Python style получит свой, напр. `PY-*`; `R-JOOQ-*` ↔ `R-SQLA-*`).
-- Каждый префикс зарегистрирован в `rule-code-registry.md` (shared / per-lang, владелец). Новый код — сначала запись в реестр, потом использование.
-- Конвенция: `<PREFIX>-<N>` — обязательно (MUST), `<PREFIX>-X<N>` — антипаттерн (MUST NOT).
+Обязательный каркас файла: `# <Домен>`, `## Purpose`, `## Requirements`, дальше
+требования. Требование:
+
+```markdown
+### Requirement: Nested-выборка через multiset
+
+Вложенные коллекции SHALL читаться одним запросом через `multiset`;
+цикл с отдельным запросом на элемент SHALL NOT применяться.
+
+**ID**: jooq/nested-via-multiset
+**Код**: R-JOOQ-7
+**Гейт**: нет
+**Покрытие**: нет
+**Не ловит**: N+1 в репозитории не ловит ничто — ни компилятор, ни тест
+на одной записи; держится ревью.
+
+#### Scenario: репозиторий тянет позиции заказа циклом
+
+- **WHEN** `JooqOrderRepository` читает заказы, а позиции — запросом на каждый
+- **THEN** ни одна проверка не краснеет — находка появляется только в ревью
+```
+
+- **ID** — `<область>/<имя>` строчными латинскими через дефис; область равна
+  имени каталога. Уникален по всему корпусу.
+- **Почему** — одна-две фразы о последствии: что ломается и для кого, когда
+  требование не выполнено. Пишется в терминах прода, а не формулировок:
+  «старые инстансы падают на каждой вставке во время выкатки», не «нарушается
+  совместимость». Поле обязательное; пересказ формулировки своими словами
+  последствием не считается.
+- **Код** — старый код правила, если требование пришло из мигрированного
+  rules-индекса. У требований, заведённых после миграции, поля нет. Кодов может
+  быть несколько через запятую: антипаттерн и его положительная формулировка
+  (`PG-M-022` и `PG-M-150`) — одно требование, но оба старых кода обязаны
+  находиться грепом.
+- **Гейт** — `нет` либо список видов из закрытого словаря (`checkstyle`,
+  `archunit`, `errorprone`, `spotbugs`, `ruff`, `mypy`, `golangci-lint`,
+  `eslint`, `import-linter`, `dependency-cruiser`, `squawk`, `gitleaks`, `trivy`,
+  `dependency-check`, `gradle`, `script`, `test`, `ci`, `ревью`). У
+  кросс-языкового домена — по языкам через `·`:
+  `java: checkstyle:UnusedImports · python: ruff:F401`. Назван обязан быть
+  каждый язык, у которого есть `references/<lang>/`.
+- **Покрытие** — `полное` / `частичное` / `нет`, **по худшему языку**.
+  `ревью` в поле **Гейт** машинным гейтом не считается: требование, которое
+  держится только ревью, имеет покрытие `нет`, даже если написано `ревью`, а не
+  `нет`. Смесь `java: archunit:X · python: ревью` — покрытие `частичное`.
+- **Не ловит** — при неполном покрытии обязано словами назвать нарушение,
+  проходящее гейт. Прочерк не считается.
+- Сценариев хотя бы один, в каждом — и `**WHEN**`, и `**THEN**`. Сценарий на
+  дыру («ни одна проверка не краснеет») так же законен, как на срабатывание.
+
+`## Purpose` домена — человеческий вход, а не аннотация: две-три фразы о том,
+что за область, затем врезка **«Что здесь главное»** — три-пять фраз простым
+языком: главные правила и то, где чаще всего больно. Последняя строка врезки
+называет типичную ошибку. Ниже автоматически встаёт блок «Чем держится домен»
+со счётом требований и долей ревью — его пишет `spec_sync.py`, руками не
+редактируется.
+
+Проверяется `python3 .claude/docs/_meta/spec_check.py`.
+
+Заготовки — в `templates/openspec/`: `domain-spec.md` для нового домена,
+`requirement.md` для одного требования в существующий файл. Шаблон домена
+сам проходит проверку, за этим следит `tools/tests/test_templates.py`.
+
+## 4. Справочники (`<domain>/references/`)
+
+Код-примеры, рецепты и объяснения «почему так» — в `references/`: у
+кросс-языкового домена по каталогу на язык (`references/java/…`), у языкового —
+плоско. В требовании — что обязано быть верно; в справочнике — как это
+выглядит в коде.
+
+Review-скилл читает `spec.md`; design-скилл — `spec.md` и `references/<lang>/`.
+
+## 5. Коды правил и ID
+
+- Адрес требования — **ID**; код остаётся alias'ом для обратной совместимости
+  (suppression-комментарии в сервисах, архив ревью, старые PR).
+- Review-скилл цитирует `ID (Код)`; если кода нет — только ID.
+- Таблица соответствия `код ↔ требование ↔ область` в `rule-code-registry.md`
+  **генерируется** `spec_sync.py` и руками не правится.
+- Домены, ещё не переведённые на требования, живут по старым правилам: их коды
+  описаны в таблице префиксов того же файла.
 
 ## 6. Скиллы (design ↔ review пары)
 
-- Каждый design-скилл имеет парный review.
+- Каждый design-скилл имеет парный review. **Исключение — трек `frontend`:** правила там живут
+  не у нас, а в `openspec/specs/**` проекта, поэтому design нарезан по задачам разработчика
+  (экран, форма, сервис, права, тесты), а review — по областям openspec, чтобы каждое замечание
+  цитировало requirement ID. Соответствие не 1:1, и это осознанно.
 - **Нейминг:** bare `ucp-<concern>-{design,review}` = **Java по умолчанию** (инкумбент, не переименовываем — завязаны цепочки `ucp-new-service` и хуки). Другие языки — `ucp-<lang>-<concern>-{design,review}` (напр. `ucp-py-error-handling-review`).
-- Скилл **читает shared rules-index** (`<concern>/<concern>-rules.md`) + **свой языковой style-guide** (`<concern>/<lang>/<concern>-style-guide.md`); цитирует коды; on-demand-указатель на полный гайд в скобках.
+- Скилл мигрированного домена **читает `<domain>/spec.md`** и, если он design, **свой справочник** (`<domain>/references/<lang>/`); цитирует `ID (Код)`. Для немигрированного домена — по-старому: rules-index плюс языковой справочник, коды.
 - SKILL.md — **человекочитаемый текст по-русски**, идентификаторы/тулы/коды — латиницей (см. `feedback_skills_in_russian`).
 - Скиллы вызываются через `Skill`-tool в текущей сессии, не через `Agent`-форк (прогретый кэш).
-- Формат findings review-скилла — по `shared/review-finding-format.md` (`RFF-*`).
+- Формат findings review-скилла — по `shared/review-format/spec.md` (`review-format/*`).
 - **Frontmatter-метка `lang:`** — обязательна для языкового выбора при установке. Значения: `any` (agnostic — spec/arch/meta/new-service, ставится всегда), `java`, `python`, `node`, `go`. **Без метки = `java`** (back-compat для инкумбентных bare-скиллов). `install.sh` читает её (`UCP_LANG=java|python|node|go`, дефолт java) и ставит только подходящие. Новый языковой скилл обязан проставить свою метку.
 - **Frontmatter-метка `track:`** (ось специализации, §10) — `backend` (по умолчанию, можно опустить), `frontend`, `e2e`, `any`. Frontend/e2e-скиллы обязаны её проставить; `install.sh` фильтрует по `UCP_TRACK` (× `UCP_LANG` внутри backend).
+- **Вывод скилла — по размеру вопроса.** Design-скилл не предписывает форму ответа: ни дерева файлов, ни «каждый файл отдельным блоком», ни audit-таблиц, ни «финального шага — запусти review». Решения и затронутые файлы — всегда; полные файлы — только по запросу на генерацию. В SKILL.md вместо секции «Структура вывода» — одна строка «Вывод — по общему правилу». Код примеров живёт в `references/` домена: скилл ссылается на раздел, а не копирует его.
+- **Ядро языка уже в контексте** (`.claude/rules/ucp-<lang>-core.md`): скилл не пересказывает базу (раскладка, чистота core, команды/запросы, фабрики, семейства исключений, время) — только дельту своего concern'а.
 - **Бюджет листинга:** `description` ≤ 250 символов, `when_to_use` ≤ 160. Оба поля показываются в листинге скиллов и считаются в общий cap — листинг-бюджет сессии делится на все установленные скиллы, переполнение роняет авто-триггер реже-используемых. В `description` — суть: глагол + объект + стек-маркер + код-префикс правил; триггер-фразы и файловый контекст — в `when_to_use`; перечни подгрупп правил, cross-ref'ы и сценарии — в теле SKILL.md. Эталон формулировок — пара `ucp-py-sqlalchemy-*`.
 
 ## 7. Оси зрелости 0–3
@@ -90,18 +190,26 @@ distributed, kafka, caching, resilience, observability, security, usecase-patter
 
 ## 8. Поток контрибуции (как питон-лид добавляет concern)
 
-1. Берёт shared `backend/<concern>/<concern>-rules.md` (если concern уже есть) — **не меняет коды/интент** без архитектурного ревью.
-2. Пишет `backend/<concern>/python/<concern>-style-guide.md` по §4 — те же коды, Python-реализация.
-3. Создаёт пару `ucp-py-<concern>-{design,review}` по §6.
-4. Регистрирует любые новые языко-специфичные коды в `rule-code-registry.md`.
+0. Новый домен заводит копией `templates/openspec/domain-spec.md`; каталог
+   называет так же, как область в **ID**.
+1. Берёт `backend/<domain>/spec.md` (если домен уже мигрирован) — **не меняет ID
+   и интент** без архитектурного ревью; новое требование добавляет с новым ID и
+   без поля **Код**.
+2. Пишет реализацию в `backend/<domain>/references/<lang>/` — те же ID, языковая
+   идиома, и дописывает свой язык в поле **Гейт** каждого требования, которое
+   его язык закрывает.
+3. Создаёт пару `ucp-<lang>-<domain>-{design,review}` по §6.
+4. Прогоняет `python3 .claude/docs/_meta/spec_check.py` и
+   `python3 .claude/docs/_meta/spec_sync.py`.
 5. **Прогоняет `ucp-meta-review`** на свой diff — гейт соответствия контракту.
 6. PR; CODEOWNERS: `**/python/**` + `ucp-py-*` — владелец питон-лид; `_meta/**` + shared `*-rules.md` — архитектурный владелец.
 
 ## 9. Что НЕ делать
 
-- Не дублировать shared-интент в языковом style-guide (там только реализация + ссылка на коды).
+- Не дублировать shared-интент в языковом справочник (там только реализация + ссылка на коды).
 - Не заводить параллельные коды на язык для общего концепта (нарушает cross-language единство).
-- Не писать гайд без парного rules-index (для shared) или без пары style-guide (для языко-специфичного).
+- Не заводить требование без полей **Гейт** / **Покрытие** / **Не ловит** и без сценария — правило, про которое неизвестно, ловит его машина или ревью, методологией не является.
+- Не оставлять `<domain>-rules.md` рядом с появившимся `spec.md`: два источника правды в одном каталоге, `spec_check.py` краснеет.
 - Не писать SKILL.md-прозу на английском (кроме явного запроса).
 - Не натягивать backend-паттерны (UseCase/aggregate/CQRS) на frontend-трек — у него свой набор concern'ов (см. §10).
 
@@ -140,7 +248,7 @@ concern'ы под backend** — у каждой специализации св�
 тому же рецепту.
 
 **Что кросс-трековое (`track: any`)** — живёт в корне `docs/`, ставится всегда: `_meta/` (этот контракт +
-реестр), `spec`/`arch` (описание контекста/платформы), `review-finding-format` (`RFF-*`), оси зрелости 0–3,
+реестр), `spec`/`arch` (описание контекста/платформы), требования `review-format/*`, оси зрелости 0–3,
 **сама форма методологии** (rules-index + per-binding + пара design/review). NB: UseCase Pattern, DDD-tactical,
 CQRS — это **backend-concern'ы, не кросс-трековое ядро**; не тащить их во frontend.
 
@@ -149,26 +257,26 @@ CQRS — это **backend-concern'ы, не кросс-трековое ядро*
 ```
 docs/
 ├── _meta/                                           # governance
-├── shared/                                          # track: any — arch/, review-finding-format.md, usecase-spec-template.md
+├── shared/                                          # track: any — arch/, review-format/, spec-format/, spec-change/
 ├── backend/<concern>/                               # BACKEND-трек
 │   ├── <concern>-rules.md
 │   ├── java/ python/                                # биндинги shared-concern'а
 │   ├── pg-*/                                         # PostgreSQL (плоско)
 │   └── java/<ls>/ python/<ls>/                       # langspecific (jooq/sqlalchemy/style/bootstrap/test)
-├── frontend/<concern>/                              # component/state/data-fetching/forms/a11y/styling/fe-test
+├── frontend/_index.md                               # биндинг на openspec проекта; своих правил у трека нет
 │   └── <concern>-rules.md                           # React+TS single-stack → плоско
 └── e2e/<concern>/                                    # journeys/fixtures/network-mock/ci/flakiness
     ├── <concern>-rules.md
-    └── playwright/<concern>-style-guide.md
+    └── playwright/references/implementation.md
 ```
 
 **Frontmatter:** к `lang` добавляется `track`. Backend-скилл — `track` отсутствует (= backend) + `lang:`.
 Frontend/e2e — `track: frontend|e2e`; стек один (React+TS / Playwright), поэтому `lang`-под-фильтр не нужен.
 
 **Нейминг скиллов** (короткий токен трека, как у языков): backend — `ucp-<concern>` / `ucp-<lang>-<concern>`
-(инкумбент); frontend — `ucp-fe-<concern>-{design,review}`; e2e — `ucp-e2e-<concern>-{design,review}`.
+(инкумбент); frontend — `ucp-fe-<задача>-design` и `ucp-fe-<область>-review` (соответствие не 1:1, §6); e2e — `ucp-e2e-<concern>-{design,review}`.
 
-**Коды:** трек резервирует префиксы в `rule-code-registry.md` — `FE-*` (frontend), `E2E-*` (e2e). Концерны
+**Коды:** трек резервирует префиксы в `rule-code-registry.md` — `E2E-*` (e2e). У frontend своих кодов **нет**: правила живут в `openspec/specs/**` проекта, скиллы цитируют его requirement ID, а прежние `FE-*` выведены из обращения. Концерны
 внутри трека следуют §3–§5 (shared rules-index + биндинг, если стеков >1; иначе плоская пара (§2)).
 
 **Установка:** `UCP_TRACK=backend,frontend,e2e` (multi) **×** `UCP_LANG` (фильтр только внутри backend). Проект
@@ -176,7 +284,7 @@ Frontend/e2e — `track: frontend|e2e`; стек один (React+TS / Playwright
 скиллы и docs по `track` (как уже делает по `lang`).
 
 **E2E — кросс-трековый трек:** проверяет систему целиком, **потребляет контракты** backend (`rest-api`/`auth`) и
-frontend (сценарии) через cross-ref, **не дублирует** их. Backend-e2e (`TS-28`) и UI-e2e сводятся в один e2e-трек
+frontend (сценарии) через cross-ref, **не дублирует** их. Backend-e2e (`test-strategy/test-layers-separated`) и UI-e2e сводятся в один e2e-трек
 с разделением API-e2e / UI-e2e.
 
 ### Рецепт «добавить специализацию» (это и есть расширяемость)

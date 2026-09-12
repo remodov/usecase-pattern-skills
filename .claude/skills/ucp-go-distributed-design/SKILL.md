@@ -1,15 +1,15 @@
 ---
 name: ucp-go-distributed-design
 lang: go
-description: Спроектировать распределённый сценарий в Go-микросервисах по UCP (коды R-DIST-*) — saga orchestration/choreography со state в pgx/sqlc, idempotency middleware (chi), outbox+relay (kafka-go), compensation, eventual consistency, запрет 2PC/XA.
+description: Спроектировать распределённый сценарий в Go-микросервисах по UCP — saga orchestration/choreography со state в pgx/sqlc, idempotency middleware (chi), outbox+relay (kafka-go), compensation, eventual consistency, запрет 2PC/XA.
 when_to_use: Триггеры — «saga для X», «cross-service процесс Y», «компенсация Z на Go». Для cross-service бизнес-операции с pgx/sqlc-стеком.
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*)
 ---
 
 # Distributed Patterns — проектирование (Go / net/http + chi)
 
-Ты проектируешь распределённый сценарий по **контракту** `backend/distributed-patterns/distributed-patterns-rules.md`
-(`R-DIST-*`) и **Go-реализации** `backend/distributed-patterns/go/distributed-patterns-style-guide.md`.
+Ты проектируешь распределённый сценарий по **контракту** `backend/distributed-patterns/spec.md`
+(`R-DIST-*`) и **Go-реализации** `backend/distributed-patterns/references/go/implementation.md`.
 
 Помни: в Go нет транзакционного менеджера — транзакция это явный `pgx.Tx`, передаваемый параметром или через
 `context.Context`; saga-оркестратор — обычная struct в `internal/saga/`; всё явно, нет магии аннотаций.
@@ -19,7 +19,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
 ## Инструкции
 
-1. **Прочитай** контракт + Go-style-guide. Коды в обосновании, не в коде. Связанные:
+1. **Прочитай** требования `go-style/*`. Коды в обосновании, не в коде. Связанные:
    `backend/kafka/go/...` (outbox/idempotent consumer), `backend/cqrs/go/...` (EC read-model),
    `backend/usecase-pattern/go/...` (UoW-аналог через pgx.Tx), `pg-runtime` (saga/idempotency-таблицы).
 
@@ -49,18 +49,18 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
 7. **Запрет** (`R-DIST-TX-*`): без 2PC/XA; `pgx` не поддерживает XA; нет последовательных `tx1.Commit; tx2.Commit`
    по разным сервисам/БД без saga-recovery. Самопроверка по чеклисту из
-   `backend/distributed-patterns/go/distributed-patterns-style-guide.md` §«Чеклист подключения».
+   `backend/distributed-patterns/references/go/implementation.md` §«Чеклист подключения».
    Предложи `ucp-go-distributed-review`.
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Saga для одного сервиса (`R-DIST-WHEN-X1`); saga без compensation (`R-DIST-SAGA-X2`/`R-DIST-COMP-X1`);
-  saga state in-memory (`R-DIST-SAGA-X3`); saga-переходы внутри UseCase Handler (`R-DIST-SAGA-X4`).
-- Receiver без dedup для money/critical (`R-DIST-IDEM-X1`); новый `Idempotency-Key` на каждый retry (`R-DIST-IDEM-X3`).
-- Молчаливая EC — stale-data без декларации в OpenAPI (`R-DIST-EC-X1`).
-- `DELETE` как compensation (`R-DIST-COMP-X2`); compensation без DLQ при сбое (`R-DIST-COMP-X3`).
-- 2PC/XA (`R-DIST-TX-X1`); `tx1.Commit; tx2.Commit` по двум БД без saga-recovery (`R-DIST-TX-X3`);
-  прямой `producer.WriteMessages` из handler без outbox (`R-DIST-OBX-X1`).
+- Saga для одного сервиса (`distributed/patterns-only-when-crossing-services`); saga без compensation (`distributed/every-step-has-compensation`/`distributed/every-step-has-compensation`);
+  saga state in-memory (`distributed/saga-state-is-persistent`); saga-переходы внутри UseCase Handler (`distributed/saga-separate-from-use-cases`).
+- Receiver без dedup для money/critical (`distributed/receiver-deduplicates`); новый `Idempotency-Key` на каждый retry (`distributed/idempotency-key-per-operation`).
+- Молчаливая EC — stale-data без декларации в OpenAPI (`distributed/bounded-and-declared-staleness`).
+- `DELETE` как compensation (`distributed/compensation-is-semantic-and-idempotent`); compensation без DLQ при сбое (`distributed/failed-compensation-goes-to-review`).
+- 2PC/XA (`distributed/no-two-phase-commit`); `tx1.Commit; tx2.Commit` по двум БД без saga-recovery (`distributed/no-two-phase-commit`);
+  прямой `producer.WriteMessages` из handler без outbox (`distributed/outbox-for-outgoing-events`).
 - Relay через `time.Sleep`-цикл (используй `time.Ticker` + `errgroup`).
 
 После работы скилла — обязательно `ucp-go-distributed-review`.

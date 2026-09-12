@@ -1,22 +1,22 @@
 ---
 name: ucp-cqrs-design
-description: Сгенерировать CQRS-разделение для агрегата на Java/Spring (коды R-CQRS-*) — Command/Query пары с UseCase-маркерами, ViewRepository + Jooq-реализация, read-model schema и consumer, выбор варианта lightweight/split/event-driven.
+description: Сгенерировать CQRS-разделение для агрегата на Java/Spring (требования cqrs/*) — Command/Query пары с UseCase-маркерами, ViewRepository + Jooq-реализация, read-model schema и consumer, выбор варианта lightweight/split/event-driven.
 when_to_use: Триггеры — «нужна read-проекция для X», «CQRS для агрегата Y», «отдельная read-model». При новом read-flow или росте read-нагрузки.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # CQRS — проектирование
 
-Ты генерируешь CQRS-разделение (write-side через aggregate, read-side через ViewRepository + read-model) по CQRS Style Guide.
+Ты генерируешь CQRS-разделение (write-side через aggregate, read-side через ViewRepository + read-model) по требованиям `cqrs/*`.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/cqrs/cqrs-rules.md` (`R-CQRS-*`). Опционально — `backend/usecase-pattern/usecase-pattern-rules.md` (`R-UC-*`), `backend/java/jooq/jooq-rules.md` (`R-JOOQ-VIEW-*`), `backend/kafka/kafka-rules.md` (`R-KFK-OBX-*`).
+1. **Прочитай** `.claude/docs/backend/cqrs/spec.md` (`R-CQRS-*`). Опционально — `backend/usecase-pattern/spec.md` (`R-UC-*`), `backend/java/jooq/spec.md` (`R-JOOQ-VIEW-*`), `backend/kafka/spec.md` (`R-KFK-OBX-*`).
 
 2. **Уточни параметры:**
    - **Aggregate** — имя (`Order`), есть ли write-handlers (`<X>CommandHandler`), есть ли уже `<X>Repository`.
    - **Read-сценарий** — что читаем (один объект, список с фильтрацией, summary, отчёт), форма read-DTO (`OrderSummary` vs `OrderListItem` vs `OrderReport`).
-   - **Вариант CQRS** (CQRS — опция Уровня 2, а её глубина растёт с уровнем зрелости):
+   - **Вариант CQRS** (маркеры обязательны с Уровня 2, глубина разделения растёт с уровнем зрелости):
      - lightweight (Уровень 2) — read через тот же `<X>Repository.findById(id, NO_LOCK)`, read-DTO просто как маппинг.
      - split (Уровень 3) — отдельный `<X>ViewRepository` в core/ + `Jooq<X>ViewRepository` в persistence/, та же БД но разные методы.
      - event-driven (Уровень 3) — отдельная read-таблица `<x>_summary` (DDL changeset), sync через outbox+Kafka, read-side consumer.
@@ -28,11 +28,11 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ### 3.1. lightweight (Уровень 2) — read через тот же repository
 
    ```java
-   // core/<bc>/usecase/query/GetOrderSummaryQuery.java
+   // core/usecase/query/order/GetOrderSummaryQuery.java
    public record GetOrderSummaryQuery(Long orderId)
        implements UseCaseQuery<OrderSummary> {}
 
-   // core/<bc>/dto/view/OrderSummary.java
+   // core/view/OrderSummary.java
    public record OrderSummary(
        Long orderId,
        OrderStatus status,
@@ -49,7 +49,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
        }
    }
 
-   // core/<bc>/usecase/query/GetOrderSummaryQueryHandler.java
+   // core/usecase/query/order/GetOrderSummaryQueryHandler.java
    @Component
    @RequiredArgsConstructor
    @Transactional(readOnly = true)
@@ -77,7 +77,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    В дополнение к варианту lightweight:
 
    ```java
-   // core/<bc>/domain/repository/OrderViewRepository.java
+   // core/port/out/repository/OrderViewRepository.java
    public interface OrderViewRepository {
        Optional<OrderSummary> findSummaryById(Long orderId);
        PaginationView<OrderSummary> findSummaries(OrderFilter filter, int page, int size);
@@ -210,17 +210,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - Idempotent consumer (`processed_event`).
    - OpenAPI description упоминает eventual consistency.
 
-5. **Структура вывода:**
-   1. **Решения** — вариант CQRS (lightweight / split / event-driven), почему. Read-model location (та же БД / Redis / новая таблица).
-   2. **Дерево новых файлов** — Query/Handler/DTO; ViewRepository (split); DDL + Consumer + RebuildJob (event-driven).
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для existing файлов** — application.yml (Kafka topic configs если C+), OpenAPI YAML.
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew compileJava`, `liquibaseUpdate` если C+.
-      - **TODO для пользователя:** запустить `OrderSummaryRebuildJob` при первом deploy (admin endpoint или migration script); создать Kafka topic; настроить алерты на consumer lag.
-      - Если split — сначала `ucp-jooq-design` для `Jooq<X>ViewRepository`.
-      - Если event-driven — сначала `ucp-pg-schema-design` для `<x>_summary` DDL + `ucp-kafka-design` для consumer.
-   6. **Финальный шаг:** «после генерации запусти `ucp-cqrs-review` для верификации».
+5. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

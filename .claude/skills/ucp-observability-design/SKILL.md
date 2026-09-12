@@ -1,17 +1,17 @@
 ---
 name: ucp-observability-design
-description: Сгенерировать observability-инфраструктуру на Java/Spring (коды R-OBS-*) — Logback JSON для prod, Micrometer + Prometheus, OpenTelemetry tracing + sampling, Actuator liveness/readiness, MdcFilter + TaskDecorator для @Async.
+description: Сгенерировать observability-инфраструктуру на Java/Spring (требования observability/*) — Logback JSON для prod, Micrometer + Prometheus, OpenTelemetry tracing + sampling, Actuator liveness/readiness, MdcFilter + TaskDecorator для @Async.
 when_to_use: Триггеры — «настрой observability», «добавь метрики и tracing», «нужен structured logging». При новом сервисе или upgrade existing.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Observability — проектирование
 
-Ты генерируешь observability-инфраструктуру (logging + metrics + tracing + health + context propagation) под Observability Style Guide.
+Ты генерируешь observability-инфраструктуру (logging + metrics + tracing + health + context propagation) под требования `observability/*`.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/observability/observability-rules.md` (`R-OBS-*`). Опционально — `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-16` PII), `backend/rest-api/rest-api-rules.md` (`R-HDR-4` traceparent), `backend/validation/validation-rules.md` (`R-VLD-CFG-*`).
+1. **Прочитай** `.claude/docs/backend/observability/spec.md` (`R-OBS-*`). Опционально — `backend/auth-patterns/spec.md` (`auth-patterns/no-pii-in-logs-and-events` PII), `backend/rest-api/spec.md` (`rest-api/trace-context-header` traceparent), `backend/validation/spec.md` (`R-VLD-CFG-*`).
 
 2. **Уточни параметры:**
    - **Сервис** — имя для `service` tag (`order-service`).
@@ -281,15 +281,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    - TaskDecorator для @Async.
    - HealthIndicator per external system — генерируется через `ucp-resilience-design` или `ucp-integration-design` (отдельные скиллы).
 
-5. **Структура вывода:**
-   1. **Решения** — backend (Loki/ELK/Datadog), sampling rate, нужны ли custom metrics.
-   2. **Дерево новых файлов** — Logback config, MdcFilter, AsyncConfig, OrderMetrics (если нужны).
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для existing файлов** — `application.yml`, `bootstrap/build.gradle.kts`.
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew bootJar`, `curl :8081/actuator/health`, `curl :8081/actuator/prometheus`.
-      - **TODO для пользователя:** настроить OTel Collector endpoint в env-vars; настроить Prometheus scraping config (scrape_configs.job: order-service, target: localhost:8081); настроить Loki/ELK ingestion для JSON-логов; alerts в Prometheus AlertManager (см. Style Guide §7).
-   6. **Финальный шаг:** «после генерации запусти `ucp-observability-review` для верификации».
+5. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

@@ -1,18 +1,18 @@
 ---
 name: ucp-py-caching-design
 lang: python
-description: Спроектировать кеширование в FastAPI-сервисе на Python (коды R-CACHE-*) — redis.asyncio/aiocache, cache-aside через cache-порт, кеш read-проекций, JSON-сериализация, explicit TTL, evict на write, защита от stampede.
+description: Спроектировать кеширование в FastAPI-сервисе на Python (требования caching/*) — redis.asyncio/aiocache, cache-aside через cache-порт, кеш read-проекций, JSON-сериализация, explicit TTL, evict на write, защита от stampede.
 when_to_use: Добавление кеша. Триггеры — «закешируй X», «redis-кеш для Y», «cache-aside на питоне».
 allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 ---
 
 # Caching — проектирование (Python / redis.asyncio + aiocache)
 
-Ты проектируешь кеширование по **контракту** `backend/caching/caching-rules.md` (`R-CACHE-*`) и **Python-реализации** `backend/caching/python/caching-style-guide.md`.
+Ты проектируешь кеширование по **контракту** `backend/caching/spec.md` (`R-CACHE-*`) и **Python-реализации** `backend/caching/references/python/implementation.md`.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Python-style-guide. Коды в обосновании, не в коде. Связанные: `cqrs` (кеш read-проекций), `backend/hexagonal/python/...` (cache-порт в core/), `observability` (hit-rate метрика), `auth-patterns` (`AUTH-5` JWK-кеш).
+1. **Прочитай** требования `python-style/*`. Коды в обосновании, не в коде. Связанные: `cqrs` (кеш read-проекций), `backend/hexagonal/python/...` (cache-порт в core/), `observability` (hit-rate метрика), `auth-patterns` (`auth-patterns/token-validated-by-library` JWK-кеш).
 
 2. **Где** (`R-CACHE-WHERE-*`): кешируй read-heavy + редко меняющиеся read-проекции (`OrderSummary`), не агрегаты, не write-path, не результат авторизации. Money — только с коротким TTL + явной invalidation.
 
@@ -28,10 +28,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Кеш агрегата целиком (`R-CACHE-WHERE-X2`); кеш на write-path (`R-CACHE-WHERE-X1`); кеш авторизации (`R-CACHE-WHERE-X5`); money без TTL (`R-CACHE-WHERE-X3`).
-- `pickle`-сериализация (`R-CACHE-CFG-X1`); in-memory dict в multi-instance проде (`R-CACHE-CFG-X2`); один глобальный TTL (`R-CACHE-CFG-X3`).
-- Sensitive в ключе plain-text (`R-CACHE-KEY-X4`); infinite TTL (`R-CACHE-TTL-X1`); TTL > 24ч (`R-CACHE-TTL-X2`).
-- Evict-all без причины (`R-CACHE-INV-X1`); write-behind для money (`R-CACHE-PATTERN-X1`); `asyncio.Lock` для distributed-кеша (`R-CACHE-STAMP-X2`).
+- Кеш агрегата целиком (`caching/cache-projections-not-aggregates`); кеш на write-path (`caching/no-cache-on-write-path`); кеш авторизации (`caching/no-caching-authorization-results`); money без TTL (`caching/money-data-needs-explicit-invalidation`).
+- `pickle`-сериализация (`caching/values-serialized-as-json`); in-memory dict в multi-instance проде (`caching/distributed-cache-in-production`); один глобальный TTL (`caching/explicit-ttl-per-cache`).
+- Sensitive в ключе plain-text (`caching/no-sensitive-data-in-keys`); infinite TTL (`caching/explicit-ttl-per-cache`); TTL > 24ч (`caching/ttl-matches-data-nature`).
+- Evict-all без причины (`caching/no-routine-full-flush`); write-behind для money (`caching/cache-aside-is-default`); `asyncio.Lock` для distributed-кеша (`caching/stampede-protection`).
 
 После работы скилла — обязательно `ucp-py-caching-review`.
 

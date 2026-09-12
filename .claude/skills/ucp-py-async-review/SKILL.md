@@ -1,18 +1,19 @@
 ---
 name: ucp-py-async-review
 lang: python
-description: Ревью async-корректности FastAPI-сервиса по UCP (коды PYASYNC-*) — блокирующие вызовы в event loop (requests/time.sleep/sync-драйверы/subprocess в async def), осиротевшие create_task, проглоченный CancelledError, отсутствие таймаутов, общий AsyncSession в gather, asyncio.run внутри loop, фоновые задачи без отмены в lifespan. Вызывается на ревью async-хендлеров, адаптеров, фоновых корутин, параллельных вызовов.
+description: Ревью async-корректности FastAPI-сервиса по UCP (требования async/*) — блокирующие вызовы в event loop, осиротевшие create_task, проглоченный CancelledError, нет таймаутов, общая сессия в gather.
+when_to_use: Ревью async-хендлеров, адаптеров, фоновых корутин, параллельных вызовов.
 allowed-tools: Read Glob Grep
 ---
 
 # Ревью async-кода (Python / asyncio + FastAPI)
 
-Ты проверяешь async-корректность против `backend/python/async/async-rules.md` (`PYASYNC-*`). Формат findings —
-`shared/review-finding-format.md` (`RFF-*`).
+Ты проверяешь async-корректность против `backend/python/async/spec.md` (`PYASYNC-*`). Формат findings —
+`shared/review-format/spec.md` (`review-format/*`).
 
 ## Процесс ревью
 
-1. **Прочитай** `.claude/docs/backend/python/async/async-rules.md` (`PYASYNC-*`) и `.claude/docs/shared/review-finding-format.md`. Связанные: `R-JOB-*`, `R-SHUT-*`, `R-SQLA-SESS-*`, `R-RES-TO-*`.
+1. **Прочитай** `.claude/docs/backend/python/async/spec.md` (`PYASYNC-*`) и `.claude/docs/shared/review-format/spec.md`. Связанные: `R-JOB-*`, `R-SHUT-*`, `R-SQLA-SESS-*`, `R-RES-TO-*`.
 
 2. **Определи объект:** `async def`-хендлеры, out-adapter'ы, фоновые корутины/`lifespan`, места с `gather`/`create_task`/`run_in_executor`.
 
@@ -24,7 +25,7 @@ allowed-tools: Read Glob Grep
 
 4. **Частые реальные дефекты** (приоритет): sync-драйвер БД или `requests` в async-сервисе; `time.sleep`; `except Exception` глотающий `CancelledError`; `gather` на одной сессии; отсутствие таймаута на httpx-вызов; фоновая задача без `cancel()` на shutdown.
 
-5. **Выдай findings** по `RFF-*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-async-design`.
+5. **Выдай findings** по `review-format/*` (severity, код, файл:строка, фикс) и предложи парный `ucp-py-async-design`.
 
 ## Что не входит
 

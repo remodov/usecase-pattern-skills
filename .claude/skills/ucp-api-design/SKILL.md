@@ -1,17 +1,17 @@
 ---
 name: ucp-api-design
-description: Спроектировать новый REST API-эндпоинт или ресурс по REST API Style Guide для Java/Spring (коды R-URL-*, R-MTH-*, R-RSP-*, R-ERR-*, R-OAS-*) — OpenAPI-first, нейминг URL, статусы, ошибки ProblemDetails.
+description: Спроектировать новый REST API-эндпоинт или ресурс по требованиям `rest-api/*` для Java/Spring — OpenAPI-first, нейминг URL, статусы, ошибки ProblemDetails.
 when_to_use: Создание новых эндпоинтов, проектирование структуры API, написание OpenAPI-спеки с нуля.
 allowed-tools: Read Glob Grep Write Edit
 ---
 
 # Проектирование REST API-эндпоинта
 
-Ты проектируешь новый REST API-эндпоинт (или набор эндпоинтов) по командному REST API Style Guide.
+Ты проектируешь новый REST API-эндпоинт (или набор эндпоинтов) по требованиям `rest-api/*`.
 
 ## Инструкции
 
-1. **Прочитай индекс правил** `.claude/docs/backend/rest-api/rest-api-rules.md` — компактный список всех кодов (`R-URL-*`, `R-MTH-*`, `R-RSP-*`, `R-ERR-*`, …) с формулировками; следуй каждому строго. Полную версию `.claude/docs/backend/rest-api/java/rest-api-style-guide.md` (примеры, code-блоки, обоснование) читай **точечно по нужному разделу**, когда индекса не хватает — не целиком.
+1. **Прочитай индекс правил** `.claude/docs/backend/rest-api/spec.md` — компактный список всех кодов (`R-URL-*`, `R-MTH-*`, `R-RSP-*`, `R-ERR-*`, …) с формулировками; следуй каждому строго. Полную версию `.claude/docs/backend/rest-api/references/java/implementation.md` (примеры, code-блоки, обоснование) читай **точечно по нужному разделу**, когда индекса не хватает — не целиком.
 
 2. **Уточни требования.** По описанию пользователя определи:
    - Какие ресурсы вовлечены
@@ -28,28 +28,28 @@ allowed-tools: Read Glob Grep Write Edit
 4. **Выход — OpenAPI-спека** (YAML). **Файл — `<module>/src/main/resources/openapi/<service>.openapi.yaml`** (OpenAPI-first). НЕ `docs/api/`, НЕ рядом с markdown-спекой.
 
    Включи:
-   - Paths с `operationId`, `tags`, `summary`, `description` (`R-OAS-1`, `R-OAS-2`, `R-OAS-4`) — `operationId` станет именем метода в `*Api`, `tags` определят имя интерфейса (`<Tag>Api`).
-   - Параметры пути в OpenAPI — уникальные имена (`{orderId}`, `{itemId}`), хотя в дизайне URL используется `{id}` (`R-OAS-3`, `R-NEST-4`).
+   - Paths с `operationId`, `tags`, `summary`, `description` (`rest-api/operation-id-and-tags`, `rest-api/operation-id-and-tags`, `rest-api/operation-has-summary`) — `operationId` станет именем метода в `*Api`, `tags` определят имя интерфейса (`<Tag>Api`).
+   - Параметры пути в OpenAPI — уникальные имена (`{orderId}`, `{itemId}`), хотя в дизайне URL используется `{id}` (`rest-api/unique-path-parameter-names`, `rest-api/path-parameter-naming`).
    - Request / response schemas под `components/schemas`. Имена схем — это имена сгенерированных Java-классов (`ProductDto`, `CreateProductRequest`, `ProductPageDto`).
-   - Schemas `ProblemDetails` и `Violation` (см. правило `R-ERR-7`).
-   - Enum `ErrorCode` со всеми применимыми business error codes (`R-ERR-4`).
-   - Примеры error response для каждого эндпоинта (`R-ERR-8`, секция 13.3 в гайде — готовые YAML).
-   - Структуру пагинации, если есть list-эндпоинты (`R-QRY-4` или `R-QRY-5`).
+   - Schemas `ProblemDetails` и `Violation` (см. правило `rest-api/error-codes-enumerated`).
+   - Enum `ErrorCode` со всеми применимыми business error codes (`rest-api/error-codes-enumerated`).
+   - Примеры error response для каждого эндпоинта (`rest-api/error-examples-in-operations`, секция 13.3 в гайде — готовые YAML).
+   - Структуру пагинации, если есть list-эндпоинты (`rest-api/pagination-forms` или `rest-api/pagination-forms`).
 
-5. **Самопроверка перед выдачей.** Проверь по style guide и в комментарии к выдаче укажи коды правил, которые применил:
-   - URL — `R-URL-1`..`R-URL-3`, `R-RES-1`..`R-RES-3`, `R-NEST-1`..`R-NEST-2`, `R-VER-3`
-   - Path-параметры — `R-NEST-4` (дизайн `{id}`), `R-OAS-3` (уникальные в OpenAPI)
-   - Query-параметры — `R-QRY-1`..`R-QRY-9` (camelCase, пагинация `R-QRY-4`/`R-QRY-5`, сортировка `R-QRY-6`, фильтры `R-QRY-2`/`R-QRY-3`)
-   - JSON-поля — `R-FLD-1`..`R-FLD-5` (camelCase, `Id`-суффикс, ISO 8601, UPPER_SNAKE_CASE для enum)
-   - Ответы — `R-RSP-1`..`R-RSP-8` (без обёртки, `content` для коллекций, без `null`)
-   - Ошибки — `R-ERR-1`..`R-ERR-9` (RFC 9457, `application/problem+json`, URN в `type`, `violations` для 400)
-   - Action-эндпоинты — `R-ACT-1`..`R-ACT-4`
-   - Заголовки — `R-HDR-1`..`R-HDR-4` (без `X-`-префикса по `R-HDR-X1`)
+5. **Самопроверка перед выдачей.** Проверь по требованиям и в комментарии к выдаче укажи коды правил, которые применил:
+   - URL — `rest-api/path-lowercase-kebab-case`..`rest-api/operational-endpoints-outside-api`, `rest-api/collections-plural-singletons-singular`..`rest-api/resource-name-is-domain-term`, `rest-api/nesting-max-two-levels`..`rest-api/nesting-max-two-levels`, `rest-api/version-in-path`
+   - Path-параметры — `rest-api/path-parameter-naming` (дизайн `{id}`), `rest-api/unique-path-parameter-names` (уникальные в OpenAPI)
+   - Query-параметры — `rest-api/query-parameter-naming`..`rest-api/filters-ranges-and-search` (camelCase, пагинация `rest-api/pagination-forms`/`rest-api/pagination-forms`, сортировка `rest-api/sorting-parameter`, фильтры `rest-api/filters-ranges-and-search`/`rest-api/filters-ranges-and-search`)
+   - JSON-поля — `rest-api/json-field-naming`..`rest-api/json-field-naming` (camelCase, `Id`-суффикс, ISO 8601, UPPER_SNAKE_CASE для enum)
+   - Ответы — `rest-api/single-resource-is-flat`..`rest-api/no-nulls-in-successful-response` (без обёртки, `content` для коллекций, без `null`)
+   - Ошибки — `error-handling/exceptions-are-part-of-contract`..`rest-api/error-status-codes-limited` (RFC 9457, `application/problem+json`, URN в `type`, `violations` для 400)
+   - Action-эндпоинты — `rest-api/action-endpoints-shape`..`rest-api/action-endpoints-shape`
+   - Заголовки — `rest-api/headers-standard-and-prefixed`..`rest-api/trace-context-header` (без `X-`-префикса по `rest-api/headers-standard-and-prefixed`)
 
 6. После OpenAPI-спеки добавь короткий блок **заметок по реализации**:
    - **Подключение генератора**: плагин `org.openapi.generator` должен быть в `build.gradle.kts` (если нет — флаг для `ucp-bootstrap-design`). Output: `build/generated/openapi/src/main/java`. Сгенерированные артефакты — `<package>.generated.api.<Tag>Api` (интерфейс контроллера) + `<package>.generated.api.model.<Schema>` (DTO).
    - **Контракт контроллера**: `<X>Controller implements <Tag>Api` — НЕ ручной класс с `@RequestMapping` и handcrafted DTO. См. `ucp-pattern-design`.
    - Какие error codes добавить в Java-enum `ErrorCode` (если он отдельный) или в маппинг `@ExceptionHandler`.
-   - Что **не пишем руками**: request DTO, response DTO, page DTO, интерфейс `<Tag>Api` — всё генерируется. Ручные DTO в пакете `jsonbean/` — нарушение `BS-20` (это касается DB-Pojo) **и** REST API style guide (это касается API-DTO — схемы определены в OpenAPI, см. `R-OAS-1`).
+   - Что **не пишем руками**: request DTO, response DTO, page DTO, интерфейс `<Tag>Api` — всё генерируется. Ручные DTO в пакете `jsonbean/` — нарушение `spring-bootstrap/external-dtos-are-handcrafted` (это касается DB-Pojo) **и** требования `rest-api/*` (это касается API-DTO — схемы определены в OpenAPI, см. `rest-api/operation-id-and-tags`).
 
 $ARGUMENTS

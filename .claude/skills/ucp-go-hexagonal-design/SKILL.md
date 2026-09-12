@@ -1,20 +1,20 @@
 ---
 name: ucp-go-hexagonal-design
 lang: go
-description: Сгенерировать или реструктурировать Go-сервис под Hexagonal Architecture (коды R-HEX-*) — core/adapter/bootstrap, архитектурный тест packages.Load, порты-interface в core/port/out/, chi-handler через UseCase Handler, sqlc+pgx, apperr.Kind+errors.As.
+description: Сгенерировать или реструктурировать Go-сервис под Hexagonal Architecture — core/adapter/bootstrap, архитектурный тест packages.Load, порты-interface в core/port/out/, chi-handler через UseCase Handler, sqlc+pgx, apperr.Kind+errors.As.
 when_to_use: Старт сервиса Уровня 3 или upgrade 2→3 на Go. Триггеры — «hexagonal layout на Go», «реструктурируй под core/adapter», «добавь порты и адаптеры».
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*)
 ---
 
 # Hexagonal Architecture — проектирование (Go / net/http + chi)
 
-Ты генерируешь раскладку сервиса по **общему контракту** `backend/hexagonal/hexagonal-rules.md` (`R-HEX-*`) и
-**Go-реализации** `backend/hexagonal/go/hexagonal-style-guide.md`. Изоляция границ — через архитектурный тест
+Ты генерируешь раскладку сервиса по **общему контракту** `backend/hexagonal/spec.md` (`R-HEX-*`) и
+**Go-реализации** `backend/hexagonal/references/go/implementation.md`. Изоляция границ — через архитектурный тест
 (`packages.Load` + forbidden-imports), не compile-time Gradle-модули.
 
 ## Инструкции
 
-1. **Прочитай** контракт `backend/hexagonal/hexagonal-rules.md` + Go style-guide. Коды `R-HEX-*` в design-обосновании, не в коде. Связанные: `backend/usecase-pattern/go/...` (UseCase/Handler), `backend/ddd-tactical/go/...` (домен в core/), `backend/error-handling/go/error-handling-style-guide.md` (apperr/Kind в port-ошибках), `backend/go/sqlc/sqlc-rules.md` (out-persistence при наличии).
+1. **Прочитай** контракт `backend/hexagonal/spec.md` + требования `go-style/*`. Коды `R-HEX-*` в design-обосновании, не в коде. Связанные: `backend/usecase-pattern/go/...` (UseCase/Handler), `backend/ddd-tactical/go/...` (домен в core/), `backend/error-handling/references/go/implementation.md` (apperr/Kind в port-ошибках), `backend/go/sqlc/spec.md` (out-persistence при наличии).
 
 2. **Реши уровень** (`R-HEX-WHEN-*`): Уровень 3 (DDD + ports/adapters) → полная раскладка; Уровень 1–2 → плоский `internal/<bc>/`, не плоди ceremony. Назови выбор в начале.
 
@@ -38,15 +38,15 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
 5. **Порты** (`R-HEX-PORT-*`) — `interface` в `core/<bc>/port/out/`, domain-типы в сигнатурах, port-ошибки с `apperr.Kind` в `core/`. **In-adapter** (`R-HEX-AIN-*`) — chi-handler → маппер → `UseCase Handler`; маппер `OrderRequestMapper` — отдельная структура в пакете адаптера. **Out-adapter** (`R-HEX-AOUT-*`) — реализует порт, compile-time assertion `var _ out.XxxPort = (*XxxAdapter)(nil)`, маппер domain↔system-DTO. **bootstrap/** (`R-HEX-BOOT-*`) — только wiring; конструкторы (`NewXxx`), не `init()`/глобальные синглтоны.
 
-6. **Placeholder-файлы**: `bootstrap/main.go` (wiring + `http.Server` + `signal.NotifyContext`), `core/<bc>/aggregate/<name>.go` (rich-domain struct + методы), `core/<bc>/port/out/<port>.go` (interface + port-ошибки), `adapter/in/http/<handler>.go` (chi-handler + маппер), `adapter/out/persistence/<repo>.go` (sqlc + pgx). Самопроверка по §9 (чеклист из style-guide). Предложи `ucp-go-hexagonal-review`.
+6. **Placeholder-файлы**: `bootstrap/main.go` (wiring + `http.Server` + `signal.NotifyContext`), `core/<bc>/aggregate/<name>.go` (rich-domain struct + методы), `core/<bc>/port/out/<port>.go` (interface + port-ошибки), `adapter/in/http/<handler>.go` (chi-handler + маппер), `adapter/out/persistence/<repo>.go` (sqlc + pgx). Самопроверка по §9 (чеклист из справочник). Предложи `ucp-go-hexagonal-review`.
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Отсутствие архитектурного теста (`R-HEX-MOD-X1`, `R-HEX-TEST-X1`); `core/` импортит chi/pgx/kafka-go/redis (`R-HEX-CORE-X1/X2`); sqlc-generated struct как domain в core (`R-HEX-CORE-X4`); HTTP-DTO в core (`R-HEX-CORE-X5`).
-- Interface `PaymentPort` объявлен в out-adapter (`R-HEX-PORT-X1`); DTO внешней системы в port-сигнатуре (`R-HEX-PORT-X2`); port как struct, не interface (`R-HEX-PORT-X4`).
-- Handler зовёт репозиторий напрямую (`R-HEX-AIN-X2`); domain entity возвращается как HTTP-ответ без маппера (`R-HEX-AIN-X3`); `adapter/in/http/` импортирует `adapter/out/*` (`R-HEX-AIN-X4`).
-- Бизнес-логика в out-adapter (`R-HEX-AOUT-X2`); один адаптер реализует несколько port'ов разных BC (`R-HEX-AOUT-X3`); адаптеры зависят друг от друга (`R-HEX-AOUT-X4`).
-- Бизнес-логика или chi-handler'ы в `bootstrap/` (`R-HEX-BOOT-X1`); `init()` для wiring вместо конструкторов; `var db *pgx.Pool` глобально в core.
+- Отсутствие архитектурного теста (`hexagonal/module-per-part`, `hexagonal/architecture-tests-required`); `core/` импортит chi/pgx/kafka-go/redis (`R-HEX-CORE-X1/X2`); sqlc-generated struct как domain в core (`hexagonal/no-generated-types-in-core`); HTTP-DTO в core (`hexagonal/no-generated-types-in-core`).
+- Interface `PaymentPort` объявлен в out-adapter (`hexagonal/outbound-port-interface-in-core`); DTO внешней системы в port-сигнатуре (`hexagonal/port-speaks-domain-types`); port как struct, не interface (`hexagonal/outbound-port-interface-in-core`).
+- Handler зовёт репозиторий напрямую (`hexagonal/controller-dispatches-only`); domain entity возвращается как HTTP-ответ без маппера (`hexagonal/rest-mapping-in-adapter`); `adapter/in/http/` импортирует `adapter/out/*` (`hexagonal/adapters-do-not-know-each-other`).
+- Бизнес-логика в out-adapter (`hexagonal/adapter-maps-not-decides`); один адаптер реализует несколько port'ов разных BC (`hexagonal/out-adapter-per-system`); адаптеры зависят друг от друга (`hexagonal/adapters-do-not-know-each-other`).
+- Бизнес-логика или chi-handler'ы в `bootstrap/` (`hexagonal/bootstrap-composition-only`); `init()` для wiring вместо конструкторов; `var db *pgx.Pool` глобально в core.
 
 После работы скилла — обязательно `ucp-go-hexagonal-review`.
 

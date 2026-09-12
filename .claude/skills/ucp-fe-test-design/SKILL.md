@@ -2,38 +2,51 @@
 name: ucp-fe-test-design
 lang: any
 track: frontend
-description: Спроектировать тесты React+TS по UCP frontend-методологии (коды FE-TEST-*) на Jest + Testing Library — поведение вместо реализации, юзер-центричные запросы getByRole + userEvent, renderWithProviders, мок на сетевой границе, async через findBy.
-when_to_use: Триггеры — «тест для X», «как протестировать компонент/хук», «покрыть Y тестами». При написании/проектировании *.test.tsx, выборе что и как проверять.
-allowed-tools: Read Glob Grep Write Edit Bash(npm*) Bash(pnpm*) Bash(npx*) Bash(yarn*)
+description: Спроектировать тесты фронта из шаблона frontend-templates — разделение по MVVM, сеть только через MSW-стенд, фабрики моков из контракта, e2e файлом на раздел, colocation и порог покрытия.
+when_to_use: Триггеры — «напиши тест», «почини тест», «нужен e2e». После постройки экрана, формы или подключения сервиса.
+allowed-tools: Read Glob Grep Write Edit Bash(bun*) Bash(npm*)
 ---
 
-# Frontend Test — проектирование (React + TS, Jest + Testing Library)
+# Тесты фронта — проектирование
 
-Ты проектируешь тесты по `frontend/fe-test/fe-test-rules.md` (`FE-TEST-*`). Часть трека `frontend` (карта —
-`frontend/_index.md`). Backend-паттерны не применяй. Стек: `jest` + `ts-jest` (запуск
-`jest --coverage`), `@testing-library/react` + `@testing-library/react-hooks`, `userEvent`.
+## Откуда берутся правила
 
-## Инструкции
+`openspec/specs/testing/spec.md` проекта; сводка — `AGENTS.md`. Заметь: больше
+половины требований этой области держится ревью, а не гейтом.
 
-1. **Прочитай** `frontend/fe-test/fe-test-rules.md` (`FE-TEST-*`). Связанные: `fe-component` (тестируем вывод вью, не внутренности), `fe-state` (рендерим с реальным store, не мокаем slice), `fe-data-fetching` (мок на границе — fetcher/thunk), `fe-forms` (поля через лейблы/`userEvent`), `fe-a11y` (роли как точка доступа). Коды — в обосновании теста, не в коде.
+## Порядок
 
-2. **Определи, что тестировать** (`FE-TEST-1/2/3`): наблюдаемое поведение — что пользователь видит/делает (DOM, текст, навигация, наружные колбэки, результат запроса), не внутренний стейт/приватные функции. Перечисли значимые ветки: загрузка / успех / ошибка / пусто / запрет.
+1. **Раздели по MVVM** (`testing/mvvm-test-split`): логику проверяет юнит на
+   `model/`-хук, вёрстку — тест на View. Тест, который дергает и то и другое
+   через полный рендер, ломается от любой правки разметки.
 
-3. **Спроектируй запросы и взаимодействия** (`FE-TEST-4/5/6`): элементы — по роли/тексту/лейблу (`getByRole`/`getByText`/`getByLabelText`); `getByTestId` — только без доступной семантики; действия — через `userEvent` (`await userEvent.click/type`), не `fireEvent`.
+2. **Сеть — только через MSW-стенд** (`testing/msw-mock-required-in-tests`).
+   Ответ мока собирается **сгенерированной фабрикой**, а не руками
+   (`testing/mock-factories-and-stand-scopes`): руками собранный ответ
+   расходится с контрактом молча.
 
-4. **Окружение рендера** (`FE-TEST-7/8/9`): рендер через общий `renderWithProviders` (реальные Redux store + Router); мок — на сетевой границе (fetcher/thunk/HTTP), не на внутренних модулях; изоляция — свежий store и `clearAllMocks`/`cleanup` на каждый тест.
+3. **Права в тесте — профилем стенда**, а не подменой хука прав: так проверяется
+   и сам путь получения скоупов.
 
-5. **Async и имена** (`FE-TEST-10/11`): появление/исчезновение элементов — `findBy*`/`waitFor`/`waitForElementToBeRemoved`, без `setTimeout`; имена по-русски — `describe('<Фича>')`, `test('должна <поведение>')`.
+4. **Хук про адрес тестируется с подменённым роутером**
+   (`testing/router-mock-in-tests`).
 
-6. **Самопроверка** (чеклист §5) + предложи `ucp-fe-test-review`. Запросы/thunks — `ucp-fe-data-fetching-design`, формы — `ucp-fe-forms-design`, вью — `ucp-fe-component-design`.
+5. **Форматтер проверен на каждом значении перечисления**
+   (`testing/formatter-test-per-enum-value`): новое значение enum в контракте
+   иначе тихо отрендерится ключом.
 
-## Антипаттерны, которые НЕ генерировать
+6. **Тест лежит рядом с кодом** (`testing/test-colocation`), e2e — файлом на
+   раздел, мок-сервер поднимает сам (`testing/e2e-conventions`).
 
-- Проверка внутреннего стейта/инстанса/приватных функций вместо DOM (`FE-TEST-X1`); тотальный `toMatchSnapshot` вместо осмысленных assert'ов (`FE-TEST-X2`).
-- Запрос по `className`/`getByTestId` там, где есть роль (`FE-TEST-X3`); привязка к порядку DOM/верстке (`FE-TEST-X4`).
-- `jest.mock` на внутренние хуки/функции/селекторы компонента вместо границы (`FE-TEST-X5`); общий мутируемый store между тестами (`FE-TEST-X6`).
-- `setTimeout`/`sleep` вместо `findBy`/`waitFor` (`FE-TEST-X7`); ручные `act`-обёртки/подавление warning'ов вместо `await findBy*`/`await userEvent` (`FE-TEST-X8`).
+7. **Тесты инфраструктуры не зависят от демо**
+   (`testing/infra-tests-demo-independent`): демо уезжает в первый день по
+   `bun run demo:remove`, и тест, опирающийся на него, ломается сразу после.
 
-После работы скилла — обязательно `ucp-fe-test-review`.
+8. **Порог покрытия** — из требований `testing/coverage-threshold-50`; прогон
+   `bun run test:coverage`, e2e — `bun run test:e2e`.
+
+## Дальше
+
+Ревью — `ucp-fe-test-review`.
 
 $ARGUMENTS

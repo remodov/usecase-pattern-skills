@@ -1,19 +1,19 @@
 ---
 name: ucp-py-distributed-design
 lang: python
-description: Спроектировать распределённый сценарий в Python-микросервисах по UCP (коды R-DIST-*) — saga orchestration/choreography со state-таблицей и сквозным saga_id, idempotency, outbox+inbox, compensation, eventual consistency, запрет 2PC/XA.
+description: Спроектировать распределённый сценарий в Python-микросервисах по UCP — saga orchestration/choreography со state-таблицей и сквозным saga_id, idempotency, outbox+inbox, compensation, eventual consistency, запрет 2PC/XA.
 when_to_use: Триггеры — «saga для X», «cross-service процесс Y», «компенсация Z на питоне». Для cross-service бизнес-операции.
 allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 ---
 
 # Distributed Patterns — проектирование (Python / saga + UoW + aiokafka)
 
-Ты проектируешь распределённый сценарий по **контракту** `backend/distributed-patterns/distributed-patterns-rules.md`
-(`R-DIST-*`) и **Python-реализации** `backend/distributed-patterns/python/distributed-patterns-style-guide.md`.
+Ты проектируешь распределённый сценарий по **контракту** `backend/distributed-patterns/spec.md`
+(`R-DIST-*`) и **Python-реализации** `backend/distributed-patterns/references/python/implementation.md`.
 
 ## Инструкции
 
-1. **Прочитай** контракт + Python-style-guide. Коды в обосновании, не в коде. Связанные: `backend/kafka/python/...` (outbox/idempotent consumer), `cqrs` (EC read-model), `backend/usecase-pattern/python/...` (UoW), `pg-runtime` (saga/idempotency-таблицы).
+1. **Прочитай** требования `python-style/*`. Коды в обосновании, не в коде. Связанные: `backend/kafka/python/...` (outbox/idempotent consumer), `cqrs` (EC read-model), `backend/usecase-pattern/python/...` (UoW), `pg-runtime` (saga/idempotency-таблицы).
 
 2. **Проверь необходимость** (`R-DIST-WHEN-*`): только если операция cross-service. Один сервис+PG → локальный UoW. Сначала альтернативы (объединить BC, modular monolith). Назови решение.
 
@@ -29,10 +29,10 @@ allowed-tools: Read Glob Grep Write Edit Bash(python*) Bash(pytest*) Bash(ruff*)
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Saga для одного сервиса (`R-DIST-WHEN-X1`); saga без compensation (`R-DIST-SAGA-X2`/`R-DIST-COMP-X1`); saga state in-memory (`R-DIST-SAGA-X3`); saga в одном handler с use case (`R-DIST-SAGA-X4`).
-- Receiver без dedup для money (`R-DIST-IDEM-X1`); idempotency-key новый на каждый retry (`R-DIST-IDEM-X3`); молчаливая EC (`R-DIST-EC-X1`).
-- `DELETE` как compensation (`R-DIST-COMP-X2`); compensation без повторного compensation/DLQ (`R-DIST-COMP-X3`).
-- 2PC/XA (`R-DIST-TX-X1`); multi-datasource-commit-цепочка (`R-DIST-TX-X3`); прямой send без outbox (`R-DIST-OBX-X1`).
+- Saga для одного сервиса (`distributed/patterns-only-when-crossing-services`); saga без compensation (`distributed/every-step-has-compensation`/`distributed/every-step-has-compensation`); saga state in-memory (`distributed/saga-state-is-persistent`); saga в одном handler с use case (`distributed/saga-separate-from-use-cases`).
+- Receiver без dedup для money (`distributed/receiver-deduplicates`); idempotency-key новый на каждый retry (`distributed/idempotency-key-per-operation`); молчаливая EC (`distributed/bounded-and-declared-staleness`).
+- `DELETE` как compensation (`distributed/compensation-is-semantic-and-idempotent`); compensation без повторного compensation/DLQ (`distributed/failed-compensation-goes-to-review`).
+- 2PC/XA (`distributed/no-two-phase-commit`); multi-datasource-commit-цепочка (`distributed/no-two-phase-commit`); прямой send без outbox (`distributed/outbox-for-outgoing-events`).
 
 После работы скилла — обязательно `ucp-py-distributed-review`.
 

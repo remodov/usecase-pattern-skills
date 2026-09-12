@@ -1,21 +1,21 @@
 ---
 name: ucp-go-observability-design
 lang: go
-description: Спроектировать наблюдаемость Go-сервиса (net/http + chi) по UCP (коды R-OBS-*) — slog JSON/Text, prometheus/client_golang RED/USE через chi-middleware, OTel с otelpgx/otelhttp, health live/ready с TTL-кешем, management-порт, SLO + burn-rate alerts.
+description: Спроектировать наблюдаемость Go-сервиса (net/http + chi) по UCP — slog JSON/Text, prometheus/client_golang RED/USE через chi-middleware, OTel с otelpgx/otelhttp, health live/ready с TTL-кешем, management-порт, SLO + burn-rate alerts.
 when_to_use: Триггеры — «настрой логи/метрики/трейсинг в Go», «slog», «prometheus на Go». При настройке observability Go-сервиса.
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*)
 ---
 
 # Observability — проектирование (Go / net/http + chi)
 
-Ты проектируешь наблюдаемость по **контракту** `backend/observability/observability-rules.md` (`R-OBS-*`) и
-**Go-реализации** `backend/observability/go/observability-style-guide.md`. Помни: в Go контекст передаётся явно
+Ты проектируешь наблюдаемость по **контракту** `backend/observability/spec.md` (`R-OBS-*`) и
+**Go-реализации** `backend/observability/references/go/implementation.md`. Помни: в Go контекст передаётся явно
 через `context.Context` (нет thread-local/MDC); логгер — через конструкторную DI, не глобальный; span закрывается
 через `defer span.End()` (нет try-with-resources).
 
 ## Инструкции
 
-1. **Прочитай** контракт + Go-style-guide. Коды в обосновании, не в коде. Связанные: `backend/error-handling/go/error-handling-style-guide.md` (`R-ERR-OBS-1` — `app_errors_total` в edge-renderer), `backend/resilience/go/resilience-style-guide.md` (health-check внешних систем), `backend/auth-patterns/go/auth-patterns-style-guide.md` (PII-гигиена `AUTH-16`, `AUTH-18`).
+1. **Прочитай** требования `go-style/*`. Коды в обосновании, не в коде. Связанные: `backend/error-handling/references/go/implementation.md` (`error-handling/errors-counted-by-kind` — `app_errors_total` в edge-renderer), `backend/resilience/references/go/implementation.md` (health-check внешних систем), `backend/auth-patterns/references/go/implementation.md` (PII-гигиена `auth-patterns/no-pii-in-logs-and-events`, `auth-patterns/error-response-hides-cause`).
 
 2. **Logging** (`R-OBS-LOG-*`): `log/slog` JSON в проде / Text локально по `APP_ENV`; логгер через конструктор-DI (`.With("component", "...")`) — никаких `slog.Default()`; структурные поля через key-value аргументы (`slog.String`, `slog.Int64`), не fmt-форматирование; уровни по семантике (INFO значимые события, WARN Domain/Validation-ошибки, ERROR — panic/Technical/Integration при открытом CB); `traceId`/`spanId` — автоматически через OTel-slog bridge (`go.opentelemetry.io/contrib/bridges/otelslog`); `requestId`/`userId` — через chi-middleware в `context.Context`, нет PII; нет `fmt.Println`/`fmt.Fprintf(os.Stderr)`.
 
@@ -31,13 +31,13 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
 ## Антипаттерны, которые НЕ генерировать
 
-- PII в логах/спанах (`R-OBS-LOG-X1`/`R-OBS-TRC-X2`); `fmt.Println`/`fmt.Fprintf(os.Stderr)` (`R-OBS-LOG-X2`); ошибка строкой (`log.ErrorContext(ctx, err.Error())`) вместо атрибута (`R-OBS-LOG-X4`).
-- High-cardinality labels (`R-OBS-MTR-X1`); raw URL вместо chi route pattern в label (`R-OBS-MTR-X2`); `/metrics` без сетевой защиты (`R-OBS-MTR-X4`).
-- `trace.AlwaysSample()` в проде (`R-OBS-TRC-X1`); PII в span attributes (`R-OBS-TRC-X2`); manual span без `defer span.End()` (`R-OBS-TRC-X3`); горутина с `context.Background()` — разрыв trace (`R-OBS-TRC-X4`).
-- Liveness зависит от DB/Redis (`R-OBS-HC-X2`); бизнес-состояние в health (`R-OBS-HC-X1`); health-probe делает бизнес-операцию (`R-OBS-HC-X3`).
-- Один порт business+management (`R-OBS-CFG-X2`); pprof без auth в проде (`R-OBS-CFG-X1`).
-- `context.WithValue` в UseCase Handler/Domain (`R-OBS-CTX-X2`); ctx захвачен из замыкания в горутине (`R-OBS-CTX-X1`); горутина без `ctx` аргумента (`R-OBS-CTX-X3`).
-- Alert на каждый ERROR (`R-OBS-SLO-X1`); SLO 100% (`R-OBS-SLO-X2`); alert без runbook (`R-OBS-SLO-X3`).
+- PII в логах/спанах (`observability/no-pii-in-logs`/`observability/manual-spans-are-closed`); `fmt.Println`/`fmt.Fprintf(os.Stderr)` (`observability/no-direct-stdout-logging`); ошибка строкой (`log.ErrorContext(ctx, err.Error())`) вместо атрибута (`observability/parameterized-log-messages`).
+- High-cardinality labels (`observability/low-cardinality-labels`); raw URL вместо chi route pattern в label (`observability/standard-metric-dimensions`); `/metrics` без сетевой защиты (`observability/management-endpoints-restricted`).
+- `trace.AlwaysSample()` в проде (`observability/sampling-strategy`); PII в span attributes (`observability/manual-spans-are-closed`); manual span без `defer span.End()` (`observability/manual-spans-are-closed`); горутина с `context.Background()` — разрыв trace (`observability/context-propagated-to-async`).
+- Liveness зависит от DB/Redis (`observability/liveness-and-readiness-split`); бизнес-состояние в health (`observability/health-check-is-technical`); health-probe делает бизнес-операцию (`observability/health-check-is-technical`).
+- Один порт business+management (`observability/separate-management-port`); pprof без auth в проде (`observability/management-endpoints-restricted`).
+- `context.WithValue` в UseCase Handler/Domain (`observability/context-set-at-edge-and-cleared`); ctx захвачен из замыкания в горутине (`observability/context-set-at-edge-and-cleared`); горутина без `ctx` аргумента (`observability/context-propagated-to-async`).
+- Alert на каждый ERROR (`observability/burn-rate-alerting`); SLO 100% (`observability/slo-with-error-budget`); alert без runbook (`observability/alerts-have-runbooks`).
 
 После работы скилла — обязательно `ucp-go-observability-review`.
 

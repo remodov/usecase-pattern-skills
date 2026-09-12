@@ -1,22 +1,25 @@
 ---
 name: ucp-kafka-review
-description: Ревью работы с Kafka в Java/Spring (коды R-KFK-*) — producer idempotence и partition key, consumer manual ack и dedup через processed_event, outbox вместо @TransactionalEventListener, retry topic + DLQ, event design, config и security.
+description: Ревью работы с Kafka в Java/Spring (требования kafka/*) — idempotent producer и partition key, ack после записи и dedup, outbox вместо @TransactionalEventListener, retry и DLQ (топик или таблица), event design, config.
 when_to_use: Изменения в KafkaListener-классах, KafkaConfig, kafka-блоке application.yml, outbox-relay.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
 
 # Ревью Kafka
 
-Ты ревьюишь работу с Kafka в Java/Spring-сервисе на соответствие Kafka Style Guide. Главные точки контроля: producer-идемпотентность и outbox publishing, consumer manual-ack и idempotent dedup, retry topic вместо blocking retry, event design.
+Ты ревьюишь работу с Kafka в Java/Spring-сервисе на соответствие требованиям `kafka/*`. Главные точки контроля: producer-идемпотентность и outbox publishing, ack только после обработки записи и idempotent dedup, повторы инфраструктурой (retry-топики или `DefaultErrorHandler`) вместо blocking retry в коде listener'а, event design.
 
 ## Зависимости
 
-- **`.claude/docs/backend/kafka/kafka-rules.md`** — индекс всех правил (полный текст с примерами — соответствующий `*-style-guide.md`). Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
-- Парные документы: `backend/pg-runtime/pg-runtime-rules.md` (`PG-L-021` — outbox-relay через SKIP LOCKED), `backend/auth-patterns/auth-patterns-rules.md` (`AUTH-19` — money-операции через Idempotency-Key), `backend/resilience/resilience-rules.md` (CB вокруг HTTP-вызовов из listener), `backend/ddd-tactical/ddd-tactical-rules.md` (`R-EVT-*` — domain events как payload).
+- **`.claude/docs/backend/kafka/spec.md`** — индекс всех правил (полный текст с примерами — `references/<lang>/implementation.md`). Подгруппы: `R-KFK-PROD-*` (producer), `R-KFK-CONS-*` (consumer), `R-KFK-OBX-*` (outbox), `R-KFK-IDEM-*` (idempotency), `R-KFK-RTRY-*` (retry+DLQ), `R-KFK-EVT-*` (event design), `R-KFK-CFG-*` (config), `R-KFK-OBS-*` (observability), `R-KFK-SEC-*` (security).
+- Парные документы: `backend/pg-runtime/spec.md` (`pg-runtime/skip-locked-for-queues` — outbox-relay через SKIP LOCKED), `backend/auth-patterns/spec.md` (`auth-patterns/money-commands-need-idempotency-key` — money-операции через Idempotency-Key), `backend/resilience/spec.md` (CB вокруг HTTP-вызовов из listener), `backend/ddd-tactical/spec.md` (`R-EVT-*` — domain events как payload).
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/kafka/kafka-rules.md`. Цитируй конкретные коды (`R-KFK-PROD-X1`, `R-KFK-OBX-X1`).
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/kafka/spec.md`. Цитируй конкретные коды (`kafka/producer-is-idempotent`, `kafka/publish-via-outbox`).
 
 2. **Определи объект ревью.** Если пользователь назвал файлы — бери их. Иначе:
    - `git diff` на `*KafkaListener*`, `*KafkaConfig*`, `*KafkaTemplate*`, `*OutboxRelay*`, `*OutboxPublisher*`.
@@ -26,35 +29,35 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 3. **Прогон по подгруппам:**
    - **`R-KFK-PROD-*`** — `enable.idempotence: true`, `acks: all`, partition key явный (aggregate id), `KafkaTemplate.send` НЕ из `@Transactional` с DB-операцией.
-   - **`R-KFK-CONS-*`** — `group.id` уникальный per-purpose, manual ack (`MANUAL_IMMEDIATE`), `auto-offset-reset: earliest` для critical, listener idempotent, нет `Thread.sleep`/blocking, HTTP-вызовы обёрнуты в CB.
-   - **`R-KFK-OBX-*`** — domain events через outbox-relay; `outbox_event` таблица с partial-индексом `WHERE published_at IS NULL`; нет `@TransactionalEventListener` для отправки в Kafka напрямую.
-   - **`R-KFK-IDEM-*`** — `eventId` UUID v7 в payload; `processed_event` таблица с PK на `event_id`; mark-processed в той же транзакции что и бизнес-результат; для money — двойная защита (eventId + Idempotency-Key).
-   - **`R-KFK-RTRY-*`** — `@RetryableTopic` с явным max-attempts; retry только на transient-errors (5xx, IOException), не на 4xx и runtime-баги; DLQ-monitoring и alert на размер; replay из DLQ — manual.
+   - **`R-KFK-CONS-*`** — `group.id` уникальный per-purpose, ack только после записи (`RECORD` или `MANUAL_IMMEDIATE`, `enable-auto-commit: false`), `auto-offset-reset: earliest` для critical, справочники из шины — с наливом через API источника (`kafka/reference-data-backfilled-via-api`), listener idempotent, нет `Thread.sleep`/blocking, HTTP-вызовы обёрнуты в CB.
+   - **`R-KFK-OBX-*`** — domain events через outbox-relay; `outbox_event` таблица с partial-индексом `WHERE published_at IS NULL`; нет `@TransactionalEventListener` для отправки в Kafka напрямую; `published_at` ставится только после ack брокера (`R-KFK-OBX-5`).
+   - **`R-KFK-IDEM-*`** — `eventId` UUID v7 в payload; `processed_event` таблица с PK на `event_id`; mark-processed в той же транзакции что и бизнес-результат; для money — двойная защита (eventId + Idempotency-Key); поток снимков состояния со stale-guard по `updatedAt` — допустимо только как задокументированное отступление.
+   - **`R-KFK-RTRY-*`** — `@RetryableTopic` с явным max-attempts либо `DefaultErrorHandler` с ограниченным backoff (суммарно ≪ `max.poll.interval`) и `addNotRetryableExceptions`; retry только на transient-errors (5xx, IOException), не на 4xx и runtime-баги; DLQ — топик или таблица `kafka_errors` с метрикой, alert и retention; replay из DLQ — manual; `Thread.sleep`/`@Retryable` в коде listener'а — критично.
    - **`R-KFK-EVT-*`** — имя событий в past tense (`OrderConfirmed`, не `ConfirmOrder`); record с `eventId`/`eventType` версионированный/`occurredAt`/`aggregateType`/`aggregateId`; нет PII в широковещательных топиках; нет Aggregate-объектов целиком в payload.
-   - **`R-KFK-CFG-*`** — `@ConfigurationProperties` + `@Validated` для KafkaSettings; `spring.json.trusted.packages` явный allow-list (не `'*'`); `missing-topics-fatal: true` в проде; `bootstrap-servers` через env-substitution.
+   - **`R-KFK-CFG-*`** — `@ConfigurationProperties` + `@Validated` для KafkaSettings; десериализация в явный тип — `spring.json.trusted.packages` явный allow-list (не `'*'`) либо `StringDeserializer` + `readValue` в конкретный тип; `allow.auto.create.topics: false`, свои топики через `KafkaAdmin.NewTopics`; `missing-topics-fatal: true` в проде; `bootstrap-servers` через env-substitution.
    - **`R-KFK-OBS-*`** — Spring Kafka Micrometer-metrics включены; alert на `kafka_consumer_lag` для критичных топиков; OTel `traceparent` пропагирует через Kafka headers; DLQ-size alert.
    - **`R-KFK-SEC-*`** — TLS/SASL для прод-кластера; ACL'ы per-сервис; PII через restricted-topic или по `customerId`.
 
 4. **Ищи паттерны-нарушения:**
-   - `kafkaTemplate.send(...)` в `@Transactional`-методе с `repository.save(...)` рядом — `R-KFK-PROD-X4` / `R-KFK-OBX-X1`.
-   - `enable.idempotence: false` или отсутствие в producer-config — `R-KFK-PROD-X1`.
-   - `acks: 0` / `acks: 1` — `R-KFK-PROD-X2`.
-   - `kafkaTemplate.send(topic, value)` без key (двух-аргументный send) для бизнес-событий — `R-KFK-PROD-X3`.
-   - `enable.auto.commit: true` или дефолтное значение — `R-KFK-CONS-X1`.
-   - `Thread.sleep` в `@KafkaListener`-методе — `R-KFK-CONS-X2` / `R-KFK-RTRY-X1`.
-   - `@KafkaListener` без `groupId` или с одинаковым `groupId` для разных listener-методов — `R-KFK-CONS-X3`.
-   - Listener делает `restTemplate.exchange(...)` или `restClient.get(...)` без `@CircuitBreaker` — `R-KFK-CONS-X4`.
-   - Listener без проверки `eventId` через `processed_event` или подобное — `R-KFK-IDEM-X1`.
-   - `@TransactionalEventListener(phase = AFTER_COMMIT)` с `kafkaTemplate.send` внутри — `R-KFK-OBX-X2`.
-   - `outbox_event` таблица без `WHERE published_at IS NULL` partial-индекса — `R-KFK-OBX-X3`.
-   - `try { ... } catch (Exception e) { log.error(...); ack.acknowledge(); }` без отправки в DLQ — `R-KFK-RTRY-X2`.
-   - `@RetryableTopic` без `attempts` или с `attempts = "Integer.MAX_VALUE"` — `R-KFK-RTRY-X3`.
-   - Имя события в коде: `ConfirmOrderEvent`, `CreateUserCommand` — `R-KFK-EVT-X1`.
-   - Payload event-record содержит `Order order` или другой Aggregate целиком — `R-KFK-EVT-X2`.
-   - `email` / `phone` / `passport` в payload event'а топика типа `customer.profile.updated` — `R-KFK-EVT-X3`.
-   - `spring.json.trusted.packages: '*'` — `R-KFK-CFG-X1`.
-   - `bootstrap-servers: localhost:9092` (hardcoded) — `R-KFK-CFG-X2`.
-   - `security.protocol: PLAINTEXT` в `application-prod.yml` — `R-KFK-SEC-X1`.
+   - `kafkaTemplate.send(...)` в `@Transactional`-методе с `repository.save(...)` рядом — `kafka/publish-via-outbox` / `kafka/publish-via-outbox`.
+   - `enable.idempotence: false` или отсутствие в producer-config — `kafka/producer-is-idempotent`.
+   - `acks: 0` / `acks: 1` — `kafka/producer-is-idempotent`.
+   - `kafkaTemplate.send(topic, value)` без key (двух-аргументный send) для бизнес-событий — `kafka/partition-key-required`.
+   - `enable.auto.commit: true` или дефолтное значение — `kafka/manual-offset-commit`.
+   - `Thread.sleep` в `@KafkaListener`-методе — `kafka/listener-does-not-block-poll-loop` / `kafka/retry-topics-with-limits`.
+   - `@KafkaListener` без `groupId` или с одинаковым `groupId` для разных listener-методов — `kafka/consumer-group-per-purpose`.
+   - Listener делает `restTemplate.exchange(...)` или `restClient.get(...)` без `@CircuitBreaker` — `kafka/listener-does-not-block-poll-loop`.
+   - Listener без проверки `eventId` через `processed_event` или подобное — `kafka/consumer-is-idempotent`.
+   - `@TransactionalEventListener(phase = AFTER_COMMIT)` с `kafkaTemplate.send` внутри — `kafka/publish-via-outbox`.
+   - `outbox_event` таблица без `WHERE published_at IS NULL` partial-индекса — `kafka/outbox-table-shape`.
+   - `try { ... } catch (Exception e) { log.error(...); ack.acknowledge(); }` без отправки в DLQ — `kafka/no-swallowing-in-listener`.
+   - `@RetryableTopic` без `attempts` или с `attempts = "Integer.MAX_VALUE"` — `kafka/retry-topics-with-limits`.
+   - Имя события в коде: `ConfirmOrderEvent`, `CreateUserCommand` — `kafka/event-named-in-past-tense`.
+   - Payload event-record содержит `Order order` или другой Aggregate целиком — `kafka/event-payload-hygiene`.
+   - `email` / `phone` / `passport` в payload event'а топика типа `customer.profile.updated` — `kafka/event-payload-hygiene`.
+   - `spring.json.trusted.packages: '*'` — `kafka/deserialization-allow-list`.
+   - `bootstrap-servers: localhost:9092` (hardcoded) — `kafka/settings-are-typed-and-external`.
+   - `security.protocol: PLAINTEXT` в `application-prod.yml` — `kafka/transport-security-and-acls`.
 
 5. **При ревью `application.yml`:**
    - `spring.kafka.producer.properties.enable.idempotence: true`.
@@ -66,9 +69,9 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - `spring.kafka.consumer.properties.spring.json.trusted.packages: 'ru.example.events.*'` (explicit, не `*`).
    - `spring.kafka.bootstrap-servers: ${KAFKA_BROKERS:...}` — env-substitution.
 
-6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-finding-format.md` (`RFF-*`).
+6. **Формат findings, локализация, серьёзность, резюме** — см. `.claude/docs/shared/review-format/spec.md` (`review-format/*`).
 
-7. **Доменные ориентиры серьёзности** (`RFF-12`):
+7. **Доменные ориентиры серьёзности** (`review-format/severity-scale-is-shared`):
    - **Критично:**
      - `KafkaTemplate.send` в одной транзакции с DB-операцией — потеря consistency (R-KFK-OBX-X1).
      - `enable.idempotence: false` — дубликаты в проде.

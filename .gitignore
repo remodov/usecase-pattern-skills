@@ -1,3 +1,7 @@
 /.idea/
 open-design/
 .DS_Store
+
+# Python-байткод тестов тулинга
+__pycache__/
+*.pyc

@@ -1,25 +1,25 @@
 ---
 name: ucp-go-api-review
 lang: go
-description: Ревью REST API-контракта/кода Go-сервиса (net/http + chi) по UCP (коды R-URL-*, R-MTH-*, R-RSP-*, R-ERR-*) — URL/методы, query/JSON camelCase, коллекции, problem+json RFC 9457, заголовки, operationId; стек chi/validator/apperr/slog.
+description: Ревью REST API-контракта/кода Go-сервиса (net/http + chi) по UCP (требования rest-api/*, error-handling/*) — URL/методы, query/JSON camelCase, коллекции, problem+json RFC 9457, заголовки, operationId; стек chi/validator/apperr/slog.
 when_to_use: Изменения в chi-роутерах, request/response-структурах, httperr-рендерере, OpenAPI-аннотациях или ProblemDetails-маппинге.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(go vet*)
 ---
 
 # Ревью REST API (Go / net/http + chi)
 
-Ты ревьюишь REST-контракт на соответствие **контракту** `backend/rest-api/rest-api-rules.md` и **Go-реализации**
-`backend/rest-api/go/rest-api-style-guide.md`. Go code-first: структуры Go — источник контракта; OpenAPI
+Ты ревьюишь REST-контракт на соответствие **контракту** `backend/rest-api/spec.md` и **Go-реализации**
+`backend/rest-api/references/go/implementation.md`. Go code-first: структуры Go — источник контракта; OpenAPI
 синхронизируется постфактум через `swaggo/swag` или ручные аннотации.
 
 ## Зависимости
 
-- **`.claude/docs/backend/rest-api/rest-api-rules.md`** + **`backend/rest-api/go/rest-api-style-guide.md`**.
+- **`.claude/docs/backend/rest-api/spec.md`** + **`backend/rest-api/references/go/implementation.md`**.
 - Парные: `backend/validation/go/...` (go-playground/validator, violations), `backend/error-handling/go/...` (apperr.Kind, problem+json), `backend/usecase-pattern/go/...` (chi-handler → UseCase/Handler).
 
 ## Инструкции
 
-1. **Прочти** контракт + Go-style-guide. Цитируй конкретные коды (`R-RSP-X1`, `R-ERR-X1`, `R-URL-X2`), не префикс. Помни Go-специфику: нет магии фреймворка — каждое правило явно выражено в коде; это ответственность разработчика.
+1. **Прочти** требования `go-style/*`. Цитируй конкретные коды (`rest-api/no-nulls-in-successful-response`, `rest-api/error-body-follows-standard`, `rest-api/path-lowercase-kebab-case`), не префикс. Помни Go-специфику: нет магии фреймворка — каждое правило явно выражено в коде; это ответственность разработчика.
 
 2. **Скоп.** chi-роутер (`r.Get/Post/Put/Patch/Delete/Route`), request/response-структуры с `json:`-тегами, `httperr.Write` / `writeProblem`, `writeValidationProblem`, OpenAPI-аннотации swaggo; `git diff`.
 
@@ -27,52 +27,52 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*) Bash(go vet*)
 
    ### URL / методы (`R-URL/MTH/NEST/ACT/VER-*`)
    - kebab-case, строчные, без trailing-slash, `/api/v1`-префикс (`r.Route("/api/v1", ...)`).
-   - Trailing-slash или заглавные → `R-URL-X1/X2`; глагол в CRUD-пути → `R-URL-X4`; >2 уровня → `R-NEST-X1`.
-   - Action не через `r.Post` → `R-ACT-X2`; версия в query → `R-VER-X2`; путь без `/api`+версии → `R-VER-X3`.
-   - `w.WriteHeader(http.StatusCreated)` при POST-create, `http.StatusNoContent` при DELETE — проверь соответствие `R-MTH-6`.
-   - В chi `{id}` в дизайне пути допустим; в OpenAPI-аннотациях параметры именуются уникально (`{orderId}`, `{itemId}`) — `R-OAS-3`.
+   - Trailing-slash или заглавные → `R-URL-X1/X2`; глагол в CRUD-пути → `R-URL-X4`; >2 уровня → `rest-api/nesting-max-two-levels`.
+   - Action не через `r.Post` → `rest-api/action-endpoints-shape`; версия в query → `rest-api/version-in-path`; путь без `/api`+версии → `rest-api/version-in-path`.
+   - `w.WriteHeader(http.StatusCreated)` при POST-create, `http.StatusNoContent` при DELETE — проверь соответствие `rest-api/methods-match-semantics`.
+   - В chi `{id}` в дизайне пути допустим; в OpenAPI-аннотациях параметры именуются уникально (`{orderId}`, `{itemId}`) — `rest-api/unique-path-parameter-names`.
 
    ### Query (`R-QRY-*`)
    - camelCase-имена в тегах `query:` / парсинге `r.URL.Query()`.
-   - CSV-массивы (`?status=NEW,PAID` вместо повтора `r.Form["status"]`) → `R-QRY-X3`.
-   - `page` проверяется `>= 1` (`page=0` → `R-QRY-X2`); бизнес-логика в query → `R-QRY-X4`.
+   - CSV-массивы (`?status=NEW,PAID` вместо повтора `r.Form["status"]`) → `rest-api/arrays-as-repeated-parameters`.
+   - `page` проверяется `>= 1` (`page=0` → `rest-api/pagination-forms`); бизнес-логика в query → `rest-api/filters-ranges-and-search`.
 
    ### JSON / ответы (`R-FLD/RSP-*`)
    - camelCase `json:"fieldName"` на каждом поле; `time.Time` ISO 8601; enum UPPER_SNAKE_CASE; деньги `int64` (не `float64`).
-   - `null`-поля в 2xx: `*T`-указатели без `omitempty` в response-структурах → `R-RSP-X1`; пустая строка вместо отсутствия поля → `R-RSP-X2`.
-   - Envelope `{"data": {...}}` для единичного ресурса → `R-RSP-X4`; коллекция без `{"content": [...], "page": ..., "size": ..., "total": ...}` → `R-RSP-2`; пустая коллекция как `null` или отсутствующее поле → `R-RSP-7`.
-   - `Location`-заголовок при создании: `w.Header().Set("Location", ...)` + `201 Created` — `R-RSP-3`.
+   - `null`-поля в 2xx: `*T`-указатели без `omitempty` в response-структурах → `rest-api/no-nulls-in-successful-response`; пустая строка вместо отсутствия поля → `rest-api/no-nulls-in-successful-response`.
+   - Envelope `{"data": {...}}` для единичного ресурса → `rest-api/single-resource-is-flat`; коллекция без `{"content": [...], "page": ..., "size": ..., "total": ...}` → `rest-api/collection-response-shape`; пустая коллекция как `null` или отсутствующее поле → `rest-api/no-nulls-in-successful-response`.
+   - `Location`-заголовок при создании: `w.Header().Set("Location", ...)` + `201 Created` — `rest-api/status-codes-and-bodies`.
 
    ### Ошибки (`R-ERR-*`)
-   - `Content-Type: application/problem+json` на всех error-response; `application/json` → `R-ERR-X1`.
-   - Единый `httperr.Write` (не разные структуры в каждом хендлере) — `R-PRIN-2`.
-   - Валидационные ошибки: `400 VALIDATION_ERROR` + `violations` через `go-playground/validator`; `422` → `R-ERR-X3`.
-   - `code` UPPER_SNAKE_CASE, `type` URN (`urn:problem:<service>:<code>`); `type: "about:blank"` → `R-ERR-X2`.
-   - Stack, `err.Error()` низкоуровневых ошибок / SQL в теле 500 → `R-ERR-X4`.
+   - `Content-Type: application/problem+json` на всех error-response; `application/json` → `rest-api/error-body-follows-standard`.
+   - Единый `httperr.Write` (не разные структуры в каждом хендлере) — `rest-api/contract-is-predictable`.
+   - Валидационные ошибки: `400 VALIDATION_ERROR` + `violations` через `go-playground/validator`; `422` → `rest-api/error-status-codes-limited`.
+   - `code` UPPER_SNAKE_CASE, `type` URN (`urn:problem:<service>:<code>`); `type: "about:blank"` → `rest-api/error-type-is-stable-category`.
+   - Stack, `err.Error()` низкоуровневых ошибок / SQL в теле 500 → `rest-api/no-internals-in-error-body`.
 
    ### Заголовки (`R-HDR-*`)
-   - Кастомные с доменным префиксом; `X-`-префикс → `R-HDR-X1`.
+   - Кастомные с доменным префиксом; `X-`-префикс → `rest-api/headers-standard-and-prefixed`.
    - `Idempotency-Key` для неидемпотентных POST (финансовые операции, создание с побочным эффектом).
-   - `traceparent` через OTel middleware (`otelhttp.NewMiddleware`) — `R-HDR-4`.
+   - `traceparent` через OTel middleware (`otelhttp.NewMiddleware`) — `rest-api/trace-context-header`.
 
    ### OpenAPI (`R-OAS-*`)
    - `operationId` camelCase, `tags` (множественное число, заглавная), `summary` ≤ 80 символов — `R-OAS-1/2/4`.
-   - Нет `operationId` → swaggo генерирует длинный авто-имя, не соответствует `R-OAS-1`.
+   - Нет `operationId` → swaggo генерирует длинный авто-имя, не соответствует `rest-api/operation-id-and-tags`.
 
 4. **Go-антипаттерны** (специфика стека):
-   - `json.Marshal(v)` без `omitempty` на response-полях → `null` в 2xx (`R-RSP-X1`).
-   - `r.URL.Query().Get("page")` без проверки `< 1` → `R-QRY-X2`.
-   - Сырой `err.Error()` в `detail` ответа → раскрытие схемы БД (`R-ERR-X4`).
-   - Разные `ProblemDetails`-структуры в разных хендлерах вместо `httperr.Write` → `R-PRIN-2`.
+   - `json.Marshal(v)` без `omitempty` на response-полях → `null` в 2xx (`rest-api/no-nulls-in-successful-response`).
+   - `r.URL.Query().Get("page")` без проверки `< 1` → `rest-api/pagination-forms`.
+   - Сырой `err.Error()` в `detail` ответа → раскрытие схемы БД (`rest-api/no-internals-in-error-body`).
+   - Разные `ProblemDetails`-структуры в разных хендлерах вместо `httperr.Write` → `rest-api/contract-is-predictable`.
 
 5. **Cross-check:** go-playground/validator-constraints и маппинг `ValidationErrors` → `violations` — `ucp-go-validation-review`; `apperr.Kind`/edge-renderer — `ucp-go-error-handling-review`; chi-handler → UseCase-слой — `ucp-go-pattern-review`; rate-limit — `ucp-go-resilience-review`.
 
-6. **Формат findings** — `.claude/docs/shared/review-finding-format.md` (`RFF-*`), Read-проверка строки обязательна.
+6. **Формат findings** — `.claude/docs/shared/review-format/spec.md` (`review-format/*`), Read-проверка строки обязательна.
 
-7. **Серьёзность** (`RFF-12`):
-   - **Критично** — `null`-поля в 2xx (`R-RSP-X1`), `application/json` вместо problem+json (`R-ERR-X1`), stack/SQL в 500 (`R-ERR-X4`), путь без `/api`+версии (`R-VER-X3`), CSV-массивы (`R-QRY-X3`), `w.WriteHeader(200)` при ошибке.
-   - **Предупреждение** — trailing-slash/заглавные в URL (`R-URL-X1/X2`), `422` вместо `400`+violations (`R-ERR-X3`), `X-`-заголовок (`R-HDR-X1`), envelope единичного (`R-RSP-X4`), action не-POST (`R-ACT-X2`), `type: "about:blank"` (`R-ERR-X2`).
-   - **Замечание** — нет `operationId`/`summary` (`R-OAS-1/4`), >2 уровня вложенности (`R-NEST-X1`), `float64` для денег, boolean без `is/has`-префикса.
+7. **Серьёзность** (`review-format/severity-scale-is-shared`):
+   - **Критично** — `null`-поля в 2xx (`rest-api/no-nulls-in-successful-response`), `application/json` вместо problem+json (`rest-api/error-body-follows-standard`), stack/SQL в 500 (`rest-api/no-internals-in-error-body`), путь без `/api`+версии (`rest-api/version-in-path`), CSV-массивы (`rest-api/arrays-as-repeated-parameters`), `w.WriteHeader(200)` при ошибке.
+   - **Предупреждение** — trailing-slash/заглавные в URL (`R-URL-X1/X2`), `422` вместо `400`+violations (`rest-api/error-status-codes-limited`), `X-`-заголовок (`rest-api/headers-standard-and-prefixed`), envelope единичного (`rest-api/single-resource-is-flat`), action не-POST (`rest-api/action-endpoints-shape`), `type: "about:blank"` (`rest-api/error-type-is-stable-category`).
+   - **Замечание** — нет `operationId`/`summary` (`R-OAS-1/4`), >2 уровня вложенности (`rest-api/nesting-max-two-levels`), `float64` для денег, boolean без `is/has`-префикса.
 
 ## Что не входит
 

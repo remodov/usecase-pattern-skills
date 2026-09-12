@@ -28,19 +28,21 @@ allowed-tools: Read Glob Bash
      `index.html`/`src/components` → `frontend`; иначе → `backend`.
    - Несколько маркеров (моно-репо: и backend, и frontend) — предложи мульти-трек.
 
-4. **Подтверди и добери недостающее через `AskUserQuestion`:** покажи задетекченные track + lang, дай поправить;
-   спроси **профиль** (`full` — всё · `rest` — REST/UCP-сервис · `data` — data-heavy). Если детект уверенный —
-   один вопрос (профиль); если нет — добавь track/lang.
+4. **Покажи срез и подтверди через `AskUserQuestion`.** Прогони `bash <repo>/install.sh --check <target>` с нужными
+   `UCP_TRACK`/`UCP_LANG` — он ничего не меняет и печатает срез по стеку (какой concern включён и почему). Покажи
+   его пользователю; спроси **design-генераторы**: `UCP_DESIGN=all` (для всех включённых concern'ов) или `chain`
+   (только цепочка `ucp-new-service`; review ставится всегда). Ручные поправки — `UCP_CONCERNS_ON` / `UCP_CONCERNS_OFF`.
+   Фиксированные профили `full` / `rest` / `data` — только если пользователь их просит.
 
 5. **Покажи команду и запусти** (после подтверждения):
    ```
-   UCP_TRACK=<track> UCP_LANG=<lang> UCP_PROFILE=<profile> bash <repo>/install.sh <target>
+   UCP_TRACK=<track> UCP_LANG=<lang> UCP_DESIGN=<all|chain> bash <repo>/install.sh <target>
    ```
    `UCP_TRACK` — список через запятую для мульти-трека. Для `frontend`/`e2e` предупреди, что скиллов пока нет
    (поставит 0) — если только их не добавили.
 
 6. **Проверь результат:** `bash <repo>/install.sh --check <target>` — отчёт о симлинках/блоках. Кратко резюмируй
-   пользователю: сколько скиллов, какой срез (track/lang/profile), всё ли на месте.
+   пользователю: сколько скиллов, какой срез (track/lang/profile), стоит ли always-loaded ядро (`.claude/rules/ucp-<lang>-core.md`), всё ли на месте.
 
 ## Важно
 

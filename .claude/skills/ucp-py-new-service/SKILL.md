@@ -1,8 +1,8 @@
 ---
 name: ucp-py-new-service
 lang: python
-description: Оркестратор создания нового FastAPI-сервиса с нуля по UCP. Запускает полную цепочку ucp-py-* скиллов в правильном порядке (спека → DDD → codegen-контракты с чекпоинтами → persistence → bootstrap → error/obs/auth → usecase/api → integration/scheduler → tests). Не пишет код от руки — вызывает downstream-скиллы. Триггер-фразы — «сделай FastAPI-сервис», «новый питон-сервис», «напиши сервис на FastAPI», «начнём сервис».
-when_to_use: Старт нового Python/FastAPI-сервиса. Для contract/DB-first проектов с OpenAPI+DBML как источниками истины.
+description: Оркестратор создания FastAPI-сервиса с нуля по UCP: запускает цепочку ucp-py-* от спеки до тестов; сам код не пишет — вызывает downstream-скиллы.
+when_to_use: Старт нового Python/FastAPI-сервиса. Триггеры — «сделай FastAPI-сервис», «новый питон-сервис», «начнём сервис».
 allowed-tools: Read Glob Grep Bash(find*) Skill(ucp-spec-design) Skill(ucp-py-ddd-tactical-design) Skill(ucp-py-codegen-design) Skill(ucp-py-sqlalchemy-design) Skill(ucp-py-bootstrap-design) Skill(ucp-py-error-handling-design) Skill(ucp-py-observability-design) Skill(ucp-py-auth-design) Skill(ucp-py-pattern-design) Skill(ucp-py-api-design) Skill(ucp-py-integration-design) Skill(ucp-py-resilience-design) Skill(ucp-py-scheduler-design) Skill(ucp-py-test-design) Skill(superpowers:*)
 ---
 

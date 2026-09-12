@@ -1,24 +1,24 @@
 ---
 name: ucp-go-bootstrap-design
 lang: go
-description: Спроектировать или починить bootstrap Go-сервиса (net/http + chi) по UCP (коды GOBOOT-*) — envconfig fail-fast, конструкторная DI без синглтонов, chi-middleware-стек, sqlc+pgx/v5, graceful shutdown с SIGTERM, health live/ready, slog+prometheus+OTel.
+description: Спроектировать или починить bootstrap Go-сервиса (net/http + chi) по UCP — envconfig fail-fast, конструкторная DI без синглтонов, chi-middleware-стек, sqlc+pgx/v5, graceful shutdown с SIGTERM, health live/ready, slog+prometheus+OTel.
 when_to_use: Триггеры — «настрой bootstrap Go-сервиса», «конструкторная DI + chi», «почему сервис не стартует». При старте сервиса или падении на конфиге.
 allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go test*) Bash(golangci-lint*)
 ---
 
 # Проектирование bootstrap (Go / net/http + chi)
 
-Ты настраиваешь bootstrap-слой Go-сервиса по UCP согласно `backend/go/go-bootstrap/go-bootstrap-rules.md`
+Ты настраиваешь bootstrap-слой Go-сервиса по UCP согласно `backend/go/go-bootstrap/spec.md`
 (`GOBOOT-*`). Цель — сервис стартует локально одной командой, конфиг валидируется fail-fast, ресурсы собираются
 конструкторной DI, chi-роутер с полным middleware-стеком, graceful shutdown через SIGTERM.
 
 ## Инструкции
 
-1. **Прочитай** `.claude/docs/backend/go/go-bootstrap/go-bootstrap-rules.md` (`GOBOOT-*`). Связанные по кодам:
-   `backend/error-handling/go/error-handling-style-guide.md` (edge error-renderer, `R-ERR-*`),
-   `backend/validation/go/validation-style-guide.md` (валидация входа, `R-VLD-*`),
-   `backend/observability/go/observability-style-guide.md` (slog/OTel/prometheus, `R-OBS-*`),
-   `backend/graceful-shutdown/go/graceful-shutdown-style-guide.md` (SIGTERM, `R-SHUT-*`).
+1. **Прочитай** `.claude/docs/backend/go/go-bootstrap/spec.md` (`GOBOOT-*`). Связанные по кодам:
+   `backend/error-handling/references/go/implementation.md` (edge error-renderer, `R-ERR-*`),
+   `backend/validation/references/go/implementation.md` (валидация входа, `R-VLD-*`),
+   `backend/observability/references/go/implementation.md` (slog/OTel/prometheus, `R-OBS-*`),
+   `backend/graceful-shutdown/references/go/implementation.md` (SIGTERM, `R-SHUT-*`).
 
 2. **Диагноз: починка или с нуля.** Для починки воспроизведи ошибку (`go run ./cmd/server`); пройди
    Quickstart-чеклист (§ конец rules) — missing env / ресурс в глобале / нет миграций / отсутствует `APP_ENV`.
@@ -37,7 +37,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
    ### 3.3 `internal/config/interfaces.go` — источники недетерминизма
    Интерфейсы `Clock` и `IDGenerator`; production-реализации (`realclock`, `uuidgen`) в пакетах `internal/timeutil/`
-   и `internal/idgen/`; в `run()` создаются и передаются в хендлеры (`GOBOOT-7`).
+   и `internal/idgen/`; в `run()` создаются и передаются в хендлеры (`go-bootstrap/clock-and-ids-behind-interfaces`).
 
    ### 3.4 `internal/server/router.go` — chi-роутер
    `buildRouter(...)` собирает `chi.NewRouter()` с полным middleware-стеком: `Recoverer`, `correlationid.Middleware`,
@@ -47,12 +47,12 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
 
    ### 3.5 Persistence-wiring
    `pgxpool.NewWithConfig` с `MaxConns/MinConns` в `run()`, `defer pool.Close()`. `sqlc`-сгенерированный пакет `db`
-   получает пул. Миграции — `golang-migrate` в CI/деплое, не в `main()` (`GOBOOT-11`).
+   получает пул. Миграции — `golang-migrate` в CI/деплое, не в `main()` (`go-bootstrap/pool-and-migrations`).
 
    ### 3.6 `internal/server/server.go` — graceful shutdown
    `signal.Notify` на `syscall.SIGTERM` + `syscall.SIGINT`; `appState.SetNotReady()` до вызова
-   `srv.Shutdown(shutCtx)`; таймаут shutdown 20–25s через `context.WithTimeout` (`GOBOOT-13`). Фоновые
-   goroutine (Kafka consumer, scheduler) — через общий `context.Context` + `sync.WaitGroup` (`GOBOOT-14`).
+   `srv.Shutdown(shutCtx)`; таймаут shutdown 20–25s через `context.WithTimeout` (`go-bootstrap/graceful-shutdown`). Фоновые
+   goroutine (Kafka consumer, scheduler) — через общий `context.Context` + `sync.WaitGroup` (`go-bootstrap/background-goroutines-awaited`).
 
    ### 3.7 `internal/health/handler.go` — health-эндпоинты
    Два раздельных хендлера: `LiveHandler()` всегда 200; `ReadyHandler(s *State, pool *pgxpool.Pool)` — проверяет
@@ -64,7 +64,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
    (`GOBOOT-17/18`).
 
    ### 3.9 README quickstart
-   Раздел «Запуск локально»: `docker compose up -d postgres && migrate -path migrations -database $DATABASE_URL up && go run ./cmd/server` (`GOBOOT-12`).
+   Раздел «Запуск локально»: `docker compose up -d postgres && migrate -path migrations -database $DATABASE_URL up && go run ./cmd/server` (`go-bootstrap/local-quickstart-documented`).
 
 4. **Структура пакетов** — строго по `GOBOOT-20/21`:
    ```
@@ -83,25 +83,53 @@ allowed-tools: Read Glob Grep Write Edit Bash(go build*) Bash(go vet*) Bash(go t
    ```
    Доменный код не импортирует `net/http`, `pgx`, `chi` — только интерфейсы портов.
 
-5. **Самопроверка** — Quickstart-чеклист из `go-bootstrap-rules.md`:
+5. **Самопроверка** — Quickstart-чеклист из `go-bootstrap/spec.md`:
    `APP_ENV` выставлен; `envconfig.Process` не упал; Postgres поднят и миграции накатаны;
    ресурсы в `run()`, не в `init()` / глобальных переменных; JWT off на `local`; `/health/ready` → 200;
-   `golangci-lint run` с `errcheck`/`errorlint`/`govet`/`staticcheck` чист (`GOBOOT-22`).
+   `golangci-lint run` с `errcheck`/`errorlint`/`govet`/`staticcheck` чист (`go-bootstrap/lint-and-format-required`).
 
 6. **Финальный шаг:** предложи `ucp-go-bootstrap-review`; для бизнес-операций — `ucp-go-pattern-design`.
 
 ## Антипаттерны, которые НЕ генерировать
 
-- `os.Getenv(...)` россыпью вместо единственного `Config` (`GOBOOT-X1`).
-- `var pool *pgxpool.Pool` на уровне пакета (`GOBOOT-X2`); `init()` для инициализации ресурсов (`GOBOOT-X3`).
-- Бизнес-роуты до `/health/*` (`GOBOOT-X4`).
-- DDL / `CREATE TABLE` в `main()` вместо миграционного инструмента (`GOBOOT-X5`); открытие нового соединения на каждый запрос вместо пула (`GOBOOT-X6`).
-- `http.Server.Close()` вместо `Shutdown` (`GOBOOT-X7`); `os.Exit(0)` внутри сервисной логики (`GOBOOT-X8`).
-- Объединение `/health/live` и `/health/ready` в один эндпоинт (`GOBOOT-X9`).
-- `log.Printf(...)` вместо `slog` (`GOBOOT-X10`); несколько `TracerProvider` на процесс (`GOBOOT-X11`).
+- `os.Getenv(...)` россыпью вместо единственного `Config` (`go-bootstrap/single-config-object`).
+- `var pool *pgxpool.Pool` на уровне пакета (`go-bootstrap/dependencies-via-constructors`); `init()` для инициализации ресурсов (`go-bootstrap/dependencies-via-constructors`).
+- Бизнес-роуты до `/health/*` (`go-bootstrap/health-routes-first`).
+- DDL / `CREATE TABLE` в `main()` вместо миграционного инструмента (`go-bootstrap/pool-and-migrations`); открытие нового соединения на каждый запрос вместо пула (`go-bootstrap/pool-and-migrations`).
+- `http.Server.Close()` вместо `Shutdown` (`go-bootstrap/graceful-shutdown`); `os.Exit(0)` внутри сервисной логики (`go-bootstrap/graceful-shutdown`).
+- Объединение `/health/live` и `/health/ready` в один эндпоинт (`go-bootstrap/liveness-and-readiness-split`).
+- `log.Printf(...)` вместо `slog` (`go-bootstrap/structured-logging`); несколько `TracerProvider` на процесс (`go-bootstrap/metrics-and-tracing-initialized-once`).
 - Импорт `internal/<domain>/http` или `internal/<domain>/postgres` из доменного пакета (`GOBOOT-X12`).
 - Пакет `utils/` или `helpers/` — заменить на `internal/timeutil/`, `internal/idgen/` и т.п. (`GOBOOT-X13`).
 
 После работы скилла — обязательно `ucp-go-bootstrap-review`.
 
 $ARGUMENTS
+
+## Гейты проекта
+
+Каталог — `.claude/docs/_meta/project-gates.md`. Эти проверки методология
+определяет сама, и генерируешь их **ты**: пока их нет в проекте, требования,
+которые на них ссылаются, фактически держатся ревью.
+
+Сгенерируй четыре скрипта и привяжи их к общей задаче проверки и в конвейер:
+
+| Скрипт | Что читает | Что делает |
+| --- | --- | --- |
+| `ddl-check` | файлы миграций | разбирает объявления таблиц, колонок, индексов и ограничений; проверяет типы, именование, безопасность изменений |
+| `config-check` | конфигурацию по профилям | сверяет значения, от которых зависит поведение под отказом: брокер, кеш, пул, обслуживание, остановка, устойчивость |
+| `manifest-check` | манифесты развёртывания | сверяет бюджет остановки, паузу перед ней, раздельные пробы, правила обновления, запуск не от суперпользователя |
+| `test-lint` | исходники тестов | ловит ожидания, обращения к настоящим часам, контейнеры брокера в подготовке, подмену портов в интеграционных тестах |
+
+Полный перечень проверок каждого скрипта — таблицы каталога. Каждая строка
+таблицы называет требование, которое проверка закрывает: **проверка без
+требования не заводится**, требование без проверки остаётся с гейтом `ревью`.
+
+Структурные правила этого трека — контракт импортов и запреты зависимостей;
+их набор перечислен в полях «Гейт» самих требований. Правила, названные
+в каталоге для Java, здесь остаются на ревью — это записано в поле «Не ловит»
+соответствующих требований, выдумывать им аналоги не нужно.
+
+Проверка, которую сервис не может пройти сразу, заводится **с файлом
+исключений** — по образцу подавлений анализаторов: причина и срок. Отключать
+проверку целиком нельзя.

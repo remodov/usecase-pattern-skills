@@ -1,28 +1,28 @@
 ---
 lang: any
 name: ucp-pg-runtime-design
-description: Сгенерировать runtime-инфраструктуру PostgreSQL для Java/Spring (коды PG-W-*, PG-V-*, PG-L-*) — outbox-relay с FOR UPDATE SKIP LOCKED, task-queue для retry, advisory-lock для singleton-job, optimistic-lock через version + retry.
+description: Сгенерировать runtime-инфраструктуру PostgreSQL для Java/Spring (требования pg-runtime/*) — outbox-relay с FOR UPDATE SKIP LOCKED, task-queue для retry, advisory-lock для singleton-job, optimistic-lock через version + retry.
 when_to_use: Триггеры — «нужен outbox-relay», «scheduler с SKIP LOCKED», «task-queue для платежей», «advisory lock», «optimistic locking для агрегата X».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # PostgreSQL Runtime — проектирование
 
-Ты генерируешь runtime-инфраструктуру для типовых PG-сценариев по `backend/pg-runtime/pg-runtime-rules.md` (`PG-W-*`, `PG-V-*`, `PG-L-*`, `PG-CP-*`, `PG-IS-*`). Это узкий скилл — покрывает 4 паттерна:
+Ты генерируешь runtime-инфраструктуру для типовых PG-сценариев по `backend/pg-runtime/spec.md` (`PG-W-*`, `PG-V-*`, `PG-L-*`, `PG-CP-*`, `PG-IS-*`). Это узкий скилл — покрывает 4 паттерна:
 
 1. **Outbox-relay** — durable publishing доменных событий.
-2. **Task-queue** — durable retry для resilience-fallback (см. `R-RES-FB-1`).
-3. **Advisory lock** — singleton scheduled-job в кластере (`PG-L-060`).
-4. **Optimistic locking** — через `version`-колонку с Spring `@Retryable` (`PG-L-051`, `PG-L-072`).
+2. **Task-queue** — durable retry для resilience-fallback (см. `resilience/fallback-does-not-fake-success`).
+3. **Advisory lock** — singleton scheduled-job в кластере (`pg-runtime/advisory-lock-for-singleton`).
+4. **Optimistic locking** — через `version`-колонку с Spring `@Retryable` (`pg-runtime/pessimistic-versus-optimistic`, `pg-runtime/deadlock-prevention-by-order`).
 
 Каждый сценарий = отдельный invoke с одним из этих параметров.
 
 ## Инструкции
 
 1. **Прочитай:**
-   - `.claude/docs/backend/pg-runtime/pg-runtime-rules.md` — главный (правила `PG-W-*`, `PG-L-*`).
-   - `.claude/docs/backend/pg-types/pg-types-rules.md` — типы под `PG-T-*` (для DDL outbox-таблицы).
-   - `.claude/docs/backend/java/jooq/jooq-rules.md` — `R-JOOQ-LCK-1`, `R-JOOQ-MS-3` (для запросов SKIP LOCKED).
+   - `.claude/docs/backend/pg-runtime/spec.md` — главный (правила `PG-W-*`, `PG-L-*`).
+   - `.claude/docs/backend/pg-types/spec.md` — типы под `PG-T-*` (для DDL outbox-таблицы).
+   - `.claude/docs/backend/java/jooq/spec.md` — `jooq/select-mode-parameter`, `jooq/nested-collections-in-one-query` (для запросов SKIP LOCKED).
 
 2. **Уточни сценарий.** Один из:
    - `outbox` — outbox-relay для доменных событий.
@@ -243,7 +243,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
 6. **Сценарий 4 — Optimistic locking**
 
-   ### 6.1. DDL — добавить version-колонку (`PG-L-051`)
+   ### 6.1. DDL — добавить version-колонку (`pg-runtime/pessimistic-versus-optimistic`)
    ```yaml
    - changeSet:
        id: <NNN>-add-version-to-<table>
@@ -270,7 +270,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   ### 6.3. Spring `@Retryable` (`PG-L-072`)
+   ### 6.3. Spring `@Retryable` (`pg-runtime/deadlock-prevention-by-order`)
    ```java
    @Component
    public class <X>UpdateService {
@@ -287,21 +287,13 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    ```
 
 7. **Самопроверка перед выдачей.** Пройди по правилам:
-   - **Outbox**: `FOR UPDATE SKIP LOCKED` (`PG-L-020`/`PG-L-021`), partial-index по `published_at IS NULL`, scheduler внутри `@Transactional`.
-   - **Task-queue**: тот же `SKIP LOCKED`, partial-index по `status = 'IN_PROGRESS'`, retry policy с exp backoff (`PG-L-051` для in-memory transient, task-queue для долгих), max-retries.
+   - **Outbox**: `FOR UPDATE SKIP LOCKED` (`pg-runtime/skip-locked-for-queues`/`pg-runtime/skip-locked-for-queues`), partial-index по `published_at IS NULL`, scheduler внутри `@Transactional`.
+   - **Task-queue**: тот же `SKIP LOCKED`, partial-index по `status = 'IN_PROGRESS'`, retry policy с exp backoff (`pg-runtime/pessimistic-versus-optimistic` для in-memory transient, task-queue для долгих), max-retries.
    - **Advisory lock**: `pg_try_advisory_xact_lock` (xact-вариант — отпускается на коммите), не `pg_advisory_lock` (session-вариант — может протечь).
    - **Optimistic**: `version`-колонка явно в схеме, UPDATE с проверкой `version`, increment в том же UPDATE, `@Retryable` на `OptimisticLockException` (1–3 попытки).
-   - Все scheduler-методы с `forUpdate()` обёрнуты в `@Transactional` (`PG-L-041`, `R-JOOQ-LCK-3`).
+   - Все scheduler-методы с `forUpdate()` обёрнуты в `@Transactional` (`pg-runtime/row-lock-inside-transaction`, `jooq/locking-select-inside-transaction`).
 
-8. **Структура вывода:**
-   1. **Решения** — какой сценарий выбран, почему, какой retry-policy.
-   2. **Дерево новых файлов** — DDL changeset, Java-классы.
-   3. **Каждый файл — отдельный code block** с путём.
-   4. **Patch для existing-файлов** — `application.yml` (retry-policy properties, scheduler enable), `bootstrap/build.gradle.kts` (если нужен `spring-boot-starter-aop` или `spring-retry`).
-   5. **Заметки по реализации:**
-      - Команды: `./gradlew liquibaseUpdate`, `./gradlew generateJooq`, `./gradlew test`.
-      - **TODO:** определить exact LOCK_KEY (`pg_try_advisory_xact_lock`); настроить мониторинг очереди (alert если `outbox_event` где `published_at IS NULL` старше N минут).
-   6. **Финальный шаг:** «после генерации — `ucp-pg-runtime-review` для проверки PG-W/PG-L правил, `ucp-jooq-review` для проверки запросов».
+8. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

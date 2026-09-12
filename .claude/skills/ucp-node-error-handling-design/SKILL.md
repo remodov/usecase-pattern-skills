@@ -1,7 +1,7 @@
 ---
 name: ucp-node-error-handling-design
 lang: node
-description: Спроектировать обработку ошибок NestJS-сервиса (Node/TypeScript) по UCP (коды R-ERR-*) — иерархия от AppError, Exception Filters с mapping в problem+json (RFC 9457), port-исключения в axios out-adapter, retry через cockatiel, prom-client + pino.
+description: Спроектировать обработку ошибок NestJS-сервиса (Node/TypeScript) по UCP — иерархия от AppError, Exception Filters с mapping в problem+json (RFC 9457), port-исключения в axios out-adapter, retry через cockatiel, prom-client + pino.
 when_to_use: Триггеры — «настрой обработку ошибок в NestJS», «добавь exception filters». При старте сервиса или миграции catch→null-кода.
 allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(pnpm*) Bash(npx*)
 ---
@@ -9,8 +9,8 @@ allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(pnpm*) Bash
 # Проектирование обработки ошибок (Node / NestJS / TypeScript)
 
 Ты создаёшь / расширяешь обработку ошибок в NestJS-сервисе согласно **общему контракту**
-`backend/error-handling/error-handling-rules.md` (`R-ERR-*`) и его **Node-реализации**
-`backend/error-handling/node/error-handling-style-guide.md`. Цель — единая стратегия: типизированная иерархия,
+`backend/error-handling/spec.md` (`R-ERR-*`) и его **Node-реализации**
+`backend/error-handling/references/node/implementation.md`. Цель — единая стратегия: типизированная иерархия,
 ровно три места catch (edge-filter / axios out-adapter / резильянс-обёртка), консистентный problem+json-mapping, наблюдаемость.
 
 Не делает: валидацию входа (`ucp-node-validation-design`), резилианс-обвязку (`ucp-node-resilience-design`),
@@ -19,17 +19,17 @@ allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(pnpm*) Bash
 ## Инструкции
 
 1. **Прочитай**:
-   - `.claude/docs/backend/error-handling/error-handling-rules.md` — общий контракт, коды `R-ERR-*` (цитируй в design-обосновании, **не** в комментариях кода).
-   - `.claude/docs/backend/error-handling/node/error-handling-style-guide.md` — Node-реализация (NestJS/axios/cockatiel/pino), открывай точечно по разделу.
-   - `.claude/docs/backend/rest-api/rest-api-rules.md` — `R-API-ERR-*` для формата problem+json.
-   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — `AUTH-19` (идемпотентность), `AUTH-18` (PII в response).
+   - `.claude/docs/backend/error-handling/spec.md` — общий контракт, коды `R-ERR-*` (цитируй в design-обосновании, **не** в комментариях кода).
+   - `.claude/docs/backend/error-handling/references/node/implementation.md` — Node-реализация (NestJS/axios/cockatiel/pino), открывай точечно по разделу.
+   - `.claude/docs/backend/rest-api/spec.md` — `R-API-ERR-*` для формата problem+json.
+   - `.claude/docs/backend/auth-patterns/spec.md` — `auth-patterns/money-commands-need-idempotency-key` (идемпотентность), `auth-patterns/error-response-hides-cause` (PII в response).
 
 2. **Идентифицируй сервис.** `git diff` или путь от пользователя. Структура UCP на NestJS:
    - `core/` — базовые ошибки (`AppError` + 4 типа) + доменные наследники; без NestJS-импортов.
    - `edge/filters/` — Exception Filters, `problem.ts`.
    - `adapters/out/<system>/` — axios-клиент + port-specific ошибки.
 
-3. **Аудит текущего состояния** (что есть / что предстоит): базовые ошибки от `AppError` (не от `HttpException`) (`R-ERR-HIER-1/2`), доменные с контекстом (`R-ERR-HIER-3/5`), per-type filters + catch-all через `APP_FILTER` (`R-ERR-WHERE-2a`, `R-ERR-MAP-*`), axios-адаптеры мапят ошибки в port-specific (`R-ERR-WHERE-2b`), нет `try/catch` в core (`R-ERR-WHERE-X1`), метрика `app_errors_total` (`R-ERR-OBS-1`).
+3. **Аудит текущего состояния** (что есть / что предстоит): базовые ошибки от `AppError` (не от `HttpException`) (`R-ERR-HIER-1/2`), доменные с контекстом (`R-ERR-HIER-3/5`), per-type filters + catch-all через `APP_FILTER` (`R-ERR-WHERE-2a`, `R-ERR-MAP-*`), axios-адаптеры мапят ошибки в port-specific (`R-ERR-WHERE-2b`), нет `try/catch` в core (`error-handling/catch-does-not-swallow`), метрика `app_errors_total` (`error-handling/errors-counted-by-kind`).
 
 4. **Произведи код** (полные `.ts`-файлы; strict TypeScript; без комментариев в коде — соответствие выражается именами/типами/структурой; коды правил в комментариях НЕ цитируй).
 
@@ -55,20 +55,20 @@ allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npm*) Bash(pnpm*) Bash
    `app_errors_total` (`prom-client` `Counter` с `type`/`exception`); в catch-all и domain-filter — `.inc({...})`; `span.recordException` + `setStatus(ERROR)`.
 
    ### 4.8 ValidationPipe
-   Глобальный `ValidationPipe` с `exceptionFactory` → `InputValidationError` (а не дефолтный `BadRequestException`), чтобы 400 шёл через наш problem+json (`R-ERR-MAP-2`).
+   Глобальный `ValidationPipe` с `exceptionFactory` → `InputValidationError` (а не дефолтный `BadRequestException`), чтобы 400 шёл через наш problem+json (`error-handling/domain-and-validation-mapping`).
 
-5. **Самопроверка** — пройдись по чеклисту из `node/error-handling-style-guide.md` §«Чеклист подключения».
+5. **Самопроверка** — пройдись по чеклисту из `node/implementation.md` §«Чеклист подключения».
 
 6. **Финальный шаг:** предложи «запусти `ucp-node-error-handling-review` для верификации».
 
 ## Антипаттерны, которые НЕ генерировать
 
-- `catch { return null }` / проглоченный `catch` (`R-ERR-WHERE-X1`/`X3`).
-- `throw new Error(...)` / `throw new Error(String(e))` без `cause` (`R-ERR-HIER-X1`/`R-ERR-WHERE-X2`).
+- `catch { return null }` / проглоченный `catch` (`error-handling/catch-does-not-swallow`/`X3`).
+- `throw new Error(...)` / `throw new Error(String(e))` без `cause` (`error-handling/no-bare-base-exceptions`/`error-handling/catch-does-not-swallow`).
 - домен наследует `HttpException` (HTTP-семантика в core).
-- `res.status(200)` при ошибке (`R-ERR-MAP-X1`).
-- `String(err)` низкоуровневой ошибки в `detail` (`R-ERR-MAP-X3`).
-- деньги в `number`; retry на write без `Idempotency-Key` (`R-ERR-RETRY-3`).
+- `res.status(200)` при ошибке (`error-handling/no-success-code-for-failure`).
+- `String(err)` низкоуровневой ошибки в `detail` (`error-handling/integration-and-technical-mapping`).
+- деньги в `number`; retry на write без `Idempotency-Key` (`error-handling/retry-semantics-by-kind`).
 
 После работы скилла — обязательно `ucp-node-error-handling-review` для верификации.
 

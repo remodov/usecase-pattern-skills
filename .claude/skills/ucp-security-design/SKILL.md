@@ -1,22 +1,22 @@
 ---
 name: ucp-security-design
-description: Подключить SAST-обвязку к существующему Spring Boot-сервису (Java) по UCP (коды R-SEC-*, BS-SEC-*) — Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks, Trivy, suppression-файлы, CI со SARIF, severity-thresholds.
+description: Подключить SAST-обвязку к существующему Spring Boot-сервису (Java) по UCP (требования security/*, spring-bootstrap/*) — Error Prone, SpotBugs+FindSecBugs, OWASP Dependency-Check, Gitleaks, Trivy, suppression-файлы, CI со SARIF, severity-thresholds.
 when_to_use: Триггеры — «подключи security к сервису X», «настрой SAST», «добавь dependency-check», «настрой gitleaks».
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 ---
 
 # Подключение backend/security/SAST-инструментов к сервису
 
-Ты добавляешь к существующему Spring Boot-сервису полный mandatory-набор security-инструментов согласно `backend/security/java/security-style-guide.md` (правила `R-SEC-*`) и `backend/java/spring-bootstrap/spring-bootstrap-rules.md` (правила `BS-SEC-*`). Цель — миграция от «scan вручную раз в квартал» или «вообще ничего» к enforcement в CI.
+Ты добавляешь к существующему Spring Boot-сервису полный mandatory-набор security-инструментов согласно `backend/security/references/java/implementation.md` (правила `R-SEC-*`) и `backend/java/spring-bootstrap/spec.md` (правила `BS-SEC-*`). Цель — миграция от «scan вручную раз в квартал» или «вообще ничего» к enforcement в CI.
 
-Не делает: настройку Vault/KMS (это infra), audit-логи admin-операций (`AUTH-15` через `ucp-auth-design`), маскирование PII в логах (`R-OBS-PII-*` через `ucp-observability-design`), threat modeling (это спека-фаза).
+Не делает: настройку Vault/KMS (это infra), audit-логи admin-операций (`auth-patterns/admin-commands-write-audit-log` через `ucp-auth-design`), маскирование PII в логах (`R-OBS-PII-*` через `ucp-observability-design`), threat modeling (это спека-фаза).
 
 ## Инструкции
 
 1. **Прочитай**:
-   - `.claude/docs/backend/security/security-rules.md` — правила `R-SEC-*`. Главный документ (полный текст с gradle/CI-сниппетами — `backend/security/java/security-style-guide.md`, открывай точечно по разделу).
-   - `.claude/docs/backend/java/spring-bootstrap/spring-bootstrap-rules.md` — правила `BS-SEC-*` (enforcement-уровень).
-   - `.claude/docs/backend/auth-patterns/auth-patterns-rules.md` — для контекста, какие auth-правила пересекаются.
+   - `.claude/docs/backend/security/spec.md` — правила `R-SEC-*`. Главный документ (полный текст с gradle/CI-сниппетами — `backend/security/references/java/implementation.md`, открывай точечно по разделу).
+   - `.claude/docs/backend/java/spring-bootstrap/spec.md` — правила `BS-SEC-*` (enforcement-уровень).
+   - `.claude/docs/backend/auth-patterns/spec.md` — для контекста, какие auth-правила пересекаются.
 
 2. **Идентифицируй сервис.**
    - `git diff` или путь от пользователя.
@@ -28,15 +28,15 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    | Инструмент | Mandatory код | Текущее состояние | План |
    |---|---|---|---|
-   | Error Prone | `R-SEC-SAST-1` | нет / частично / есть | добавить / усилить |
-   | SpotBugs + FindSecBugs | `R-SEC-SAST-2` | нет / есть без findsecbugs / полный | добавить findsecbugs / failOnError |
-   | OWASP Dependency-Check | `R-SEC-DEP-1` | нет / есть без NVD ключа | добавить ключ |
-   | Renovate / Dependabot | `R-SEC-DEP-2` | нет / Dependabot / Renovate | подключить |
-   | Gitleaks | `R-SEC-SECRET-1` | нет / только pre-commit | добавить CI |
-   | Trivy | `R-SEC-IMG-1` | нет / есть без exit-code | добавить exit-code 1 |
-   | Non-root user в Dockerfile | `R-SEC-IMG-3` | нет / есть | добавить USER |
+   | Error Prone | `security/compile-time-analysis-enabled` | нет / частично / есть | добавить / усилить |
+   | SpotBugs + FindSecBugs | `security/code-security-scanner-required` | нет / есть без findsecbugs / полный | добавить findsecbugs / failOnError |
+   | OWASP Dependency-Check | `security/checks-layered-by-feedback-speed` | нет / есть без NVD ключа | добавить ключ |
+   | Renovate / Dependabot | `security/dependency-updates-automated` | нет / Dependabot / Renovate | подключить |
+   | Gitleaks | `security/secret-scanning-before-push` | нет / только pre-commit | добавить CI |
+   | Trivy | `security/image-scanning-before-push` | нет / есть без exit-code | добавить exit-code 1 |
+   | Non-root user в Dockerfile | `security/image-pinned-and-nonroot` | нет / есть | добавить USER |
 
-4. **Внеси изменения.** Lombok-defaults обязательны (`JS-6.1`–`JS-6.7`). Не цитируй коды правил в комментариях кода (`JS-7.3`).
+4. **Внеси изменения.** Lombok-defaults обязательны (`java-style/boilerplate-is-generated`–`java-style/builder-used-sparingly`). Не цитируй коды правил в комментариях кода (`java-style/no-rule-codes-or-history-in-code`).
 
    ### 4.1 `build.gradle` — плагины и dependencies
 
@@ -91,7 +91,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-   `<base-package>` — определи из `package` верхнего java-файла или из `group` в settings.gradle (типично `ru.vikulinva` или `ru.vikulinva`).
+   `<base-package>` — определи из `package` верхнего java-файла или из `group` в settings.gradle (например `ru.example.<service>`).
 
    ### 4.2 Конфиг-файлы (создаются пустыми, если нет)
 
@@ -201,7 +201,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
          with: { sarif_file: trivy-results.sarif }
    ```
 
-   ### 4.4 Pre-commit hook (`R-SEC-SECRET-2`)
+   ### 4.4 Pre-commit hook (`security/secret-scanning-before-push`)
 
    Если `.husky/` или `.pre-commit-config.yaml` отсутствуют — создать `.pre-commit-config.yaml`:
 
@@ -215,7 +215,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    В README сервиса — секция «Setup → `pre-commit install`». Без этого hook не активируется автоматически.
 
-   ### 4.5 Dockerfile (`R-SEC-IMG-2`/`R-SEC-IMG-3`)
+   ### 4.5 Dockerfile (`security/image-pinned-and-nonroot`/`security/image-pinned-and-nonroot`)
 
    Если base image — `:latest` или без digest, или нет `USER`:
 
@@ -237,7 +237,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
 
    Digest получи: `docker pull eclipse-temurin:21-jre-alpine && docker inspect --format='{{index .RepoDigests 0}}' eclipse-temurin:21-jre-alpine`.
 
-   ### 4.6 Renovate (`R-SEC-DEP-2`)
+   ### 4.6 Renovate (`security/dependency-updates-automated`)
 
    Если `renovate.json` отсутствует — создать минимальный:
 
@@ -250,18 +250,9 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*)
    }
    ```
 
-5. **Самопроверка перед выдачей** — пройдись по чеклисту из `backend/security/java/security-style-guide.md` §«Чеклист подключения нового сервиса».
+5. **Самопроверка перед выдачей** — пройдись по чеклисту из `backend/security/references/java/implementation.md` §«Чеклист подключения нового сервиса».
 
-6. **Структура вывода:**
-   1. **Audit таблица** (из шага 3).
-   2. **План изменений** — какие файлы создаются/правятся, в каком порядке.
-   3. **Изменения по файлам** — каждый файл отдельным code-block с пометкой «add» / «replace» / «patch».
-   4. **Команды проверки локально:**
-      - `./gradlew compileJava spotbugsMain dependencyCheckAnalyze`
-      - `gitleaks detect --source=. --config=.gitleaks.toml`
-      - `docker build -t <service>:test . && trivy image --severity HIGH,CRITICAL --exit-code 1 <service>:test`
-   5. **Что **не** покрывается** (с пояснением, какой скилл это делает): Vault, audit log, PII-маскирование.
-   6. **Финальный шаг:** «запусти `ucp-security-review` для верификации».
+6. **Вывод** — по общему правилу: размер ответа равен размеру вопроса; решения и затронутые файлы — всегда, полные файлы — только когда просят сгенерировать; ревью — по запросу, не автоматически.
 
 ## Что НЕ делает
 

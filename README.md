@@ -1,19 +1,87 @@
-# usecase-pattern-skills
+# claude-code-java
 
-Скиллы (slash-команды) для Claude Code по методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; полные style-guide-снапшоты лежат в `.claude/docs/`.
+Скиллы (slash-команды) для Claude Code по методологии Use Case Pattern. Каждый скилл — компактный чек-лист для агента; корпус требований лежит в `.claude/docs/`.
 
 > **Мультиязычность и специализации.** Методология устроена по двум ортогональным осям:
 > **язык** (`lang`: java — референс, python — полностью покрыт, node/go — пилот) и
-> **специализация** (`track`: backend; frontend/e2e — зарезервированы, скиллов пока нет).
-> Язык-нейтральный контракт (`<concern>/<concern>-rules.md`) один на все языки; реализация — в биндинге
-> `<concern>/<lang>/<concern>-style-guide.md`. Подробно — `.claude/docs/_meta/authoring-contract.md` (§10 — ось track)
-> и `_meta/rule-code-registry.md`. Backend-скиллы названы `ucp-<concern>` (java) / `ucp-<lang>-<concern>` (напр.
-> `ucp-py-pattern-design`); каталог ниже описывает java-набор — для python есть `ucp-py-*`-аналоги.
+> **специализация** (`track`: backend — 42 домена, общий слой — 4, e2e — 2; frontend — процедура поверх требований
+> шаблонов `<репозиторий шаблонов фронтенда>`).
+> Требование язык-нейтрально, реализация — в `<домен>/references/<lang>/`. Подробно —
+> `.claude/docs/_meta/authoring-contract.md`. Backend-скиллы названы `ucp-<concern>` (java) /
+> `ucp-<lang>-<concern>` (напр. `ucp-py-pattern-design`); каталог ниже описывает java-набор.
 
 ## Принцип
 
-- **`.claude/docs/` — единственный источник правды.** Скиллы цитируют коды правил (`R-UC-1`, `JS-4.7`, `AUTH-15`, `PG-T-013` и т.д.), агент читает соответствующий гайд при работе.
+- **`.claude/docs/` — единственный источник правды.** Правило — это **требование** с идентификатором (`jooq/nested-collections-in-one-query`, `pg-types/money-is-numeric`), а не буллет с кодом. Скиллы цитируют идентификаторы, агент читает `spec.md` нужного домена.
+- **У каждого требования сказано, чем оно ловится.** Поле «Гейт» называет проверку либо честно говорит `ревью`; поле «Не ловит» — что проскакивает мимо. Это главное отличие корпуса от обычного свода правил.
 - **Скиллы** — короткие инструкции для агента: что проверить, как отчитаться.
+
+## Формат требования
+
+```markdown
+### Requirement: Nested-выборка через multiset
+
+Вложенные коллекции SHALL читаться одним запросом; цикл с отдельным
+запросом на элемент SHALL NOT применяться.
+
+**Почему**: сто первый запрос вместо одного не виден в коде и не роняет тест —
+он проявляется ростом задержки на боевом объёме.
+**ID**: jooq/nested-collections-in-one-query
+**Код**: R-JOOQ-MS-1, R-JOOQ-MS-X2
+**Гейт**: ревью
+**Покрытие**: нет
+**Не ловит**: догрузка в цикле — обычный код с верным результатом;
+число запросов видно только в журнале базы.
+
+#### Scenario: маппер догружает позиции для каждого заказа
+- **WHEN** список из ста заказов
+- **THEN** выполняется сто первый запрос, результат верный
+```
+
+| Поле | Что означает |
+| --- | --- |
+| **ID** | адрес требования: `<домен>/<имя>`, уникален по корпусу |
+| **Почему** | последствие в терминах прода: что ломается и для кого, если требование не выполнено; обязательное |
+| **Код** | старый код правила — чтобы ссылки из архива ревью и подавлений находились грепом |
+| **Гейт** | вид проверки (`checkstyle:X`, `archunit:Y`, `script:ddl-check`, `ci:...`) или `ревью`; у кросс-языковых доменов — по языкам через `·` |
+| **Покрытие** | `полное` / `частичное` / `нет`; считается для проекта по `ucp-bootstrap-design` и **по худшему языку** |
+| **Не ловит** | что проходит мимо гейта; при неполном покрытии заполнено обязательно |
+
+**Читай эти поля первыми.** Сегодня 59 % требований корпуса держатся ревью —
+там единственная защита — внимательность читающего.
+
+| Покрытие | Требований |
+| --- | --- |
+| полное | 20 |
+| частичное | 367 |
+| нет | 560 |
+
+## Гейты проекта
+
+Часть проверок методология определяет сама, и `ucp-*-bootstrap-design` заводит
+их в сервисе. Каталог — `.claude/docs/_meta/project-gates.md`: 155 собственных
+проверок плюс 120 имён правил чужих анализаторов.
+
+| Скрипт | Что читает | Примеры проверок |
+| --- | --- | --- |
+| `ddl-check` | миграции | деньги не плавающей точкой, момент с зоной, ограничение ожидания блокировки, индекс без параллельного режима |
+| `config-check` | конфигурацию по профилям | идемпотентный отправитель, ручное подтверждение обработки, срок жизни у каждого кеша, порог утечек соединений |
+| `manifest-check` | манифесты развёртывания | бюджет остановки, пауза перед ней, раздельные пробы, запуск не от суперпользователя |
+| `test-lint` | тесты | ожидания и опрос в цикле, контейнер брокера в подготовке, подмена портов в интеграционном тесте |
+
+Плюс структурные правила по языкам — 84 штуки, каждое названо по требованию,
+которое закрывает: 68 архитектурных тестов в Java, 8 контрактов импортов
+в Python, 8 правил зависимостей в Node.
+
+**Если проверка в проекте не заведена**, требования, ссылающиеся на неё,
+фактически держатся ревью. Ревью-скиллы это проверяют и сообщают отдельной
+находкой.
+
+**Правила чужих анализаторов** (`ruff`, `eslint`, `checkstyle`, `squawk`, …)
+вынесены в каталоге отдельной таблицей — 120 имён в десяти инструментах. Имя,
+которого нет в пинуемой версии, делает требование ложно закрытым: сверьте
+таблицу со своими конфигами прежде, чем опираться на такой гейт. Имена правил
+линтера миграций помечены как несверенные.
 
 ## Workflow: как пользоваться скиллами
 
@@ -102,6 +170,33 @@
 
 **`ucp-pg-schema-review` — обязательный шаг ПРОВЕРКИ.** Любой PR, который трогает DDL (`db/changelog/**`, `db/migration/**`, `*.sql` с `CREATE TABLE`/`ALTER TABLE`), должен пройти через `ucp-pg-schema-review` до code-review. Скилл проверяет типы (`PG-T-NNN`): `bigint IDENTITY` для PK, `timestamptz` для бизнес-времени, `numeric(p,s)` для денег, `uuid` для UUID, антипаттерны (`varchar(255)`, `varchar(36)`, `float` для денег, `timestamp` без TZ). Без этого ревью DDL не уходит в merge.
 
+**После выкатки — регресс.** `ucp-e2e-pipeline-design` заводит смоук, который
+идёт после каждого деплоя и блокирует продвижение сборки, и полный регресс по
+расписанию. Набор растёт не по интуиции: каждый инцидент закрывается сценарием
+через `ucp-e2e-regression-grow`, и сценарий обязан падать на неисправленном коде.
+
+**Frontend-трек — другая механика.** Своих правил у трека нет: источник правды —
+`openspec/specs` в шаблоне проекта (`<репозиторий шаблонов фронтенда>`, шаблон `next-ssr`).
+Скиллы читают требования оттуда, поэтому цепочка короче:
+
+```
+1. ЗАДАЧА
+   ucp-fe-new-project        (проект из шаблона: выбор, старт, демо, гейты)
+   ucp-fe-screen-design      (экран/маршрут)
+   ucp-fe-form-design        (форма + серверное действие)
+   ucp-fe-service-design     (доступ к данным)
+   ucp-fe-auth-design        (вход, сессия, защита маршрутов)
+   ucp-fe-test-design        (тесты)
+
+2. РЕВЬЮ — по областям openspec, каждая своим скиллом
+   ucp-fe-architecture-review · ucp-fe-api-review · ucp-fe-auth-review
+   ucp-fe-design-system-review · ucp-fe-content-review
+   ucp-fe-test-review · ucp-fe-tooling-review
+```
+
+Если в проекте нет каталога `openspec/`, скиллы говорят об этом прямо и не
+подставляют правила из головы: проверять нечем — это находка, а не мелочь.
+
 **Когда нужна вся связка:** новый сервис с нуля, миграция с классической слоёной архитектуры на UCP, большой рефакторинг с переходом на новый Tier.
 
 **Когда `superpowers` избыточен:** одна операция, один UseCase, добавить эндпоинт в существующий сервис. Дёргай `ucp-*-design` напрямую. Но `ucp-pg-schema-review` всё равно вызывай, если меняется DDL.
@@ -112,7 +207,7 @@
 
 ### `/ucp-api-review`
 
-Ревью REST API контракта или кода на соответствие REST API Style Guide (`.claude/docs/rest-api-style-guide.md`).
+Ревью REST API контракта или кода на соответствие требованиям `rest-api/*` (`.claude/docs/backend/rest-api/spec.md`).
 
 **Что проверяет:**
 - Формат URL (kebab-case, множественное число, вложенность)
@@ -133,7 +228,7 @@
 
 ### `/ucp-api-design`
 
-Проектирование новых REST API эндпоинтов по style guide. Генерирует OpenAPI-спеку и заметки по реализации.
+Проектирование новых REST API эндпоинтов по требованиям `rest-api/*`. Генерирует OpenAPI-спеку и заметки по реализации.
 
 **Что генерирует:**
 - OpenAPI YAML с paths, schemas, error responses
@@ -151,7 +246,7 @@
 
 ### `/ucp-ddd-tactical-review`
 
-Ревью доменного кода на соответствие тактическим паттернам DDD (контракт `.claude/docs/backend/ddd-tactical/ddd-tactical-rules.md`, Java-реализация `.claude/docs/backend/ddd-tactical/java/ddd-tactical-style-guide.md`) и корректное использование библиотеки [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks).
+Ревью доменного кода на соответствие тактическим паттернам DDD (`.claude/docs/backend/ddd-tactical/spec.md`, примеры — `references/java/`) и корректное использование библиотеки [`ddd-building-blocks`](https://github.com/remodov/ddd-building-blocks).
 
 **Что проверяет:**
 - Entity → `Entity<ID>`, equals/hashCode не переопределены, ID `final`
@@ -171,7 +266,7 @@
 
 ### `/ucp-pattern-review`
 
-Ревью Java/Spring-кода на соответствие методологии Use Case Pattern (`.claude/docs/usecase-pattern-style-guide.md`) и корректное использование библиотеки [`usecase-pattern`](https://github.com/remodov/usecase-pattern).
+Ревью Java/Spring-кода на соответствие методологии Use Case Pattern (`.claude/docs/backend/usecase-pattern/spec.md`) и корректное использование библиотеки [`usecase-pattern`](https://github.com/remodov/usecase-pattern).
 
 **Что проверяет:**
 - UseCase — immutable record/final, без логики
@@ -230,7 +325,7 @@
 
 ### `/ucp-spec-design`
 
-Написание Use Case спецификации (`.claude/docs/shared/usecase-spec-template.md`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
+Написание Use Case спецификации (требования `spec-format/*`, скелеты — `.claude/docs/shared/spec-format/references/`) сервиса по бизнес-описанию. Сам определяет нужный Tier (A — классическая слоёная, B — UCP L1–2, C — DDD/Hexagonal) и заполняет 16 разделов с правильной глубиной.
 
 **Что генерирует:**
 - Папка `docs/spec/` с **разбитыми по разделам файлами** — один `.md` на каждый из 16 разделов плюс консолидированный `<service>.md` для шаринга. Это инвариант — спеки одним файлом скилл больше не делает.
@@ -275,7 +370,7 @@
 
 ### `/ucp-spec-change` · `/ucp-spec-change-review`
 
-Спека описывает контекст **как есть сейчас**. Правка её напрямую даёт результат, но не оставляет причины — через полгода никто не помнит, почему статус меняется именно так. Пара ведёт изменение живущего сервиса отдельным артефактом: он живёт, пока изменение делается, вливается в спеку и уходит в архив. Формат — `.claude/docs/shared/spec-change-template.md`, коды ревью — `SC-*`.
+Спека описывает контекст **как есть сейчас**. Правка её напрямую даёт результат, но не оставляет причины — через полгода никто не помнит, почему статус меняется именно так. Пара ведёт изменение живущего сервиса отдельным артефактом: он живёт, пока изменение делается, вливается в спеку и уходит в архив. Формат — `.claude/docs/shared/spec-change/spec.md`, коды ревью — `SC-*`.
 
 **Что проверяет ревью:** есть ли причина, а не пересказ решения (`SC-WHY`); полнота «было → станет» по всем затронутым разделам, не только очевидному (`SC-DIFF`); класс изменения `compatible` / `breaking` / `semantic-break` и поимённые потребители (`SC-IMP`); expand-contract и `vN+1` для событий (`SC-MIG`); задачи вертикальными срезами со ссылкой на скилл (`SC-TASK`); приёмка GWT (`SC-ACR`); готовность к слиянию (`SC-MRG`).
 
@@ -318,7 +413,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-java-style-review`
 
-Ревью Java-кода на соответствие Java Style Guide (`.claude/docs/java-style-guide.md`) — именование, импорты, выражения, отступы. Каждое нарушение цитируется кодом правила (`JS-2.5`, `JS-4.7` и т.д.).
+Ревью Java-кода на соответствие требованиям домена `java-style` (`.claude/docs/backend/java/java-style/spec.md`) — именование, импорты, выражения, отступы. Каждое нарушение цитируется идентификатором требования (`java-style/no-star-imports`), код правила (`JS-2.5`) — рядом.
 
 **Что проверяет:**
 - Именование (классы — существительные; интерфейсы — без `I`; аббревиатуры по правилу 2/3 букв; константы UPPER_SNAKE_CASE; имена тестов).
@@ -337,7 +432,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-jooq-review`
 
-Ревью persistence-слоя (модуль `persistence/`) на соответствие jOOQ Style Guide (`.claude/docs/jooq-style-guide.md`) — repository-pattern, multiset, фильтры, маппинг record↔domain, SelectMode, view-репозитории, transaction boundaries. Каждое нарушение цитируется кодом из подгрупп (`R-JOOQ-MS-1`, `R-JOOQ-LCK-X1` и т. д.).
+Ревью persistence-слоя (модуль `persistence/`) на соответствие требованиям домена `jooq` (`.claude/docs/backend/java/jooq/spec.md`) — repository-pattern, multiset, фильтры, маппинг record↔domain, SelectMode, view-репозитории, transaction boundaries. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - Codegen-конфиг: `setDaos(false)`, `setImmutablePojos(false)`, `OffsetDateTime` для timestamptz, `<enumConverter>true</enumConverter>` для domain-enum'ов.
@@ -362,7 +457,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-resilience-review`
 
-Ревью защиты сервиса от отказов внешних систем на соответствие Resilience Style Guide (`.claude/docs/resilience-style-guide.md`) — timeouts, circuit breaker, retry, bulkhead, fallback, health checks, связка с OpenAPI generator. Каждое нарушение цитируется кодом из подгрупп (`R-RES-CB-1`, `R-RES-OAS-X1` и т. д.).
+Ревью защиты сервиса от отказов внешних систем на соответствие требованиям домена `resilience` (`.claude/docs/backend/resilience/spec.md`) — timeouts, circuit breaker, retry, bulkhead, fallback, health checks, связка с OpenAPI generator. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - Per-system isolation: свой `OkHttpClient`/`RestClient` bean + pool + dispatcher на каждую внешнюю систему (Sber, OdnaKassa, etc.). Shared pool — критическое нарушение.
@@ -389,7 +484,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-integration-design`
 
-Генерирует **полный скелет outbound-интеграции** с новой внешней системой под Resilience Style Guide. Создаёт:
+Генерирует **полный скелет outbound-интеграции** с новой внешней системой под требования `resilience/*`. Создаёт:
 - Доменный port в `core/<bc>/port/out/<system>/` (interface + command/result records).
 - Gradle-модуль `<system>-client-generator/` с `openapi-generator` плагином (target `spring-restclient`).
 - Gradle-модуль `<system>-out-adapter/` со всем требуемым: `<System>ClientConfig` + `ClientSettings` + `ClientAdapter` (с `@CircuitBreaker`/`@Bulkhead`/`@Retry`) + `Mapper` + `HealthIndicator` (TTL-кеш) + exception hierarchy (4xx/5xx).
@@ -414,7 +509,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-jooq-design`
 
-**Парный к `/ucp-jooq-review`.** Генерирует persistence-слой на jOOQ из доменного `<X>Repository` интерфейса под jOOQ Style Guide. Создаёт:
+**Парный к `/ucp-jooq-review`.** Генерирует persistence-слой на jOOQ из доменного `<X>Repository` интерфейса под требования `jooq/*`. Создаёт:
 - `Jooq<X>Repository` — реализация с `DSLContext`, multiset для eager-fetch child-коллекций, `applyLock()` switch для `SelectMode`, private `toSortFields()` helper.
 - `<X>DomainRecordMapper` — Plain Java (если есть assemble-логика, enum-translation, JSONB) или MapStruct interface (для простых DTO ↔ POJO).
 - `<X>FilterConditionBuilder` — если фильтр > 3 полей или содержит EXISTS-условия. С `FilterConditionHelper.andIfNotNull/Empty/True`.
@@ -438,7 +533,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-schema-design`
 
-**Парный к `/ucp-pg-schema-review`.** Генерирует Liquibase changeset (YAML) для нового агрегата под `pg-types-style-guide.md` (`PG-T-*`) и `pg-naming-style-guide.md` (`PG-N-*`):
+**Парный к `/ucp-pg-schema-review`.** Генерирует Liquibase changeset (YAML) для нового агрегата под требования `pg-types/*` (коды `PG-T-*`) и `pg-naming/*` (`PG-N-*`):
 - `CREATE TABLE` с типами: `bigint IDENTITY` или `uuid v7` для PK, `numeric(p,s)` для денег, `timestamptz` для бизнес-времени, `text` для строк (без `varchar(255)`), JSONB для VO с complex structure.
 - FK constraints с CASCADE-стратегией (`ON DELETE CASCADE` для child-сущностей агрегата).
 - Индексы под фильтрацию (FK всегда отдельным индексом + composite под `<X>Filter`).
@@ -456,7 +551,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-migration-design`
 
-**Парный к `/ucp-pg-migration-review`.** Генерирует **безопасные** expand-contract Liquibase changeset'ы для типовых breaking changes по `pg-migrations-style-guide.md` (`PG-M-*`):
+**Парный к `/ucp-pg-migration-review`.** Генерирует **безопасные** expand-contract Liquibase changeset'ы для типовых breaking changes по требованиям `pg-migrations/*` (коды `PG-M-*`):
 - `RENAME COLUMN` — 3 фазы (add new + sync trigger → deploy code → drop trigger + drop old).
 - `ALTER TYPE` — 2-3 фазы через теневую колонку + swap.
 - `ADD CONSTRAINT FK` — 2 фазы (`NOT VALID` + отдельный `VALIDATE`).
@@ -464,7 +559,7 @@ ucp-spec-design  →  спека в docs/spec/
 - `CREATE INDEX` — `CONCURRENTLY` + `runInTransaction: false` + `VACUUM` после.
 - Удаление значения enum — через теневой тип.
 
-Каждая phase имеет `SET LOCAL lock_timeout = '3s'`. Все операции обеспечивают **N-1 совместимость** (миграция работает с предыдущей версией кода). Без down-rollback'ов: `PG-M-*` правило — forward fix, не rollback.
+Каждая phase имеет `SET LOCAL lock_timeout = '3s'`. Все операции обеспечивают **N-1 совместимость** (миграция работает с предыдущей версией кода). Без down-rollback'ов: требования `pg-migrations/*` знают только forward fix, не rollback.
 
 **Использование:**
 
@@ -476,7 +571,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-runtime-design`
 
-**Парный к `/ucp-pg-runtime-review`.** Генерирует runtime-инфраструктуру для четырёх типовых PG-сценариев по `pg-runtime-style-guide.md`:
+**Парный к `/ucp-pg-runtime-review`.** Генерирует runtime-инфраструктуру для четырёх типовых PG-сценариев по требованиям `pg-runtime/*`:
 
 1. **Outbox-relay** — durable publishing доменных событий. DDL `outbox_event` с partial-индексом `WHERE published_at IS NULL`, scheduler с `FOR UPDATE SKIP LOCKED` (`PG-L-021`), запись в outbox в той же транзакции что и UPDATE агрегата.
 2. **Task-queue** — durable retry для resilience-fallback (см. `R-RES-FB-1`). DDL `<x>_task` с retry_count + next_attempt_at, scheduler-poll, `Process<X>TaskCommandHandler` с exponential backoff.
@@ -496,7 +591,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-validation-review`
 
-Ревью валидации входных данных (Jakarta Validation) на соответствие Validation Style Guide (`.claude/docs/validation-style-guide.md`) — где валидируем, какие constraints, custom-валидаторы, validation groups, cross-field, OpenAPI integration. Каждое нарушение цитируется кодом из подгрупп (`R-VLD-WHERE-1`, `R-VLD-OAS-X1` и т. д.).
+Ревью валидации входных данных (Jakarta Validation) на соответствие требованиям домена `validation` (`.claude/docs/backend/validation/spec.md`) — где валидируем, какие constraints, custom-валидаторы, validation groups, cross-field, OpenAPI integration. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - `@Valid` на `@RequestBody`/`@RequestParam` контроллеров и на nested-полях DTO (без `@Valid` nested не валидируется).
@@ -524,7 +619,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-validation-design`
 
-**Парный к `/ucp-validation-review`.** Генерирует кастомный Jakarta Validation constraint, validation group или cross-field-валидатор по Validation Style Guide:
+**Парный к `/ucp-validation-review`.** Генерирует кастомный Jakarta Validation constraint, validation group или cross-field-валидатор по требованиям `validation/*`:
 - **Field-level custom constraint** (`@RussianPhone`, `@VatNumber`, `@Iso8601Duration`) — annotation interface + `ConstraintValidator` implementation, расположение по domain (`core/<bc>/validation/` для domain-specific, `common/validation/` для общих технических).
 - **Validation group** — пустой interface с doc-comment («применяется в Create/Update»).
 - **Cross-field constraint** (`@DateRange`, `@PasswordsMatch`) — class-level annotation с `addPropertyNode(<field>)` для прицепления ошибки к конкретному полю в violations.
@@ -545,7 +640,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-caching-review`
 
-Ревью кеширования (Spring Cache + Redis) на соответствие Caching Style Guide (`.claude/docs/caching-style-guide.md`) — где кешируем, конфигурация, ключи, TTL, invalidation, паттерны, stampede, observability. Каждое нарушение цитируется кодом из подгрупп (`R-CACHE-WHERE-X1`, `R-CACHE-CFG-X1` и т. д.).
+Ревью кеширования (Spring Cache + Redis) на соответствие требованиям домена `caching` (`.claude/docs/backend/caching/spec.md`) — где кешируем, конфигурация, ключи, TTL, invalidation, паттерны, stampede, observability. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - `@Cacheable` только на read-методах, не на write (`R-CACHE-WHERE-X1`); не на доменном агрегате целиком (`R-CACHE-WHERE-X2`); money-кеш с TTL ≤ 30s + строгий evict (`R-CACHE-WHERE-X3`).
@@ -569,7 +664,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-caching-design`
 
-**Парный к `/ucp-caching-review`.** Генерирует кеш-обвязку под Caching Style Guide:
+**Парный к `/ucp-caching-review`.** Генерирует кеш-обвязку под требования `caching/*`:
 - `CacheSettings` (`@ConfigurationProperties` + `@Validated`) с per-cache TTL.
 - `CacheConfiguration` (`@Configuration` + `@EnableCaching`) с `RedisCacheManager` + `GenericJackson2JsonRedisSerializer` + `withInitialCacheConfigurations`.
 - `application.yml` patch — `spring.data.redis.*`, `spring.cache.type: redis`, `cache.caches.<name>.ttl`.
@@ -593,7 +688,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-kafka-review`
 
-Ревью работы с Kafka на соответствие Kafka Style Guide (`.claude/docs/kafka-style-guide.md`) — producer (idempotence, partition key), consumer (manual ack, idempotent dedup), outbox publishing, retry topic + DLQ, event design, security. Каждое нарушение цитируется кодом из подгрупп (`R-KFK-PROD-X1`, `R-KFK-OBX-X1` и т. д.).
+Ревью работы с Kafka на соответствие требованиям домена `kafka` (`.claude/docs/backend/kafka/spec.md`) — producer (idempotence, partition key), consumer (manual ack, idempotent dedup), outbox publishing, retry topic + DLQ, event design, security. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - Producer: `enable.idempotence: true`, `acks: all`, partition key явный (aggregate id), `KafkaTemplate.send` НЕ из `@Transactional` с DB-операцией.
@@ -617,7 +712,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-kafka-design`
 
-**Парный к `/ucp-kafka-review`.** Генерирует Kafka-обвязку под Kafka Style Guide:
+**Парный к `/ucp-kafka-review`.** Генерирует Kafka-обвязку под требования `kafka/*`:
 - `KafkaSettings` (`@ConfigurationProperties` + `@Validated`) с topics + retry-policy.
 - `application.yml` patch — producer/consumer/listener с правильными defaults (idempotent, manual-ack, trusted-packages explicit).
 - Event-record в `core/<bc>/domain/event/` — `record OrderConfirmedEvent` с `eventId` UUID v7, `eventType` версионированный, `aggregateType`/`aggregateId`, бизнес-полями.
@@ -644,7 +739,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-observability-review`
 
-Ревью наблюдаемости на соответствие Observability Style Guide (`.claude/docs/observability-style-guide.md`) — structured logging с MDC, Micrometer-метрики, OpenTelemetry tracing, Actuator health, context propagation, SLO. Каждое нарушение цитируется кодом из подгрупп (`R-OBS-LOG-X1`, `R-OBS-CTX-X1` и т. д.).
+Ревью наблюдаемости на соответствие требованиям домена `observability` (`.claude/docs/backend/observability/spec.md`) — structured logging с MDC, Micrometer-метрики, OpenTelemetry tracing, Actuator health, context propagation, SLO. Каждое нарушение цитируется идентификатором требования; старый код правила — в поле **Код**.
 
 **Что проверяет:**
 - Logging: JSON в проде, `@Slf4j` через Lombok, `{}`-placeholders (не string-concat), правильные log-уровни, MDC fields в каждой записи, **PII запрещены** (см. `AUTH-16`), нет `System.out`/`printStackTrace`, ERROR с stack trace.
@@ -668,7 +763,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-observability-design`
 
-**Парный к `/ucp-observability-review`.** Генерирует observability-инфраструктуру под Observability Style Guide:
+**Парный к `/ucp-observability-review`.** Генерирует observability-инфраструктуру под требования `observability/*`:
 - `logback-spring.xml` с двумя профилями (text dev / JSON prod через `LogstashEncoder`).
 - `application.yml` patch — `management.*` (отдельный port, explicit exposure, стандартизованные tags, liveness/readiness probes), `otel.*` (sampling 10%, OTLP endpoint), `logging.*`.
 - `MdcFilter` (Spring `@Component` + `OncePerRequestFilter`) с `MDC.clear()` в `finally`.
@@ -715,7 +810,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-auth-review`
 
-Ревью кода на соответствие паттернам авторизации (`.claude/docs/auth-patterns-style-guide.md`) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется кодом правила (`AUTH-9`, `AUTH-15` и т.д.).
+Ревью кода на соответствие паттернам авторизации (`.claude/docs/backend/auth-patterns/spec.md`) — JWT + RBAC + ABAC + S2S + audit + PII / секреты + идемпотентность. Каждое нарушение цитируется идентификатором требования, код правила (`AUTH-9`) — рядом.
 
 **Что проверяет:**
 - JWT validation через `oauth2ResourceServer().jwt()`, без кастомных фильтров.
@@ -753,7 +848,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-test-design`
 
-Проектирование интеграционных и unit-тестов под стратегию тестов (`.claude/docs/test-strategy.md`): синхронные, только PostgreSQL + WireMock, без Kafka/Redis в базовом классе, события через in-memory publisher.
+Проектирование интеграционных и unit-тестов под стратегию тестов (`.claude/docs/backend/java/test-strategy/spec.md`): синхронные, только PostgreSQL + WireMock, без Kafka/Redis в базовом классе, события через in-memory publisher.
 
 **Что генерирует:**
 - `BaseIntegrationTest` (если ещё нет) — Testcontainers PostgreSQL с reuse, WireMock, in-memory `DomainEventPublisher`.
@@ -770,7 +865,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-schema-review`
 
-Ревью PostgreSQL-схемы и миграций (DDL Liquibase / Flyway / сырой SQL) против `pg-types-style-guide.md` (правила `PG-T-NNN`).
+Ревью PostgreSQL-схемы и миграций (DDL Liquibase / Flyway / сырой SQL) против требований `pg-types/*` (коды `PG-T-NNN`).
 
 **Что проверяет:**
 - Числа: `bigint IDENTITY` для PK, `numeric(p,s)` для денег, без `serial`/`float`.
@@ -788,7 +883,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-explain-review`
 
-Ревью индексов и плана запроса PostgreSQL против `pg-indexes-style-guide.md` (правила `PG-I-NNN`, `PG-E-NNN`).
+Ревью индексов и плана запроса PostgreSQL против требований `pg-indexes/*` (коды `PG-I-NNN`, `PG-E-NNN`).
 
 **Что проверяет:**
 - Composite-индексы: левый префикс, порядок полей, range последним.
@@ -806,7 +901,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-runtime-review`
 
-Ревью runtime-аспектов PostgreSQL против `pg-runtime-style-guide.md` (правила `PG-W-NNN`, `PG-V-NNN`, `PG-L-NNN`).
+Ревью runtime-аспектов PostgreSQL против требований `pg-runtime/*` (коды `PG-W-NNN`, `PG-V-NNN`, `PG-L-NNN`).
 
 **Что проверяет:**
 - WAL: длинные транзакции в `@Transactional` (HTTP/Kafka/S3 внутри), bulk-операции (COPY vs цикл INSERT), HOT/fillfactor, JSONB с горячими полями.
@@ -823,7 +918,7 @@ ucp-spec-design  →  спека в docs/spec/
 
 ### `/ucp-pg-migration-review`
 
-Ревью PostgreSQL миграций (Liquibase / Flyway / сырой SQL) на безопасность для прода против `pg-migrations-style-guide.md` (правила `PG-M-NNN`).
+Ревью PostgreSQL миграций (Liquibase / Flyway / сырой SQL) на безопасность для прода против требований `pg-migrations/*` (коды `PG-M-NNN`).
 
 **Что проверяет:**
 - Lock-агрессивность: `ALTER TABLE` без `lock_timeout`, `CREATE INDEX` без `CONCURRENTLY`, `ADD CONSTRAINT FK` без `NOT VALID`.
@@ -843,13 +938,72 @@ ucp-spec-design  →  спека в docs/spec/
 
 **Обязательный шаг ПРОВЕРКИ.** Любой PR с миграцией должен пройти этот скилл. На проде это разница между «прокатилось за минуту» и «легло на 30 минут с лок-стормом».
 
+### Frontend-скиллы
+
+Ставятся при `UCP_TRACK=frontend`. Design-скиллы разрезаны **по задачам**
+(экран, форма, доступ к данным, вход, тесты), review-скиллы — **по областям
+openspec** шаблона, чтобы находка ссылалась на требование, которое живёт
+в проекте, а не в этом репозитории.
+
+| Скилл | О чём |
+| --- | --- |
+| `/ucp-fe-new-project` | завести проект из шаблона: выбор шаблона, `new-project.sh`, `demo:remove`, первый прогон гейтов |
+| `/ucp-fe-screen-design` | экран или маршрут: серверные и клиентские компоненты, состояния загрузки и ошибки |
+| `/ucp-fe-form-design` | форма: схема данных, серверное действие, ошибки полей |
+| `/ucp-fe-service-design` | доступ к данным: слой сервисов, кеширование, поведение при отказе |
+| `/ucp-fe-auth-design` | вход, сессия, защита маршрутов |
+| `/ucp-fe-test-design` | тесты по областям openspec |
+| `/ucp-fe-architecture-review` | структура слоёв, границы модулей, направления импортов |
+| `/ucp-fe-api-review` | клиент API, работа с данными, обработка отказов |
+| `/ucp-fe-auth-review` | аутентификация и доступ |
+| `/ucp-fe-design-system-review` | компоненты и оформление |
+| `/ucp-fe-content-review` | тексты, локализация, доступность |
+| `/ucp-fe-test-review` | тесты |
+| `/ucp-fe-tooling-review` | сборка, линтеры, окружение |
+
+**Использование:**
+
+```
+/ucp-fe-new-project Админка для операторов
+/ucp-fe-screen-design Список заказов с фильтром по статусу
+/ucp-fe-form-design Форма оформления заказа
+/ucp-fe-architecture-review          # из git diff
+/ucp-fe-api-review src/services/
+```
+
+### e2e-скиллы
+
+Ставятся при `UCP_TRACK=e2e`. Трек отвечает на два вопроса, которые обычно
+нигде не записаны: что происходит сразу после деплоя и откуда в регрессе
+берутся новые сценарии.
+
+| Скилл | О чём |
+| --- | --- |
+| `/ucp-e2e-design` | сценарии по спеке сервиса: бизнес-пути, свои данные, устойчивые селекторы, разметка на смоук и регресс |
+| `/ucp-e2e-pipeline-design` | прогон вокруг выкатки: смоук после деплоя с блокировкой продвижения, регресс по расписанию, карантин, отчёт с владельцем |
+| `/ucp-e2e-regression-grow` | рост регресса по инцидентам: путь вместо симптома, сценарий, падающий на неисправленном коде |
+| `/ucp-e2e-review` | ревью набора и конвейера, включая отсутствие джоб как отдельную находку |
+
+**Использование:**
+
+```
+/ucp-e2e-design Оформление заказа с оплатой картой
+/ucp-e2e-pipeline-design                       # завести смоук и ночной регресс
+/ucp-e2e-regression-grow INC-482               # закрыть инцидент сценарием
+/ucp-e2e-review e2e/                           # ревью набора
+```
+
+**Требования трека:** `e2e-suite/*` — из чего состоит набор; `e2e-pipeline/*` —
+когда он гоняется и как растёт. Обе джобы (`ci:e2e-smoke`, `ci:e2e-regression`)
+описаны в каталоге проверок `_meta/project-gates.md`.
+
 ## Подключение к проекту
 
 Три способа, от простого к ручному. Все ставят только **нужный срез** (язык × специализация × профиль).
 
 ```bash
-git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/usecase-pattern-skills
-cd ~/projects/usecase-pattern-skills
+git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/claude-code-java
+cd ~/projects/claude-code-java
 ```
 
 #### A. Через Claude — диалогом (рекомендуется)
@@ -860,7 +1014,7 @@ cd ~/projects/usecase-pattern-skills
 
 > Чтобы это работало в проекте, где скиллов ещё нет (холодный старт), поставьте `ucp-install` в личные скиллы один раз:
 > ```bash
-> ln -s ~/projects/usecase-pattern-skills/.claude/skills/ucp-install ~/.claude/skills/ucp-install
+> ln -s ~/projects/claude-code-java/.claude/skills/ucp-install ~/.claude/skills/ucp-install
 > ```
 
 #### B. Интерактивный мастер (без Claude)
@@ -872,7 +1026,10 @@ cd ~/projects/usecase-pattern-skills
 #### C. Вручную через env-переменные
 
 ```bash
-./install.sh ~/my-project                                    # всё, backend, java (дефолты)
+./install.sh ~/my-project                                    # срез по стеку проекта, backend, java (дефолты)
+UCP_DESIGN=chain ./install.sh ~/my-project                   # review для всех concern'ов, design — только цепочка
+UCP_CONCERNS_ON='caching' UCP_CONCERNS_OFF='cqrs' ./install.sh ~/p  # ручные поправки к auto-срезу
+UCP_PROFILE=full ./install.sh ~/my-project                   # всё без детекта
 UCP_LANG=python ./install.sh ~/my-svc                        # python-срез (FastAPI/SQLAlchemy/…)
 UCP_LANG=python UCP_PROFILE=rest ./install.sh ~/my-svc       # python REST/UCP-сервис
 UCP_PROFILE=data ./install.sh ~/my-java-project              # data-heavy: pg+persistence+caching+observability
@@ -884,22 +1041,47 @@ UCP_SKILLS='ucp-py-pattern-* ucp-py-api-*' ./install.sh ~/p  # произвол�
 
 | Переменная | Значения | Назначение |
 |---|---|---|
-| `UCP_TRACK` | `backend` (деф.) `frontend` `e2e` (список через запятую) | специализация — фильтр по frontmatter `track:` |
-| `UCP_LANG` | `java` (деф.) `python` `node` `go` | язык — фильтр скиллов по `lang:` и доков по `<concern>/<lang>/` |
-| `UCP_PROFILE` | `full` (деф.) `rest` `data` | набор concern'ов; **lang-aware** (`rest` для python = py-pattern/api/auth/sqlalchemy/… + pg) |
+| `UCP_TRACK` | `backend` (деф.) `frontend` `e2e` (список через запятую) | специализация — фильтр по frontmatter `track:`; `frontend` тянет `ucp-fe-*` |
+| `UCP_LANG` | `java` (деф.) `python` `node` `go` | язык — фильтр скиллов по `lang:` и примеров по `<домен>/references/<lang>/` |
+| `UCP_PROFILE` | `auto` (деф.) `full` `rest` `data` | `auto` — срез по стеку: concern включается по маркеру в проекте (таблица ниже); `rest`/`data` — фиксированные наборы, **lang-aware** |
+| `UCP_DESIGN` | `all` (деф.) `chain` | в `auto`-срезе: design-скиллы для всех включённых concern'ов или только для цепочки `ucp-new-service`; review ставится всегда |
+| `UCP_CONCERNS_ON` / `UCP_CONCERNS_OFF` | список через пробел | ручные поправки к `auto`-срезу; причина попадает в таблицу среза |
 | `UCP_SKILLS` | глоб-список | произвольный набор, перекрывает `UCP_PROFILE` |
 
-Скрипт создаёт симлинки на `.claude/skills/*` и `.claude/docs/` — обновления в репо автоматически прилетят в проект.
+Срез `auto` считается по маркерам в build-файлах, исходниках и раскладке; результат пишется таблицей «Установленный срез»
+в managed-блок `CLAUDE.md` (что стоит, что выключено и почему) и печатается в `--check`. Спеки всех доменов ставятся
+независимо от среза — выключается только упакованный скилл, не правила.
+
+| Concern | Маркер |
+|---|---|
+| pattern, ddd-tactical, bootstrap, test, style, error-handling, security, shutdown | всегда |
+| spec | есть `docs/spec/`, или нет `openspec/` (проект на OpenSpec спековые скиллы не получает) |
+| arch | `architecture/services/_registry.yaml` |
+| hexagonal | модули `core/` и `*-adapter/` |
+| api · validation · persistence · pg-* | web-стек / библиотека валидации / слой хранения / PostgreSQL и миграции |
+| cqrs · kafka · scheduler · integration · resilience · auth · observability · caching · streaming | зависимость или класс-маркер (usecase-pattern, Kafka, ShedLock/`@Scheduled`, out-adapter или HTTP-клиент, Resilience4j, Spring Security/OAuth2, Micrometer/Actuator, Redis/Caffeine, Kafka Streams) |
+| distributed · payment-integration · meta | только вручную через `UCP_CONCERNS_ON` |
+
+Скрипт создаёт симлинки на `.claude/skills/*`, `.claude/docs/` и `.claude/rules/ucp-<lang>-core.md` — обновления в репо автоматически прилетят в проект.
 При повторном запуске с другим срезом лишние ucp-симлинки чистятся (смена языка/трека корректна). `install.sh --check
 <project>` — диагностика без модификаций.
 
 После установки в проекте появятся:
 
 - `.claude/skills/ucp-*/` — все скиллы (`ucp-pattern-review`, `ucp-api-design` и т.д.)
-- `.claude/docs/*.md` — снапшоты style-guide-ов, которые скиллы читают как input
+- `.claude/docs/**/spec.md` — корпус требований, который скиллы читают как input
+- `.claude/docs/<домен>/references/` — примеры под выбранный язык
+- `.claude/docs/_meta/project-gates.md` — каталог проверок, которые заводит bootstrap
+- `.claude/rules/ucp-java-core.md` — **always-loaded ядро** языка: Claude Code грузит `.claude/rules/*.md` в каждую
+  сессию, поэтому базовые решения (раскладка модулей, чистота core, команды и запросы, фабрики агрегатов,
+  семейства исключений, источник времени) попадают в контекст без вызова скилла. Источник —
+  `.claude/docs/backend/java/java-core.md`: выжимка ≤ 200 строк со ссылками на ID требований, новых правил не вводит
 
-Style-guide-ы — это **инструментальные** документы, не часть проектной
-документации. Поэтому они живут под `.claude/docs/`, а не в пользовательской
+Python-тулинг корпуса (`spec_check.py` и соседи) в проект **не** ставится:
+`install.sh` симлинкует только `*.md`.
+
+Корпус требований — **инструментальный** документ, не часть проектной
+документации. Поэтому он живёт под `.claude/docs/`, а не в пользовательской
 `docs/`. Ваша проектная `docs/` остаётся чистой для проектной документации
 (спецификация, ADR-ы, диаграммы и т.п.).
 
@@ -991,8 +1173,8 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 
 ```
 .claude/skills/
-# backend/java-набор ниже; для python — аналоги `ucp-py-<concern>-{design,review}`
-# (38 скиллов), node/go — пилот. Плюс тулинг: `ucp-install/` (Claude-мастер установки),
+# backend/java-набор; для python — аналоги `ucp-py-<concern>-{design,review}`,
+# node/go — пилот; frontend — 12 скиллов (ниже). Плюс тулинг: `ucp-install/`,
 # `ucp-new-service/`. install.sh ставит срез по UCP_TRACK × UCP_LANG × UCP_PROFILE.
 ├── ucp-install/                    # установить/обновить UCP-скиллы в проект (диалогом)
 ├── ucp-api-review/                 # ревью контракта REST API
@@ -1005,75 +1187,138 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 ├── ucp-java-style-review/  # ревью Java-кода на стиль (naming, imports, expressions)
 ├── ucp-jooq-review/        # ревью persistence-слоя на jOOQ (repository, multiset, mapper)
 ├── ucp-jooq-design/        # генерация Jooq<X>Repository + Mapper + FilterConditionBuilder + ViewRepository
-├── ucp-pg-schema-design/   # Liquibase changeset для нового агрегата (PG-T-*/PG-N-*)
-├── ucp-pg-migration-design/ # expand-contract шаблоны для breaking changes (PG-M-*)
-├── ucp-pg-runtime-design/  # outbox-relay, task-queue, advisory-lock, optimistic-lock (PG-W/L-*)
-├── ucp-validation-review/  # ревью Jakarta Validation (R-VLD-*)
+├── ucp-pg-schema-design/   # Liquibase changeset для нового агрегата (pg-types/*, pg-naming/*)
+├── ucp-pg-migration-design/ # expand-contract шаблоны для breaking changes (pg-migrations/*)
+├── ucp-pg-runtime-design/  # outbox-relay, task-queue, advisory-lock, optimistic-lock (pg-runtime/*)
+├── ucp-validation-review/  # ревью Jakarta Validation (validation/*)
 ├── ucp-validation-design/  # генерация custom constraints, groups, cross-field
-├── ucp-caching-review/     # ревью Spring Cache + Redis (R-CACHE-*)
+├── ucp-caching-review/     # ревью Spring Cache + Redis (caching/*)
 ├── ucp-caching-design/     # генерация CacheManager, @Cacheable, @CacheEvict, refresh-ahead
-├── ucp-kafka-review/       # ревью Kafka producer/consumer/outbox (R-KFK-*)
+├── ucp-kafka-review/       # ревью Kafka producer/consumer/outbox (kafka/*)
 ├── ucp-kafka-design/       # генерация Producer/Listener/Event/processed_event с idempotent-dedup и retry-topic
-├── ucp-observability-review/  # ревью logging/metrics/tracing/health/MDC (R-OBS-*)
+├── ucp-observability-review/  # ревью logging/metrics/tracing/health/MDC (observability/*)
 ├── ucp-observability-design/  # генерация Logback + Micrometer + OTel + Actuator + MdcFilter + TaskDecorator
-├── ucp-cqrs-review/        # ревью CQRS-разделения (R-CQRS-*)
+├── ucp-cqrs-review/        # ревью CQRS-разделения (cqrs/*)
 ├── ucp-cqrs-design/        # генерация Command/Query + ViewRepository + read-model + sync
-├── ucp-hexagonal-review/   # ревью Hexagonal multi-module layout (R-HEX-*)
+├── ucp-hexagonal-review/   # ревью Hexagonal multi-module layout (hexagonal/*)
 ├── ucp-hexagonal-design/   # генерация multi-module skeleton + ArchUnit-тесты
-├── ucp-distributed-review/ # ревью distributed patterns (R-DIST-*)
+├── ucp-distributed-review/ # ревью distributed patterns (distributed-patterns/*)
 ├── ucp-distributed-design/ # генерация saga + idempotency-инфра + compensation
 ├── ucp-resilience-review/  # ревью защиты от отказов внешних систем (CB, retry, bulkhead, OpenAPI generator)
 ├── ucp-integration-design/ # генерация ПОЛНОГО скелета новой outbound-интеграции (port + client-generator + out-adapter)
-├── ucp-resilience-design/  # миграция existing out-adapter под R-RES-* (CB/Bulkhead/Retry без создания модулей)
+├── ucp-resilience-design/  # миграция existing out-adapter под resilience/* (без создания модулей)
 ├── ucp-test-design/        # проектирование интеграционных и unit-тестов
 ├── ucp-auth-review/        # ревью авторизации (JWT, RBAC, ABAC, audit, PII)
-└── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
+├── ucp-auth-design/        # scaffold Spring Security + OAuth2 для UCP-сервиса
+│
+│   # e2e-трек (UCP_TRACK=e2e)
+├── ucp-e2e-design/         # сценарии по спеке сервиса
+├── ucp-e2e-pipeline-design/ # смоук после деплоя, регресс по расписанию, карантин
+├── ucp-e2e-regression-grow/ # рост набора по инцидентам
+├── ucp-e2e-review/         # ревью набора и конвейера
+│
+│   # frontend-трек (UCP_TRACK=frontend): правила берутся из openspec/specs шаблона
+├── ucp-fe-new-project/     # проект из шаблона: выбор, старт, удаление демо, гейты
+├── ucp-fe-screen-design/   # экран/маршрут: серверные и клиентские компоненты, состояния загрузки
+├── ucp-fe-form-design/     # форма: схема, серверное действие, ошибки полей
+├── ucp-fe-service-design/  # доступ к данным: слой сервисов, кеширование, обработка отказов
+├── ucp-fe-auth-design/     # вход, сессия, защита маршрутов
+├── ucp-fe-test-design/     # тесты по областям openspec
+├── ucp-fe-architecture-review/  # структура слоёв и границы модулей
+├── ucp-fe-api-review/      # клиент API и работа с данными
+├── ucp-fe-auth-review/     # аутентификация и доступ
+├── ucp-fe-design-system-review/ # компоненты и оформление
+├── ucp-fe-content-review/  # тексты, локализация, доступность
+├── ucp-fe-test-review/     # тесты
+└── ucp-fe-tooling-review/  # сборка, линтеры, окружение
 
 .claude/docs/
 #
-# Каждый крупный гайд — папка `<concern>/`:
-#   <concern>/<concern>-rules.md            — язык-нейтральный индекс правил (код +
-#                                              формулировка интента, без code-сниппетов).
-#                                              ОБЩИЙ контракт на все языки. Рабочий вход
-#                                              скиллов: review цитирует код, design
-#                                              сверяется по чек-листу. ~15–45% полного.
-#   <concern>/<lang>/<concern>-style-guide.md — РЕАЛИЗАЦИЯ под язык (java=Spring/jOOQ,
-#                                              python=FastAPI/SQLAlchemy, …), примеры +
-#                                              обоснование, читается on-demand по разделу.
-# install.sh ставит rules-index всегда + style-guide только выбранного UCP_LANG.
-# Скиллы читают `*-rules.md` + свой `<lang>/`-биндинг. Языко-специфичные concern'ы
-# (backend/java/jooq/sqlalchemy, java-style/python-style, bootstrap, test-strategy) — без shared-слоя,
-# плоская пара на язык. Governance — в `_meta/` (authoring-contract + rule-code-registry).
-# Standalone-файлы (review-finding-format и т.п.) — плоско в корне docs/.
-├── backend/rest-api/              # REST API (R-URL-*/MTH-*/RSP-*/ERR-*/OAS-*/...)
-├── backend/usecase-pattern/       # Use Case Pattern (R-UC-*, R-HND-*, R-LAY-*)
-├── backend/ddd-tactical/          # тактические паттерны DDD (R-ENT-*, R-AGG-*, R-VO-*, R-EVT-*)
-├── backend/java/jooq/                  # jOOQ (R-JOOQ-CFG-*/REPO-*/MS-*/FLT-*/...)
-├── backend/resilience/            # Resilience (R-RES-CB-*/RE-*/BH-*/OAS-*/...)
-├── backend/validation/            # Validation (R-VLD-WHERE-*/STD-*/CC-*/OAS-*/...)
-├── backend/caching/               # Caching (R-CACHE-WHERE-*/CFG-*/KEY-*/TTL-*/INV-*/...)
-├── backend/kafka/                 # Kafka (R-KFK-PROD-*/CONS-*/OBX-*/IDEM-*/RTRY-*/...)
-├── backend/observability/         # Observability (R-OBS-LOG-*/MTR-*/TRC-*/HC-*/CTX-*/SLO-*/...)
-├── backend/cqrs/                  # CQRS (R-CQRS-WHEN-*/CMD-*/QRY-*/RM-*/SYNC-*/TIER-*/...)
-├── backend/hexagonal/             # Hexagonal (R-HEX-MOD-*/CORE-*/PORT-*/AIN-*/AOUT-*/BOOT-*/TEST-*/...)
-├── backend/distributed-patterns/  # Distributed Patterns (R-DIST-SAGA-*/IDEM-*/EC-*/OBX-*/COMP-*/TX-*/...)
-├── shared/arch/                  # платформенная согласованность (R-ARCH-*)
-├── java/                  # Java Style Guide (JS-2.*..8.*, JS-CS-*)
-├── backend/java/spring-bootstrap/      # Spring Boot bootstrap (BS-*, BS-LINT-*, BS-SEC-*)
-├── backend/auth-patterns/         # паттерны авторизации (AUTH-*)
-├── backend/error-handling/        # Error Handling (R-ERR-HIER-*/WHERE-*/MAP-*/LOG-*/RETRY-*/RESULT-*/OBS-*)
-├── backend/graceful-shutdown/     # Graceful Shutdown (R-SHUT-CFG-*/HTTP-*/KFK-*/DB-*/SCHED-*/K8S-*/IDEM-*/OBS-*)
-├── backend/security/              # Security enforcement (R-SEC-SAST-*/DEP-*/SECRET-*/IMG-*/CRYPTO-*/FIND-*)
-├── backend/pg-types/              # PostgreSQL типы (PG-T-*)
-├── backend/pg-naming/             # PostgreSQL нейминг (PG-N-*)
-├── backend/pg-indexes/            # PostgreSQL индексы / план (PG-I-*, PG-E-*)
-├── backend/pg-partitioning/       # PostgreSQL партиционирование (PG-P-*)
-├── backend/pg-migrations/         # PostgreSQL миграции expand-contract (PG-M-*)
-├── backend/pg-runtime/            # PostgreSQL runtime (PG-W-*/V-*/L-*/CP-*/IS-*)
-├── backend/java/test-strategy/         # стратегия тестов (TS-*) — индекс + полный test-strategy.md (без -style-guide суффикса)
-├── review-finding-format.md   # формат findings для review-скиллов (RFF-*) — standalone
-└── usecase-spec-template.md   # шаблон Use Case спецификации (не реестр правил) — standalone
+# Каждый домен — папка `<домен>/`:
+#   <домен>/spec.md              — требования: SHALL / SHALL NOT + ID + Код + Гейт +
+#                                  Покрытие + Не ловит + сценарии. Рабочий вход скиллов:
+#                                  review цитирует ID, design сверяется по требованиям.
+#   <домен>/references/          — реализация и примеры, читаются on-demand:
+#                                  implementation.md (у кросс-языкового домена —
+#                                  references/<lang>/implementation.md), recipes.md.
+#                                  Имя файла фиксировано: домен уже в пути.
+# Требование язык-нейтрально; язык различает только поле **Гейт** (`java: archunit:X ·
+# python: ревью`) и каталог примеров. install.sh ставит spec.md всегда + references
+# только выбранного UCP_LANG, и симлинкует только `*.md` — тулинг в проекты не уезжает.
+# Языко-специфичные домены (java/jooq, python/sqlalchemy, *-style, *-bootstrap,
+# *-test-strategy) лежат под `<lang>/` и references не разделяют.
+├── backend/rest-api/              # REST API: URL, методы, ответы, ошибки, OpenAPI
+├── backend/usecase-pattern/       # Use Case Pattern: UseCase, Handler, слои
+├── backend/ddd-tactical/          # тактические паттерны DDD: сущность, агрегат, VO, событие
+├── backend/java/jooq/             # jOOQ: конфигурация, репозиторий, multiset, фильтры
+├── backend/resilience/            # защита от отказов: CB, retry, bulkhead, fallback
+├── backend/validation/            # валидация входных данных
+├── backend/caching/               # кеширование: ключи, TTL, инвалидация, stampede
+├── backend/kafka/                 # Kafka: producer, consumer, outbox, retry-topic
+├── backend/observability/         # журналы, метрики, трассировка, health, SLO
+├── backend/cqrs/                  # CQRS: команды, запросы, read-model, синхронизация
+├── backend/hexagonal/             # многомодульная раскладка, направления зависимостей
+├── backend/distributed-patterns/  # saga, идемпотентность, компенсации, запрет 2PC
+├── backend/error-handling/        # иерархия ошибок, где ловим, как отображаем
+├── backend/graceful-shutdown/     # корректное завершение: HTTP, Kafka, БД, планировщик
+├── backend/security/              # SAST, зависимости, секреты, образы, криптография
+├── backend/scheduler/             # планировщик задач
+├── backend/streaming/             # потоковая обработка
+├── backend/payment-integration/   # платёжная интеграция
+├── backend/auth-patterns/         # авторизация: JWT, RBAC, ABAC, S2S, audit, PII
+├── backend/pg-types/              # PostgreSQL: типы
+├── backend/pg-naming/             # PostgreSQL: нейминг
+├── backend/pg-indexes/            # PostgreSQL: индексы и план запроса
+├── backend/pg-partitioning/       # PostgreSQL: партиционирование
+├── backend/pg-migrations/         # PostgreSQL: миграции expand-contract
+├── backend/pg-runtime/            # PostgreSQL: транзакции, блокировки, пул, изоляция
+├── backend/java/{java-style,spring-bootstrap,test-strategy}/
+├── backend/python/{python-style,python-bootstrap,python-test-strategy,sqlalchemy,async,codegen}/
+├── backend/node/{node-style,nest-bootstrap,node-test-strategy,typeorm}/
+├── backend/go/{go-style,go-bootstrap,go-test-strategy,sqlc}/
+├── shared/arch/                   # платформенная согласованность
+├── frontend/_index.md             # тонкая привязка: правила — в openspec/specs шаблона
+├── _meta/authoring-contract.md    # контракт на форму требования (как писать)
+├── _meta/project-gates.md         # каталог проверок, которые заводит bootstrap
+├── _meta/rule-code-registry.md    # карта «старый код → ID требования»
+├── _meta/migrated-domains.md      # реестр доменов в форме spec.md
+├── shared/review-format/          # формат находки и протокол локализации
+├── shared/spec-format/            # формат Use Case спецификации + скелеты разделов
+└── shared/spec-change/            # формат изменения живущей спеки
 ```
+
+### Шаблоны
+
+Заготовки под форму требований — в `templates/openspec/`:
+
+| Файл | Когда берут |
+| --- | --- |
+| `domain-spec.md` | новый домен корпуса — копируется в `.claude/docs/<трек>/<домен>/spec.md` |
+| `requirement.md` | требование в существующий `spec.md` — вставляется блоком |
+| `change/proposal.md` + `change/tasks.md` | изменение отдельным артефактом — каталог `openspec/changes/<id>/` |
+
+`domain-spec.md` — валидный документ, а не набор скобок: он целиком проходит
+`spec_check`, и тест следит, чтобы проходил и дальше. Форма и раскладка те же,
+что в `<репозиторий шаблонов фронтенда>` (`templates/next-ssr/openspec/`), — трек
+меняется, стиль требования нет.
+
+### Тулинг корпуса
+
+Живёт в `_meta/` самого репозитория и в проекты не устанавливается:
+
+| Команда | Что делает |
+| --- | --- |
+| `python3 .claude/docs/_meta/spec_check.py` | гейт корпуса: форма требований, уникальность ID и кодов, согласованность реестров, мёртвые ссылки, гейты вне каталога |
+| `python3 .claude/docs/_meta/spec_sync.py` | перегенерирует сводные таблицы в `_index.md` и `rule-code-registry.md` |
+| `python3 .claude/docs/_meta/check-shared-neutral.py` | ловит framework-специфичные токены в язык-нейтральном тексте |
+| `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
+| `python3 -m unittest discover -s tools/tests` | 85 тестов: тулинг, шаблоны, числа в README, сверка с фронт-шаблонами |
+
+Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
+рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,
+роняет `spec_check` — иначе имена гейтов расходятся с реальностью так же
+незаметно, как имена правил чужих анализаторов.
+
 
 ## Связанные библиотеки
 
@@ -1081,7 +1326,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 - [`usecase-pattern`](https://github.com/remodov/usecase-pattern) — Java-библиотека UseCase / UseCaseHandler / UseCaseDispatcher.
 - [`hexagonal-architecture`](https://github.com/remodov/hexagonal-architecture) — Java-библиотека для Hexagonal-разделения (`core` ↔ `adapter-in/out`) на Уровне 4.
 
-Все основные style guides покрыты. Дальнейшее расширение — по конкретным запросам команды.
+Все основные домены покрыты. Дальнейшее расширение — по конкретным запросам команды.
 
 ## Лицензия
 

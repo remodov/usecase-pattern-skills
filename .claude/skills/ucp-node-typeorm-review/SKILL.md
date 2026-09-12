@@ -1,7 +1,7 @@
 ---
 name: ucp-node-typeorm-review
 lang: node
-description: Ревью persistence-слоя на TypeORM 0.3 (DataSource API) по UCP (коды R-TYPEORM-*) — порт/маппер Entity↔domain, граница TX на Handler, Data Mapper без ActiveRecord, relations явно, ViewRepository, деньги string+decimal, миграции.
+description: Ревью persistence-слоя на TypeORM 0.3 (DataSource API) по UCP (требования typeorm/*) — порт/маппер Entity↔domain, граница TX на Handler, Data Mapper без ActiveRecord, relations явно, ViewRepository, деньги string+decimal, миграции.
 when_to_use: Изменения в adapters/out/persistence (*.entity.ts, *.repository.ts, *.mapper.ts) или в миграциях TypeORM.
 paths: "**/adapters/out/persistence/**, **/migrations/**"
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
@@ -9,37 +9,37 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 # Ревью persistence (Node / TypeORM 0.3 DataSource API)
 
-Ты ревьюишь persistence-слой на соответствие `backend/node/typeorm/typeorm-rules.md` (`R-TYPEORM-*`). Репозиторий
+Ты ревьюишь persistence-слой на соответствие `backend/node/typeorm/spec.md` (`R-TYPEORM-*`). Репозиторий
 реализует порт из `core/`, маппит Entity↔domain, граница транзакции — на Handler. Механический слой
 (импорт-границы, типы) ловит CI-стек (`eslint`, `tsc --noEmit` strict); здесь — семантика.
 
 ## Зависимости
 
-- **`.claude/docs/backend/node/typeorm/typeorm-rules.md`** — правила `R-TYPEORM-*` (код-примеры включены).
-- Парные: `backend/usecase-pattern/node/...` (порт/слои, `R-LAY-*`/`R-HEX-*`), `backend/node/nest-bootstrap/nest-bootstrap-rules.md` (`NESTBOOT-6/8/9`), `backend/pg-types/pg-types-rules.md` (`PG-T-*` типы), `backend/pg-migrations/pg-migrations-rules.md` (`PG-M-*` безопасные миграции), `backend/pg-runtime/pg-runtime-rules.md` (locks/bulk, `PG-W-*`), `backend/cqrs/cqrs-rules.md` (`R-CQRS-4` read-проекции).
+- **`.claude/docs/backend/node/typeorm/spec.md`** — правила `R-TYPEORM-*` (код-примеры включены).
+- Парные: `backend/usecase-pattern/node/...` (порт/слои, `R-LAY-*`/`R-HEX-*`), `backend/node/nest-bootstrap/spec.md` (`NESTBOOT-6/8/9`), `backend/pg-types/spec.md` (`PG-T-*` типы), `backend/pg-migrations/spec.md` (`PG-M-*` безопасные миграции), `backend/pg-runtime/spec.md` (locks/bulk, `PG-W-*`), `backend/cqrs/spec.md` (`usecase-pattern/reads-via-read-model` read-проекции).
 
 ## Инструкции
 
-1. **Прочти** `typeorm-rules.md`. Цитируй конкретные коды (`R-TYPEORM-REPO-X1`), не префикс.
+1. **Прочти** `typeorm/spec.md`. Цитируй конкретные коды (`typeorm/repository-speaks-domain-types`), не префикс.
 
 2. **Скоп.** `adapters/out/persistence/**` (`*.entity.ts`, `*.repository.ts`, `*.mapper.ts`, `*view*.ts`), каталог миграций TypeORM (`migrations/**`), порт-интерфейс в `core/<bc>/port/`, `git diff` на `.ts`.
 
 3. **Прогон.**
-   - **Repository:** реализует порт из `core/`, в `adapters/out/persistence/`, биндится через DI-токен (`NESTBOOT-6`)? Public-методы принимают/возвращают доменные объекты, не Entity/raw row? `EntityManager`/`Repository<T>` инжектится, не создаётся внутри? Покрыт интеграционным тестом против Testcontainers без моков `EntityManager` (`R-TYPEORM-REPO-1..4`). Возврат Entity наружу → `R-TYPEORM-REPO-X1`. Бизнес-логика в репозитории (`if (order.status === ...)`) → `R-TYPEORM-REPO-X2`. `DataSource`/`createQueryBuilder` в `core/` → `R-TYPEORM-REPO-X3` (cross-ref `R-HEX-X1`).
-   - **Entity:** `@Entity`+`@Column` в `adapters/out/persistence/`, не в `core/`; relations `eager: false`, без lazy-Promise; Data Mapper — не наследует `BaseEntity` (`R-TYPEORM-ENT-1/3`). Типы: деньги `numeric(p,s)` → `string` + Big.js/decimal.js, время `timestamptz` → `Date`, идентификаторы `uuid` (`R-TYPEORM-ENT-2`, cross-ref `PG-T-013/030/040`). Entity ≠ domain ≠ DTO (`R-TYPEORM-REPO-2`). Доменная логика/инварианты на Entity → `R-TYPEORM-ENT-X1`. ActiveRecord (`extends BaseEntity`, `order.save()`) → `R-TYPEORM-ENT-X2`. `number` для money через `parseFloat`-transformer → `R-TYPEORM-ENT-X3`.
-   - **Маппинг:** явные `toDomain`/`toEntity` рядом с репозиторием, сборка агрегата из Entity-графа в маппере (`R-TYPEORM-MAP-1/2`). «Универсальный» `Object.assign`/spread Entity → domain → `R-TYPEORM-MAP-X1`.
-   - **Транзакции:** граница на Handler — `dataSource.transaction(async (em) => ...)` или CLS-обёртка (`typeorm-transactional`); внутри — репозитории через транзакционный `EntityManager`, не глобальный DataSource; read-методы без транзакции (`R-TYPEORM-TX-1/2/3`). `queryRunner.commitTransaction()`/`startTransaction()` в репозитории → `R-TYPEORM-TX-X1`. Несколько `save()` без общей транзакции в одной операции → `R-TYPEORM-TX-X2`.
-   - **Запросы:** `find*` с явным `relations: [...]` или QueryBuilder с `leftJoinAndSelect` — против N+1 (`R-TYPEORM-QRY-1`); update агрегата — load → мутация домена → `save` полного агрегата, точечный — `update().set().where()` (`R-TYPEORM-QRY-2`); пагинация `take/skip`/keyset, `count` отдельно (`R-TYPEORM-QRY-3`); read-проекции — `TypeOrm<X>ViewRepository` с raw `select` → read-DTO (`R-TYPEORM-QRY-4`, cross-ref `R-CQRS-4`); именованные bind-параметры (`R-TYPEORM-QRY-5`). Lazy relations → `R-TYPEORM-QRY-X1`. `save()` подмножества полей без load → `R-TYPEORM-QRY-X2`. `find()` без `take` на больших таблицах → `R-TYPEORM-QRY-X3`. Сырой SQL конкатенацией → `R-TYPEORM-QRY-X4`.
-   - **Миграции:** схема через `migration:generate` + вычитка руками, запуск `migration:run` отдельной командой (`R-TYPEORM-MIG-1`, cross-ref `NESTBOOT-9`); безопасность по `PG-M-*` (`R-TYPEORM-MIG-2`). `synchronize: true` вне одноразовых unit-тестов → `R-TYPEORM-MIG-X1` (cross-ref `NESTBOOT-X4`). Правка применённой миграции → `R-TYPEORM-MIG-X2`.
+   - **Repository:** реализует порт из `core/`, в `adapters/out/persistence/`, биндится через DI-токен (`nest-bootstrap/inject-by-port-tokens`)? Public-методы принимают/возвращают доменные объекты, не Entity/raw row? `EntityManager`/`Repository<T>` инжектится, не создаётся внутри? Покрыт интеграционным тестом против Testcontainers без моков `EntityManager` (`R-TYPEORM-REPO-1..4`). Возврат Entity наружу → `typeorm/repository-speaks-domain-types`. Бизнес-логика в репозитории (`if (order.status === ...)`) → `typeorm/no-business-logic-in-repository`. `DataSource`/`createQueryBuilder` в `core/` → `typeorm/port-in-core-implementation-in-adapter` (cross-ref `hexagonal/outbound-port-interface-in-core`).
+   - **Entity:** `@Entity`+`@Column` в `adapters/out/persistence/`, не в `core/`; relations `eager: false`, без lazy-Promise; Data Mapper — не наследует `BaseEntity` (`R-TYPEORM-ENT-1/3`). Типы: деньги `numeric(p,s)` → `string` + Big.js/decimal.js, время `timestamptz` → `Date`, идентификаторы `uuid` (`typeorm/precise-column-types`, cross-ref `PG-T-013/030/040`). Entity ≠ domain ≠ DTO (`typeorm/repository-speaks-domain-types`). Доменная логика/инварианты на Entity → `typeorm/entities-are-anemic-data-mapper`. ActiveRecord (`extends BaseEntity`, `order.save()`) → `typeorm/entities-are-anemic-data-mapper`. `number` для money через `parseFloat`-transformer → `typeorm/precise-column-types`.
+   - **Маппинг:** явные `toDomain`/`toEntity` рядом с репозиторием, сборка агрегата из Entity-графа в маппере (`R-TYPEORM-MAP-1/2`). «Универсальный» `Object.assign`/spread Entity → domain → `typeorm/explicit-mapper`.
+   - **Транзакции:** граница на Handler — `dataSource.transaction(async (em) => ...)` или CLS-обёртка (`typeorm-transactional`); внутри — репозитории через транзакционный `EntityManager`, не глобальный DataSource; read-методы без транзакции (`R-TYPEORM-TX-1/2/3`). `queryRunner.commitTransaction()`/`startTransaction()` в репозитории → `typeorm/transaction-on-handler`. Несколько `save()` без общей транзакции в одной операции → `typeorm/transaction-on-handler`.
+   - **Запросы:** `find*` с явным `relations: [...]` или QueryBuilder с `leftJoinAndSelect` — против N+1 (`typeorm/relations-are-explicit`); update агрегата — load → мутация домена → `save` полного агрегата, точечный — `update().set().where()` (`typeorm/update-full-aggregate-or-explicit`); пагинация `take/skip`/keyset, `count` отдельно (`typeorm/pagination-and-counting`); read-проекции — `TypeOrm<X>ViewRepository` с raw `select` → read-DTO (`typeorm/view-repository-for-projections`, cross-ref `usecase-pattern/reads-via-read-model`); именованные bind-параметры (`typeorm/bind-parameters-only`). Lazy relations → `typeorm/relations-are-explicit`. `save()` подмножества полей без load → `typeorm/update-full-aggregate-or-explicit`. `find()` без `take` на больших таблицах → `typeorm/pagination-and-counting`. Сырой SQL конкатенацией → `typeorm/bind-parameters-only`.
+   - **Миграции:** схема через `migration:generate` + вычитка руками, запуск `migration:run` отдельной командой (`typeorm/schema-via-reviewed-migrations`, cross-ref `nest-bootstrap/datasource-and-migrations`); безопасность по `PG-M-*` (`typeorm/schema-via-reviewed-migrations`). `synchronize: true` вне одноразовых unit-тестов → `typeorm/schema-via-reviewed-migrations` (cross-ref `nest-bootstrap/datasource-and-migrations`). Правка применённой миграции → `typeorm/schema-via-reviewed-migrations`.
 
 4. **Cross-check:** DDL/типы колонок — `ucp-pg-schema-review` (`PG-T-*`); безопасность миграций — `ucp-pg-migration-review` (`PG-M-*`); транзакции/блокировки под нагрузкой — `ucp-pg-runtime-review`; CQRS-разделение — `ucp-cqrs-review`.
 
-5. **Формат findings** — `.claude/docs/shared/review-finding-format.md` (`RFF-*`), Read-проверка строки обязательна.
+5. **Формат findings** — `.claude/docs/shared/review-format/spec.md` (`review-format/*`), Read-проверка строки обязательна.
 
-6. **Серьёзность** (`RFF-12`):
-   - **Критично** — возврат Entity наружу (`R-TYPEORM-REPO-X1`), `DataSource`/QueryBuilder в `core/` (`R-TYPEORM-REPO-X3`), `commitTransaction` в репозитории (`R-TYPEORM-TX-X1`), `save()` частичного объекта без load (`R-TYPEORM-QRY-X2`), сырой SQL конкатенацией (`R-TYPEORM-QRY-X4`), money `number` (`R-TYPEORM-ENT-X3`), `synchronize: true` в проде (`R-TYPEORM-MIG-X1`).
-   - **Предупреждение** — бизнес-логика в репозитории (`R-TYPEORM-REPO-X2`), доменная логика на Entity (`R-TYPEORM-ENT-X1`), ActiveRecord-паттерн (`R-TYPEORM-ENT-X2`), `Object.assign`-маппинг (`R-TYPEORM-MAP-X1`), несколько `save()` без транзакции (`R-TYPEORM-TX-X2`), lazy relations (`R-TYPEORM-QRY-X1`), `find()` без `take` (`R-TYPEORM-QRY-X3`), правка применённой миграции (`R-TYPEORM-MIG-X2`).
-   - **Замечание** — маппинг размазан по репозиторию (`R-TYPEORM-MAP-2`), `(await find()).length` вместо `count`, нет интеграционного теста на репозиторий (`R-TYPEORM-REPO-4`), generate-миграция не вычитана (`R-TYPEORM-MIG-1`).
+6. **Серьёзность** (`review-format/severity-scale-is-shared`):
+   - **Критично** — возврат Entity наружу (`typeorm/repository-speaks-domain-types`), `DataSource`/QueryBuilder в `core/` (`typeorm/port-in-core-implementation-in-adapter`), `commitTransaction` в репозитории (`typeorm/transaction-on-handler`), `save()` частичного объекта без load (`typeorm/update-full-aggregate-or-explicit`), сырой SQL конкатенацией (`typeorm/bind-parameters-only`), money `number` (`typeorm/precise-column-types`), `synchronize: true` в проде (`typeorm/schema-via-reviewed-migrations`).
+   - **Предупреждение** — бизнес-логика в репозитории (`typeorm/no-business-logic-in-repository`), доменная логика на Entity (`typeorm/entities-are-anemic-data-mapper`), ActiveRecord-паттерн (`typeorm/entities-are-anemic-data-mapper`), `Object.assign`-маппинг (`typeorm/explicit-mapper`), несколько `save()` без транзакции (`typeorm/transaction-on-handler`), lazy relations (`typeorm/relations-are-explicit`), `find()` без `take` (`typeorm/pagination-and-counting`), правка применённой миграции (`typeorm/schema-via-reviewed-migrations`).
+   - **Замечание** — маппинг размазан по репозиторию (`typeorm/explicit-mapper`), `(await find()).length` вместо `count`, нет интеграционного теста на репозиторий (`typeorm/repository-integration-tested`), generate-миграция не вычитана (`typeorm/schema-via-reviewed-migrations`).
 
 ## Что не входит
 

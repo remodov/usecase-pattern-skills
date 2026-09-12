@@ -1,57 +1,77 @@
-# Frontend-трек — карта и «что куда добавлять»
+# Frontend-трек — карта и правила игры
 
-Каркас специализации **`track: frontend`** (стек: **React + TypeScript**). Backend-паттерны (UseCase/aggregate/
-CQRS) сюда **не тянем** — у фронта свой набор concern'ов (см. `_meta/authoring-contract.md` §10). Кросс-трековое
-(spec/arch/meta) приходит из `track: any` — не дублировать.
+Frontend отличается от backend тем, что **правила живут не здесь**. Источник
+правды — `openspec/specs/**` проекта, приехавшего из шаблона
+`<репозиторий шаблонов фронтенда>`: там требования в том же формате, что и в нашем
+корпусе (**ID / Гейт / Покрытие / Не ловит** плюс сценарии), их пишет и
+версионирует FE-команда вместе с шаблоном, а сводная таблица инвариантов
+собирается в `AGENTS.md` проекта командой `bun run spec:sync`.
 
-> **Статус: НАПОЛНЕН (project-stack).** Раскладка, гейты и шаблон вертикали готовы. Все 9 concern'ов наполнены под
-> реальный стек проекта (React 17 + TS, Redux Toolkit + thunks, Fetcher-слой, Formik+yup,
-> react-router 6, @design-system/components, jest+Testing Library) и снабжены парами скиллов
-> `ucp-fe-<concern>-{design,review}`. Эталон формы — `fe-component/` и `fe-state/`.
+Мы даём **процедуру**: чем начинать экран, в каком порядке проходить гейты,
+что смотреть на ревью. Правила мы не дублируем — иначе они разъедутся с
+шаблоном, и разойдутся молча.
 
-## Раскладка (стек один → плоско, без `<lang>/`)
+## Скиллы
 
-Frontend — single-stack (React+TS), поэтому concern'ы — **плоская single-file форма** (rules-index с
-код-примерами внутри, без отдельного style-guide; §2 / §11 контракта это разрешает):
+Design нарезан по задачам разработчика, review — по областям openspec, чтобы
+каждое замечание цитировало requirement ID.
+
+| Design | Про что |
+|---|---|
+| `ucp-fe-new-project` | завести проект из шаблона: выбор шаблона, `new-project.sh`, `demo:remove`, зеркала, первый прогон гейтов |
+| `ucp-fe-screen-design` | новый экран или раздел по контракту: карта экрана → слайсы → гейты |
+| `ucp-fe-form-design` | форма создания и редактирования (живого образца в шаблоне нет) |
+| `ucp-fe-service-design` | подключение сервиса: контракт-пакет, секция orval, генерация, моки |
+| `ucp-fe-auth-design` | права и сессия: `useCan`, 401/403, скоупы профиля |
+| `ucp-fe-test-design` | unit по MVVM и e2e с мок-сервером |
+
+| Review | Область openspec |
+|---|---|
+| `ucp-fe-architecture-review` | `specs/architecture` — слои FSD, MVVM, состояние в адресе, `use client` |
+| `ucp-fe-api-review` | `specs/api` — контракт, сгенерированные хуки, пагинация, инвалидация |
+| `ucp-fe-auth-review` | `specs/auth` — сессия, CSRF, 401/403, права |
+| `ucp-fe-design-system-review` | `specs/design-system` — кит, токены, карты экранов, макет |
+| `ucp-fe-content-review` | `specs/content` — словарь, ключи, значения из контракта |
+| `ucp-fe-test-review` | `specs/testing` — слои тестов, MSW, покрытие, colocation |
+| `ucp-fe-tooling-review` | `specs/tooling` + `environment` + `code-style` — гейты, окружение, стиль |
+
+Пар design ↔ review здесь **не 1:1**, и это осознанно: разработчик работает
+задачами, а нарушения группируются по областям. Исключение оговорено
+в `_meta/authoring-contract.md` §6.
+
+## Что делать, если в проекте нет openspec
+
+`openspec/` есть не в каждом шаблоне: на 4 сентября 2026 он живёт в `next-ssr`,
+а `vite-spa` и `next-static` его не имеют. Скилл в таком проекте **не выдумывает
+требования за шаблон**. Он говорит прямо: «в проекте нет `openspec/specs` —
+требований, против которых можно ревьюить, не объявлено», предлагает завести их
+по образцу `next-ssr` и дальше работает только по тому, что видит в коде,
+помечая находки как «мнение, а не требование».
+
+## Чего здесь нет и не будет
+
+- **Своих правил `FE-*`.** Прежние девять файлов `fe-<concern>/<concern>-rules.md`
+  описывали стек, которого в шаблонах нет вовсе (React 17, Redux Toolkit + thunks,
+  Formik + yup, react-router 6, отдельный пакет компонентов, jest). Они удалены,
+  а коды `FE-*` помечены в реестре как выведенные из обращения.
+- **Backend-паттернов.** UseCase, агрегаты и CQRS на фронт не тянем.
+- **E2E как отдельного трека.** Playwright-часть живёт в `specs/testing` проекта
+  и покрывается `ucp-fe-test-*`.
+
+## Установка
 
 ```
-docs/frontend/
-├── _index.md                         # этот файл
-└── <concern>/<concern>-rules.md      # коды FE-* + интент + примеры на React/TS
-.claude/skills/
-└── ucp-fe-<concern>-{design,review}/ # пара скиллов, frontmatter track: frontend
+UCP_TRACK=frontend ./install.sh ~/my-frontend
+UCP_TRACK=backend,frontend UCP_LANG=java ./install.sh ~/monorepo
 ```
 
-## Карта concern'ов (что куда)
+## Сверка с эталоном
 
-| Concern | Префикс | Про что | Статус |
-|---|---|---|---|
-| `fe-component` | `FE-CMP-*` | компоненты: презентационные vs контейнеры, типизация props, композиция, мемоизация | эталон (наполнен) |
-| `fe-state` | `FE-ST-*` | состояние: Redux Toolkit slice по домену, local vs server-state, селекторы, эффекты в thunk'ах | наполнен + скиллы |
-| `fe-data-fetching` | `FE-DATA-*` | запросы: Fetcher+thunks+request-status, эндпоинты, ошибки, типизация (RTK Query — альт.); не `fetch` в компоненте | наполнен + скиллы |
-| `fe-forms` | `FE-FORM-*` | формы: Formik + yup (схемная валидация), submit/ошибки, блокировка | наполнен + скиллы |
-| `fe-routing` | `FE-RT-*` | react-router 6: централизованный ROUTES, ролевые guard'ы, code-splitting | наполнен + скиллы |
-| `fe-styling` | `FE-STY-*` | дизайн-система @design-system/components, deep-import, токены, отказ от inline-магии | наполнен + скиллы |
-| `fe-a11y` | `FE-A11Y-*` | семантика, ARIA, фокус, контраст, клавиатура | наполнен + скиллы |
-| `fe-test` | `FE-TEST-*` | jest + Testing Library (юзер-центрично), моки на границе | наполнен + скиллы |
-| `fe-style` | `FE-STYLE-*` | eslint/prettier/tsconfig strict (общий пресет проекта; langspecific-аналог `python-style`) | наполнен + скиллы |
+Скиллы ведут по требованиям шаблона, поэтому обязаны с ним совпадать:
+`python3 tools/fe_audit.py <клон frontend-templates>` проверяет, что ни один
+скилл не ссылается на несуществующее требование и что у каждого требования
+шаблона есть ведущий скилл. В конвейере — ручная джоба `fe:audit`: репозиторий
+шаблонов приватный, ей нужен доступ.
 
-(E2E — **отдельный трек** `track: e2e` (Playwright), не под frontend: он дёргает контракты и backend, и фронта.)
-
-## Как FE-лид добавляет concern (по `authoring-contract.md` §8)
-
-1. Зарезервировать префикс `FE-<X>-*` в `_meta/rule-code-registry.md` (уже намечены в карте выше).
-2. Наполнить `docs/frontend/<concern>/<concern>-rules.md`: разделы `## N.`, `**MUST:**`/`**MUST NOT:**`,
-   буллеты `- **FE-<X>-<N>.** формулировка` (`-X<N>` — антипаттерн). Код-примеры на React/TS — внутри.
-3. Создать пару `ucp-fe-<concern>-{design,review}` с frontmatter `track: frontend`, `lang: any` (стек один) —
-   по образцу `ucp-fe-component-*`. SKILL.md — текст по-русски, идентификаторы латиницей.
-4. **Прогнать гейты:** скилл `ucp-meta-review` + `python3 .claude/docs/_meta/check-shared-neutral.py`
-   (для single-stack frontend D мягок — биндинг и есть реализация; но meta-review проверит форму/пары/нейминг).
-5. CODEOWNERS: `docs/frontend/**` + `ucp-fe-*` → FE-лид.
-
-## Установка фронт-среза
-
-```
-UCP_TRACK=frontend ./install.sh ~/my-frontend     # только fe-* + кросс-трековое (spec/arch/meta)
-UCP_TRACK=backend,frontend UCP_LANG=python ./install.sh ~/monorepo   # моно-репо: и бэк, и фронт
-```
+Сегодня в шаблоне `next-ssr` 64 требования в девяти областях, и все они
+покрыты скиллами.

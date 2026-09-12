@@ -1,7 +1,7 @@
 ---
 lang: any
 name: ucp-pg-schema-review
-description: Ревью PostgreSQL-схемы и DDL-миграций (Liquibase/Flyway/сырой SQL) против PG Types Style Guide (коды PG-T-*) — типы колонок, boolean, enum, антипаттерны varchar(255), timestamp без TZ, float для денег, serial.
+description: Ревью PostgreSQL-схемы и DDL-миграций (Liquibase/Flyway/сырой SQL) против требований pg-types/* — типы колонок, boolean, enum, антипаттерны varchar(255), timestamp без TZ, float для денег, serial.
 when_to_use: Каждый PR с DDL-файлами в db/changelog/, db/migration/, src/main/resources/db/.
 allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 ---
@@ -12,13 +12,16 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Зависимости
 
-- **`.claude/docs/backend/pg-types/pg-types-rules.md`** — типы колонок (`PG-T-NNN`).
-- **`.claude/docs/backend/pg-naming/pg-naming-rules.md`** — конвенции именования (`PG-N-NNN`).
-- **`.claude/docs/backend/pg-partitioning/pg-partitioning-rules.md`** — партиционирование (`PG-P-NNN`).
+- **`.claude/docs/backend/pg-types/spec.md`** — типы колонок (`PG-T-NNN`).
+- **`.claude/docs/backend/pg-naming/spec.md`** — конвенции именования (`PG-N-NNN`).
+- **`.claude/docs/backend/pg-partitioning/spec.md`** — партиционирование (`PG-P-NNN`).
 
 ## Инструкции
 
-1. **Прочти индекс правил** `.claude/docs/backend/pg-types/pg-types-rules.md` (полный текст с примерами и таблицами соответствия типов — `backend/pg-types/pg-types-style-guide.md`, открывай точечно по разделу). Цитируй коды `PG-T-NNN` в каждой находке.
+
+**Гейты проекта.** Часть требований домена закрыта проверками, которые заводит `ucp-bootstrap-design` (каталог — `_meta/project-gates.md`). Если проверка в проекте не заведена, требования, ссылающиеся на неё, фактически держатся ревью — это **отдельная находка**, и она важнее единичного нарушения.
+
+1. **Прочти индекс правил** `.claude/docs/backend/pg-types/spec.md` (полный текст с примерами и таблицами соответствия типов — `backend/pg-types/references/implementation.md`, открывай точечно по разделу). Цитируй коды `PG-T-NNN` в каждой находке.
 
 2. **Определи область ревью.** Если пользователь указал файл — ревью этого файла. Иначе — `git diff` против main / develop, ищи изменения в:
    - `db/changelog/**/*.{xml,sql,yml,json}` (Liquibase)
@@ -27,95 +30,95 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
    - Любые `*.sql` с `CREATE TABLE` / `ALTER TABLE`.
 
 3. **Пройди по каждой DDL-операции** и проверь по списку правил (см. ниже). Для каждой находки:
-   - Цитируй код правила (`PG-T-013`).
+   - Цитируй код правила (`pg-types/money-is-numeric`).
    - Покажи проблемный фрагмент DDL.
    - Покажи как должно быть.
 
-4. **Сгруппируй вывод** по категориям: критично (`PG-T-082`/`-083`/`-091` — необратимое или ломающее), важно (типы id, время), мелкое (стилистика).
+4. **Сгруппируй вывод** по категориям: критично (`pg-types/uuid-is-uuid-type`/`-083`/`-091` — необратимое или ломающее), важно (типы id, время), мелкое (стилистика).
 
-5. **В конце — чек-лист** «всё проверено» (см. в style guide).
+5. **В конце — чек-лист** «всё проверено» (см. в требованиях).
 
 ## Чек-лист правил
 
-### Числа (`PG-T-010` — `PG-T-016`)
+### Числа (`pg-types/pk-bigint-identity` — `pg-types/boolean-is-boolean`)
 
-- `PG-T-010` PK = `bigint GENERATED ALWAYS AS IDENTITY` (или `uuid`). Не `int`/`integer`/`serial`/`bigserial`.
-- `PG-T-013` Денежные колонки = `numeric(p, s)`. Не `float`/`real`/`double precision`/`money`.
-- `PG-T-014` Тип `money` запрещён. → `numeric` + `currency char(3)`.
-- `PG-T-016` Boolean = `boolean`. Не `smallint 0/1`/`char(1)`/`varchar('Y'/'N')`.
+- `pg-types/pk-bigint-identity` (`pg-types/pk-bigint-identity`) PK = `bigint GENERATED ALWAYS AS IDENTITY` (или `uuid`). Не `int`/`integer`/`serial`/`bigserial`.
+- `pg-types/money-is-numeric` (`pg-types/money-is-numeric`) Денежные колонки = `numeric(p, s)`. Не `float`/`real`/`double precision`/`money`.
+- `pg-types/money-is-numeric` (`pg-types/money-is-numeric`) Тип `money` запрещён. → `numeric` + `currency char(3)`.
+- `pg-types/boolean-is-boolean` (`pg-types/boolean-is-boolean`) Boolean = `boolean`. Не `smallint 0/1`/`char(1)`/`varchar('Y'/'N')`.
 
-### Строки (`PG-T-020` — `PG-T-025`)
+### Строки (`pg-types/text-by-default` — `pg-types/no-premature-column-split`)
 
-- `PG-T-020` Без бизнес-причины — `text`, не `varchar(255)` / `varchar(N)` с произвольным `N`.
-- `PG-T-021` `varchar(N)` оправдан только под доменное правило (E.164, ISO-страна, ИНН).
-- `PG-T-022` `char(N)` — только строго фиксированная длина из стандарта.
-- `PG-T-023` Case-insensitive — `citext` или functional unique index `(lower(...))`.
+- `pg-types/text-by-default` (`pg-types/text-by-default`) Без бизнес-причины — `text`, не `varchar(255)` / `varchar(N)` с произвольным `N`.
+- `pg-types/varchar-when-domain-rule` (`pg-types/varchar-when-domain-rule`) `varchar(N)` оправдан только под доменное правило (E.164, ISO-страна, ИНН).
+- `pg-types/varchar-when-domain-rule` (`pg-types/varchar-when-domain-rule`) `char(N)` — только строго фиксированная длина из стандарта.
+- `pg-types/case-insensitive-via-citext` (`pg-types/case-insensitive-via-citext`) Case-insensitive — `citext` или functional unique index `(lower(...))`.
 
-### Время (`PG-T-030` — `PG-T-035`)
+### Время (`pg-types/business-time-is-timestamptz` — `pg-types/intervals-not-magic-seconds`)
 
-- `PG-T-030` Бизнес-время = `timestamptz`. `timestamp without time zone` / `timestamp` для бизнес-времени = критическая ошибка.
-- `PG-T-032` `timestamp` (без TZ) допустим только для локального времени без момента (расписание магазина) — должна быть рядом колонка с зоной.
+- `pg-types/business-time-is-timestamptz` (`pg-types/business-time-is-timestamptz`) Бизнес-время = `timestamptz`. `timestamp without time zone` / `timestamp` для бизнес-времени = критическая ошибка.
+- `pg-types/business-time-is-timestamptz` (`pg-types/business-time-is-timestamptz`) `timestamp` (без TZ) допустим только для локального времени без момента (расписание магазина) — должна быть рядом колонка с зоной.
 
-### UUID (`PG-T-040` — `PG-T-044`)
+### UUID (`pg-types/uuid-is-uuid-type` — `pg-types/index-fk-under-uuid-pk`)
 
-- `PG-T-040` UUID = тип `uuid`. Не `varchar(36)`/`char(36)`/`text`.
-- `PG-T-044` При UUID-PK: дочерние таблицы должны иметь индекс по FK.
+- `pg-types/uuid-is-uuid-type` (`pg-types/uuid-is-uuid-type`) UUID = тип `uuid`. Не `varchar(36)`/`char(36)`/`text`.
+- `pg-types/index-fk-under-uuid-pk` (`pg-types/index-fk-under-uuid-pk`) При UUID-PK: дочерние таблицы должны иметь индекс по FK.
 
-### Enum (`PG-T-050` — `PG-T-052`)
+### Enum (`pg-types/boolean-is-boolean` — `pg-types/typed-enum-in-code`)
 
-- `PG-T-051` Если перечисление может расти / иметь атрибуты — reference table, не PG `ENUM`.
-- `PG-T-051` Если простое техническое ≤7 значений — `ENUM` или `CHECK IN`.
+- `pg-types/enum-vs-reference-table` (`pg-types/enum-vs-reference-table`) Если перечисление может расти / иметь атрибуты — reference table, не PG `ENUM`.
+- `pg-types/enum-vs-reference-table` (`pg-types/enum-vs-reference-table`) Если простое техническое ≤7 значений — `ENUM` или `CHECK IN`.
 
-### JSONB (`PG-T-060` — `PG-T-067`)
+### JSONB (`pg-types/jsonb-not-json` — `pg-types/no-binary-in-jsonb`)
 
-- `PG-T-060` Всегда `jsonb`, не `json`.
-- `PG-T-061` Если по полю фильтруют/сортируют/джойнят — выноси в колонку, не оставляй в JSONB.
-- `PG-T-067` В JSONB не должно быть бинарей/большого текста/base64.
+- `pg-types/jsonb-not-json` (`pg-types/jsonb-not-json`) Всегда `jsonb`, не `json`.
+- `pg-types/jsonb-for-peripheral-attributes` (`pg-types/jsonb-for-peripheral-attributes`) Если по полю фильтруют/сортируют/джойнят — выноси в колонку, не оставляй в JSONB.
+- `pg-types/no-binary-in-jsonb` (`pg-types/no-binary-in-jsonb`) В JSONB не должно быть бинарей/большого текста/base64.
 
-### Массивы и range (`PG-T-070` — `PG-T-074`)
+### Массивы и range (`pg-types/array-for-simple-scalars` — `pg-types/range-for-intervals`)
 
-- `PG-T-071` Массив объектов с атрибутами (`jsonb[]` для строк заказа) — антипаттерн, нужна отдельная таблица.
-- `PG-T-072` Сущность-интервал (тариф, бронь, период) → range-тип.
-- `PG-T-073` Для непересечения интервалов → `EXCLUDE USING gist` constraint.
-- `PG-T-074` Range с границей `[)` по умолчанию.
+- `pg-types/array-for-simple-scalars` (`pg-types/array-for-simple-scalars`) Массив объектов с атрибутами (`jsonb[]` для строк заказа) — антипаттерн, нужна отдельная таблица.
+- `pg-types/range-for-intervals` (`pg-types/range-for-intervals`) Сущность-интервал (тариф, бронь, период) → range-тип.
+- `pg-types/exclude-constraint-for-overlap` (`pg-types/exclude-constraint-for-overlap`) Для непересечения интервалов → `EXCLUDE USING gist` constraint.
+- `pg-types/range-for-intervals` (`pg-types/range-for-intervals`) Range с границей `[)` по умолчанию.
 
-### Антипаттерны (сводно — `PG-T-080` — `PG-T-093`)
+### Антипаттерны (сводно — `pg-types/text-by-default` — `pg-types/uuid-v7-for-keys`)
 
 Эти 14 правил повторяют категории выше — используй их когда ссылаешься на «классический» антипаттерн в одном слове.
 
 ### Именование (`PG-N-NNN`) — обязательно проверяй на каждом DDL
 
-- `PG-N-001`/`002` snake_case без двойных кавычек.
-- `PG-N-010` Таблицы — едино singular или plural.
-- `PG-N-020` PK — `id`, не `<table>_id`.
-- `PG-N-021` FK — `<parent>_id`.
-- `PG-N-022` Boolean с префиксом `is_`/`has_`/`can_`.
-- `PG-N-023` Времена — `_at`/`_on`.
-- `PG-N-024`/`025` Деньги/длительности с осмысленным суффиксом.
-- `PG-N-030` Audit-набор: `created_at`, `updated_at`, `version`.
-- `PG-N-031` Soft-delete через `deleted_at`, не `is_deleted`.
-- `PG-N-040`–`045` Префиксы `ix_`/`uk_`/`fk_`/`ck_`. CHECK с явным именем.
-- `PG-N-050` Не зарезервированные слова.
-- `PG-N-060`/`061` Длина ≤ 30 символов.
-- `PG-N-094` Не `data`/`info` jsonb для основной модели.
+- `pg-naming/snake-case-no-quotes`/`002` snake_case без двойных кавычек.
+- `pg-naming/table-singular-noun` (`pg-naming/table-singular-noun`) Таблицы — едино singular или plural.
+- `pg-naming/pk-named-id` (`pg-naming/pk-named-id`) PK — `id`, не `<table>_id`.
+- `pg-naming/fk-column-names-parent` (`pg-naming/fk-column-names-parent`) FK — `<parent>_id`.
+- `pg-naming/boolean-column-prefix` (`pg-naming/boolean-column-prefix`) Boolean с префиксом `is_`/`has_`/`can_`.
+- `pg-naming/time-column-suffix` (`pg-naming/time-column-suffix`) Времена — `_at`/`_on`.
+- `pg-naming/money-column-suffix`/`025` Деньги/длительности с осмысленным суффиксом.
+- `pg-naming/audit-columns-set` (`pg-naming/audit-columns-set`) Audit-набор: `created_at`, `updated_at`, `version`.
+- `pg-naming/soft-delete-keeps-moment` (`pg-naming/soft-delete-keeps-moment`) Soft-delete через `deleted_at`, не `is_deleted`.
+- `pg-naming/index-constraint-prefix`–`045` Префиксы `ix_`/`uk_`/`fk_`/`ck_`. CHECK с явным именем.
+- `pg-naming/no-reserved-words` (`pg-naming/no-reserved-words`) Не зарезервированные слова.
+- `pg-naming/short-names-consistent-abbreviations`/`061` Длина ≤ 30 символов.
+- `pg-naming/document-column-meaningful-name` (`pg-naming/document-column-meaningful-name`) Не `data`/`info` jsonb для основной модели.
 
 ### Партиционирование (`PG-P-NNN`) — если вижу `PARTITION BY` в DDL
 
-- `PG-P-001` Таблица > 50 GB / time-series / multi-tenant — оправдан выбор.
-- `PG-P-003` PK включает ключ партиционирования.
-- `PG-P-020` Ключ в `WHERE` большинства запросов.
-- `PG-P-030` Размер партиции 1–50 GB.
-- `PG-P-040` Есть план автоматического создания новых партиций.
-- `PG-P-085` Partition key не обновляется в типичных операциях.
+- `pg-partitioning/partition-only-when-justified` (`pg-partitioning/partition-only-when-justified`) Таблица > 50 GB / time-series / multi-tenant — оправдан выбор.
+- `pg-partitioning/pk-includes-partition-key` (`pg-partitioning/pk-includes-partition-key`) PK включает ключ партиционирования.
+- `pg-partitioning/key-present-in-queries` (`pg-partitioning/key-present-in-queries`) Ключ в `WHERE` большинства запросов.
+- `pg-partitioning/partition-size-range` (`pg-partitioning/partition-size-range`) Размер партиции 1–50 GB.
+- `pg-partitioning/create-partitions-ahead` (`pg-partitioning/create-partitions-ahead`) Есть план автоматического создания новых партиций.
+- `pg-partitioning/partition-key-immutable` (`pg-partitioning/partition-key-immutable`) Partition key не обновляется в типичных операциях.
 
 ## Формат вывода
 
 ```
-[критично] PG-T-091 customer.created_at: timestamp without time zone для бизнес-времени.
+[критично] pg-types/time-mapping-keeps-zone (PG-T-091) customer.created_at: timestamp without time zone для бизнес-времени.
    В Java маппинг будет на LocalDateTime → разные значения на UTC-сервере и MSK-разработке.
    Должно быть: created_at timestamptz NOT NULL DEFAULT now()
 
-[важно] PG-T-082 customer.public_id: varchar(36) для UUID.
+[важно] pg-types/uuid-is-uuid-type (PG-T-082) customer.public_id: varchar(36) для UUID.
    Размер 36+ байт vs 16, нет валидации формата на вставке, чувствительно к регистру.
    Должно быть: public_id uuid NOT NULL DEFAULT gen_random_uuid()
 

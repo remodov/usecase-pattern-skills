@@ -18,8 +18,8 @@ allowed-tools: Read Glob Grep Bash(git diff*) Bash(git log*)
 
 ## Инструкции
 
-1. **Прочитай формат** из `.claude/docs/shared/spec-change-template.md` — источник правды по разделам и
-   классификации. Формат спеки — `.claude/docs/shared/usecase-spec-template.md`.
+1. **Прочитай формат** из `.claude/docs/shared/spec-change/spec.md` — источник правды по разделам и
+   классификации. Формат спеки — `.claude/docs/shared/spec-format/spec.md`.
 
 2. **Найди документ.** Пользователь назвал файл — ревьюй его. Иначе `Glob`: `docs/spec/changes/*.md` (без
    `archive/`). Документов нет — скажи это и предложи `ucp-spec-change`.

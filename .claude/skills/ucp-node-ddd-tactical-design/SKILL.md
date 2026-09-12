@@ -1,22 +1,22 @@
 ---
 name: ucp-node-ddd-tactical-design
 lang: node
-description: Спроектировать доменную модель на чистом TypeScript в core/ по UCP DDD Tactical Patterns (коды R-ENT/VO/AGG/EVT/REP-*) — Entity с identity-equality, иммутабельный VO, branded ids, AggregateRoot с событиями, порт + Symbol-токен, деньги Big.js.
+description: Спроектировать доменную модель на чистом TypeScript в core/ по UCP DDD Tactical Patterns (требования ddd-tactical/*) — Entity с identity-equality, иммутабельный VO, branded ids, AggregateRoot с событиями, порт + Symbol-токен, деньги Big.js.
 when_to_use: Триггеры — «агрегат X на ноде», «доменная модель для Y», «value object Money». При моделировании BC или агрегата на Уровне 3.
 allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npx*) Bash(jest*) Bash(eslint*)
 ---
 
 # DDD Tactical Patterns — проектирование (Node / чистый core)
 
-Ты проектируешь доменную модель согласно **общему контракту** `backend/ddd-tactical/ddd-tactical-rules.md`
-(`R-ENT/VO/AGG/EVT/REP/DS/FAC/SPEC/MOD-*`) и его **Node-реализации** `backend/ddd-tactical/node/ddd-tactical-style-guide.md`.
+Ты проектируешь доменную модель согласно **общему контракту** `backend/ddd-tactical/spec.md`
+(`R-ENT/VO/AGG/EVT/REP/DS/FAC/SPEC/MOD-*`) и его **Node-реализации** `backend/ddd-tactical/references/node/implementation.md`.
 Домен живёт в `core/` **без фреймворка** (ни NestJS-декораторов, ни TypeORM, ни class-validator) — чистый TypeScript + доменные утилиты (Big.js, uuid).
 
 ## Инструкции
 
-1. **Прочитай** контракт `backend/ddd-tactical/ddd-tactical-rules.md` + Node-style-guide `backend/ddd-tactical/node/ddd-tactical-style-guide.md`. Коды `R-*` обязательны; цитируй их в **design-обосновании**, не в комментариях кода. Связанные: `backend/usecase-pattern/node/...` (Handler/граница TX/порты), `backend/node/typeorm/typeorm-rules.md` (реализация репозитория).
+1. **Прочитай** контракт `backend/ddd-tactical/spec.md` + требования `node-style/*` `backend/ddd-tactical/references/node/implementation.md`. Коды `R-*` обязательны; цитируй их в **design-обосновании**, не в комментариях кода. Связанные: `backend/usecase-pattern/node/...` (Handler/граница TX/порты), `backend/node/typeorm/spec.md` (реализация репозитория).
 
-2. **Базовые типы.** Если в `core/shared/building-blocks.ts` нет `Entity`/`ValueObject`/`AggregateRoot`/`DomainEvent` — создай тонкие ручные (в Node нет `ddd-building-blocks`); образец — в style-guide. Не тащи их из adapter-слоя.
+2. **Базовые типы.** Если в `core/shared/building-blocks.ts` нет `Entity`/`ValueObject`/`AggregateRoot`/`DomainEvent` — создай тонкие ручные (в Node нет `ddd-building-blocks`); образец — в справочнике реализации. Не тащи их из adapter-слоя.
 
 3. **Уточни модель:** Bounded Context и папку (`core/<bc>/`); корень агрегата и защищаемый инвариант; внутренние Entity; Value Objects (бьём primitive obsession — `Money`/`Email`/`OrderId`); доменные события (прошедшее время); ссылки на другие агрегаты — по id; оправданы ли Factory/Domain Service/Specification (по умолчанию нет).
 
@@ -28,16 +28,16 @@ allowed-tools: Read Glob Grep Write Edit Bash(node*) Bash(npx*) Bash(jest*) Bash
    - **Repository** — интерфейс + Symbol-токен в `core/<bc>/port/`, методы в доменных терминах, возвращает домен (`R-REP-*`); реализация — отдельно через `ucp-node-typeorm-design`.
    - **Domain Service / Factory / Specification** — только если оправдано; укажи обоснование. Domain Service — plain class без `@Injectable`.
 
-5. **Раскладка по домену** (`R-MOD-*`): `core/<bc>/{aggregate,entity,value-object,event,port,service,specification,usecases}/`. `core/` не импортирует `@nestjs/*`/`typeorm`/`class-validator`/`adapters/*` — предложи контракт dependency-cruiser или eslint-boundaries (`R-HEX-2`, `NESTBOOT-15`).
+5. **Раскладка по домену** (`R-MOD-*`): `core/<bc>/{aggregate,entity,value-object,event,port,service,specification,usecases}/`. `core/` не импортирует `@nestjs/*`/`typeorm`/`class-validator`/`adapters/*` — предложи контракт dependency-cruiser или eslint-boundaries (`hexagonal/core-free-of-framework`, `nest-bootstrap/layout-directs-dependencies-inward`).
 
-6. **Самопроверка** (чек-лист §10 style-guide) + предложи `ucp-node-ddd-tactical-review`. Persistence агрегата — `ucp-node-typeorm-design`.
+6. **Самопроверка** (чек-лист §10 справочник) + предложи `ucp-node-ddd-tactical-review`. Persistence агрегата — `ucp-node-typeorm-design`.
 
 ## Антипаттерны, которые НЕ генерировать
 
-- Entity с equality по полям (`JSON.stringify`/lodash `isEqual` — VO-семантика, `R-ENT-X2`); публичные сеттеры на всё (`R-ENT-X3`); анемичная модель (`R-ENT-X5`).
-- VO с id/жизненным циклом (`R-VO-X1`); primitive obsession (`R-VO-X2`); мутабельный массив внутри VO без копии (`R-VO-X3`); деньги `number`.
-- Регистрация события вне корня (`R-AGG-X4`); возврат внутренней коллекции наружу без копии (`R-AGG-X2`); ссылка на агрегат объектом (`R-ENT-X4`/`R-AGG-5`).
-- Событие со ссылкой на агрегат (`R-EVT-X2`); фреймворк/декораторы NestJS в `core/` (`R-MOD-2`); порт-репозиторий вне домена (`R-REP-1`).
+- Entity с equality по полям (`JSON.stringify`/lodash `isEqual` — VO-семантика, `ddd-tactical/entity-equality-by-identity`); публичные сеттеры на всё (`ddd-tactical/entity-constructor-validates`); анемичная модель (`ddd-tactical/model-is-not-anemic`).
+- VO с id/жизненным циклом (`ddd-tactical/value-has-no-identity`); primitive obsession (`ddd-tactical/no-primitive-obsession`); мутабельный массив внутри VO без копии (`ddd-tactical/collections-in-values-are-protected`); деньги `number`.
+- Регистрация события вне корня (`ddd-tactical/events-registered-by-root`); возврат внутренней коллекции наружу без копии (`ddd-tactical/aggregate-root-is-single-entry`); ссылка на агрегат объектом (`ddd-tactical/no-object-references-across-aggregates`/`ddd-tactical/no-object-references-across-aggregates`).
+- Событие со ссылкой на агрегат (`ddd-tactical/event-carries-business-context`); фреймворк/декораторы NestJS в `core/` (`ddd-tactical/packages-grouped-by-domain`); порт-репозиторий вне домена (`ddd-tactical/repository-port-in-domain`).
 
 После работы скилла — обязательно `ucp-node-ddd-tactical-review`.
 
