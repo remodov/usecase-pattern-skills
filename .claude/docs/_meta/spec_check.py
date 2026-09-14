@@ -43,6 +43,64 @@ def check_registry(docs, migrated):
 
 
 migrated = spec_format.parse_migrated(REGISTRY.read_text(encoding="utf-8")) if REGISTRY.exists() else []
+def check_changes(root, specs):
+    """Каталог изменения: предложение, задачи и дельта — и все на месте.
+
+    Дельта — это кусок будущей спеки, а не пересказ словами: при слиянии её
+    переносят как есть. Поэтому проверяем не только наличие файлов, но и что
+    дельта называет существующий spec.md и что раздел «Добавлено» написан
+    в той же форме, что корпус.
+    """
+    problems = []
+    changes = root / "openspec" / "changes"
+
+    if not changes.is_dir():
+        return problems
+
+    # Каталоги изменений лежат вне .claude/docs, поэтому путь считаем от корня
+    # репозитория: _relative умеет только «относительно корпуса».
+    def откорня(path):
+        try:
+            return str(Path(path).resolve().relative_to(root.resolve()))
+        except ValueError:
+            return str(path)
+
+    known = {str(Path(spec.file)) for spec in specs}
+
+    for change in sorted(p for p in changes.iterdir() if p.is_dir()):
+        if change.name == "archive":
+            continue
+
+        for required in ("proposal.md", "tasks.md"):
+            if not (change / required).exists():
+                problems.append(f"{откорня(change)}: нет {required}")
+
+        deltas = sorted(change.glob("delta*.md")) + sorted(change.glob("specs/**/*.md"))
+
+        if not deltas:
+            problems.append(
+                f"{откорня(change)}: нет дельты — изменение без неё нечего вливать в спеку"
+            )
+            continue
+
+        for delta in deltas:
+            source = delta.read_text(encoding="utf-8")
+            targets = [line for line in source.splitlines() if "spec.md" in line]
+
+            if not targets:
+                problems.append(f"{откорня(delta)}: дельта не называет файл спеки")
+            elif not any(t in line for t in known for line in targets):
+                problems.append(f"{откорня(delta)}: названный файл спеки не найден в корпусе")
+
+            if "## Добавлено" in source and "### Requirement:" not in source:
+                problems.append(
+                    f"{откорня(delta)}: раздел «Добавлено» без «### Requirement:» — "
+                    "при слиянии такое переносят руками и теряют поля"
+                )
+
+    return problems
+
+
 specs = spec_format.collect_specs(DOCS)
 languages = spec_format.collect_languages(DOCS)
 
@@ -238,6 +296,7 @@ def check_gate_catalogue(docs, specs):
 
 problems = check_registry(DOCS, migrated)
 problems.extend(check_dangling_references(DOCS, migrated, DOCS.parent / "skills"))
+problems.extend(check_changes(DOCS.parent.parent, specs))
 
 for spec in specs:
     problems.extend(spec_format.check_structure(spec))

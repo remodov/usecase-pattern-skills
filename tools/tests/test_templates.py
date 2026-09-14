@@ -57,5 +57,40 @@ class RequirementSnippet(unittest.TestCase):
         self.assertIn("**THEN**", text)
 
 
+class DeltaTemplate(unittest.TestCase):
+    """Дельта — это кусок будущей спеки, а не пересказ словами.
+
+    Раздел «Добавлено» обязан нести требование целиком и в той же форме, что
+    в spec.md: при слиянии его переносят как есть. Если форма разойдётся,
+    слияние превратится в ручной перенабор, а он теряет поля.
+    """
+
+    def setUp(self):
+        self.text = (TEMPLATES / "change" / "delta.md").read_text(encoding="utf-8")
+
+    def test_three_sections(self):
+        for раздел in ("## Добавлено", "## Изменено", "## Удалено"):
+            self.assertIn(раздел, self.text)
+
+    def test_added_carries_full_requirement_form(self):
+        добавлено = self.text.split("## Добавлено", 1)[1].split("## Изменено", 1)[0]
+        for field in ("### Requirement:", "**Почему**", "**ID**", "**Гейт**",
+                      "**Покрытие**", "#### Scenario:", "**WHEN**", "**THEN**"):
+            self.assertIn(field, добавлено, f"в «Добавлено» нет {field}")
+
+    def test_modified_shows_before_and_after(self):
+        изменено = self.text.split("## Изменено", 1)[1].split("## Удалено", 1)[0]
+        self.assertIn("**Было:**", изменено)
+        self.assertIn("**Стало:**", изменено)
+        self.assertIn("**Почему меняем:**", изменено)
+
+    def test_removed_demands_reason(self):
+        удалено = self.text.split("## Удалено", 1)[1]
+        self.assertIn("**Причина:**", удалено)
+
+    def test_names_target_file(self):
+        self.assertIn("spec.md", self.text.split("## Добавлено", 1)[0])
+
+
 if __name__ == "__main__":
     unittest.main()
