@@ -66,6 +66,12 @@ def check_changes(root, specs):
             return str(path)
 
     known = {str(Path(spec.file)) for spec in specs}
+    known_ids = {
+        requirement.meta["ID"]
+        for spec in specs
+        for requirement in spec.requirements
+        if "ID" in requirement.meta
+    }
 
     for change in sorted(p for p in changes.iterdir() if p.is_dir()):
         if change.name == "archive":
@@ -78,9 +84,24 @@ def check_changes(root, specs):
         deltas = sorted(change.glob("delta*.md")) + sorted(change.glob("specs/**/*.md"))
 
         if not deltas:
-            problems.append(
-                f"{откорня(change)}: нет дельты — изменение без неё нечего вливать в спеку"
-            )
+            # Изменение без дельты бывает законным — правка инструментов, сборки,
+            # документации. Но это должно быть сказано вслух и с причиной, иначе
+            # забытая дельта не отличается от намеренно отсутствующей.
+            proposal = change / "proposal.md"
+            причина = ""
+
+            if proposal.exists():
+                for line in proposal.read_text(encoding="utf-8").splitlines():
+                    if line.strip().startswith("Дельты нет:"):
+                        причина = line.split(":", 1)[1].strip()
+
+            if not причина:
+                problems.append(
+                    f"{откорня(change)}: нет дельты — изменение без неё нечего вливать в спеку. "
+                    "Если требования не меняются, скажи это в proposal.md строкой "
+                    "«Дельты нет: <причина>»"
+                )
+
             continue
 
         for delta in deltas:
@@ -96,6 +117,38 @@ def check_changes(root, specs):
                 problems.append(
                     f"{откорня(delta)}: раздел «Добавлено» без «### Requirement:» — "
                     "при слиянии такое переносят руками и теряют поля"
+                )
+
+            # «Изменено» и «Удалено» правят то, что уже есть в спеке. Если такого
+            # ID там нет, дельту некуда приложить — и узнаётся это обычно при
+            # слиянии, когда автор изменения уже забыл подробности.
+            for раздел in ("## Изменено", "## Удалено"):
+                if раздел not in source:
+                    continue
+
+                хвост = source.split(раздел, 1)[1]
+
+                for следующий in ("## Изменено", "## Удалено", "## Добавлено"):
+                    if следующий != раздел and следующий in хвост:
+                        хвост = хвост.split(следующий, 1)[0]
+
+                for header in re.findall(r"^###\s+([\w./-]+/[\w./-]+)\s*$", хвост, re.MULTILINE):
+                    if header.startswith("<") or header not in known_ids:
+                        problems.append(
+                            f"{откорня(delta)}: «{header}» — такого требования нет в корпусе, "
+                            f"раздел «{раздел.strip('# ')}» правит то, чего не существует"
+                        )
+
+    archive = changes / "archive"
+
+    if archive.is_dir():
+        for change in sorted(p for p in archive.iterdir() if p.is_dir()):
+            tasks = change / "tasks.md"
+
+            if tasks.exists() and "- [ ]" in tasks.read_text(encoding="utf-8"):
+                problems.append(
+                    f"{откорня(change)}: в архиве неотмеченные задачи — "
+                    "изменение закрыли, не доделав"
                 )
 
     return problems

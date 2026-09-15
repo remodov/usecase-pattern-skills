@@ -356,3 +356,81 @@ class GateCatalogueTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("нет в каталоге", result.stderr)
+
+
+class ChangeFolderTest(unittest.TestCase):
+    """Каталог изменения: дельта, сверка «Изменено» со спекой, архив.
+
+    Дельта, которая правит требование, исчезнувшее из спеки, — тихая поломка:
+    при слиянии её просто некуда приложить, а заметно это станет через месяц.
+    """
+
+    def _repo(self, tmp):
+        root = Path(tmp)
+        docs = root / ".claude" / "docs"
+        domain = docs / "backend" / "pg-migrations"
+        domain.mkdir(parents=True)
+        (docs / "_meta").mkdir(parents=True)
+        (docs / "_meta" / "migrated-domains.md").write_text(
+            "- `backend/pg-migrations`\n", encoding="utf-8")
+        (domain / "spec.md").write_text(SPEC, encoding="utf-8")
+        return root, docs
+
+    def _change(self, root, name, proposal="# Изменение\n", tasks="# Задачи\n", delta=None):
+        change = root / "openspec" / "changes" / name
+        change.mkdir(parents=True)
+        (change / "proposal.md").write_text(proposal, encoding="utf-8")
+        (change / "tasks.md").write_text(tasks, encoding="utf-8")
+
+        if delta is not None:
+            (change / "delta-pg-migrations.md").write_text(delta, encoding="utf-8")
+
+        return change
+
+    def test_изменение_без_дельты_и_без_причины_не_проходит(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "без-дельты")
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("нет дельты", result.stderr)
+
+    def test_дельты_нет_с_причиной_пропускается(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "инструменты",
+                         proposal="# Изменение\n\nДельты нет: правим только сборку, "
+                                  "требования не меняются.\n")
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_правка_несуществующего_требования_ловится(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "правка", delta=(
+                "# Дельта\n\nМеняем backend/pg-migrations/spec.md\n\n"
+                "## Изменено\n\n### pg-migrations/такого-нет\n\n"
+                "**Было:**\n\n> старое\n\n**Стало:**\n\n> новое\n"))
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("такого-нет", result.stderr)
+
+    def test_архив_с_неотмеченными_задачами_ловится(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            archive = root / "openspec" / "changes" / "archive" / "старое"
+            archive.mkdir(parents=True)
+            (archive / "proposal.md").write_text("# Старое\n", encoding="utf-8")
+            (archive / "tasks.md").write_text("# Задачи\n\n- [x] сделано\n- [ ] забыли\n",
+                                              encoding="utf-8")
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("неотмеченные задачи", result.stderr)
