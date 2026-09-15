@@ -413,13 +413,56 @@ class ChangeFolderTest(unittest.TestCase):
             root, docs = self._repo(tmp)
             self._change(root, "правка", delta=(
                 "# Дельта\n\nМеняем backend/pg-migrations/spec.md\n\n"
-                "## Изменено\n\n### pg-migrations/такого-нет\n\n"
-                "**Было:**\n\n> старое\n\n**Стало:**\n\n> новое\n"))
+                "## Изменено\n\n### Requirement: Чего-то нет\n\n"
+                "**ID**: pg-migrations/такого-нет\n\n"
+                "#### Scenario: раз\n\n- **WHEN** а\n- **THEN** б\n"))
 
             result = _run(docs)
 
             self.assertEqual(result.returncode, 1)
             self.assertIn("такого-нет", result.stderr)
+
+    def test_изменено_кусками_не_проходит(self):
+        """Правка «одного поля» не вливается механически — только руками."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "кусками", delta=(
+                "# Дельта\n\nМеняем backend/pg-migrations/spec.md\n\n"
+                "## Изменено\n\n### pg-migrations/lock-timeout-required\n\n"
+                "**Было:**\n\n> старое\n\n**Стало:**\n\n> новое\n"))
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("целиком", result.stderr)
+
+    def test_изменено_целиком_проходит(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "целиком", delta=(
+                "# Дельта\n\nМеняем backend/pg-migrations/spec.md\n\n"
+                "## Изменено\n\n### Requirement: Таймаут блокировки\n\n"
+                "**ID**: pg-migrations/lock-timeout-required\n\n"
+                "#### Scenario: раз\n\n- **WHEN** а\n- **THEN** б\n\n"
+                "**Что изменилось:** добавлен сценарий\n"))
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_переименование_несуществующего_ловится(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root, docs = self._repo(tmp)
+            self._change(root, "переименование", delta=(
+                "# Дельта\n\nМеняем backend/pg-migrations/spec.md\n\n"
+                "## Переименовано\n\n"
+                "- FROM: `pg-migrations/такого-не-было`\n"
+                "- TO: `pg-migrations/новое-имя`\n"))
+
+            result = _run(docs)
+
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("такого-не-было", result.stderr)
 
     def test_архив_с_неотмеченными_задачами_ловится(self):
         with tempfile.TemporaryDirectory() as tmp:

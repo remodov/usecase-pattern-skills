@@ -69,7 +69,7 @@ class DeltaTemplate(unittest.TestCase):
         self.text = (TEMPLATES / "change" / "delta.md").read_text(encoding="utf-8")
 
     def test_three_sections(self):
-        for раздел in ("## Добавлено", "## Изменено", "## Удалено"):
+        for раздел in ("## Добавлено", "## Изменено", "## Удалено", "## Переименовано"):
             self.assertIn(раздел, self.text)
 
     def test_added_carries_full_requirement_form(self):
@@ -78,11 +78,23 @@ class DeltaTemplate(unittest.TestCase):
                       "**Покрытие**", "#### Scenario:", "**WHEN**", "**THEN**"):
             self.assertIn(field, добавлено, f"в «Добавлено» нет {field}")
 
-    def test_modified_shows_before_and_after(self):
+    def test_modified_carries_whole_requirement(self):
+        """Слияние заменяет блок целиком — значит и в дельте он целиком.
+
+        Правка «одного поля» видом «было/стало» вливается только руками, а
+        в ручном переносе теряются поля «Гейт» и «Не ловит».
+        """
         изменено = self.text.split("## Изменено", 1)[1].split("## Удалено", 1)[0]
-        self.assertIn("**Было:**", изменено)
-        self.assertIn("**Стало:**", изменено)
-        self.assertIn("**Почему меняем:**", изменено)
+        for field in ("### Requirement:", "**ID**", "**Гейт**", "#### Scenario:"):
+            self.assertIn(field, изменено, f"в «Изменено» нет {field}")
+        self.assertIn("**Что изменилось:**", изменено)
+
+    def test_renamed_section_exists(self):
+        """Переименование — отдельный раздел, а не «удалили и добавили»."""
+        self.assertIn("## Переименовано", self.text)
+        переименовано = self.text.split("## Переименовано", 1)[1]
+        self.assertIn("- FROM:", переименовано)
+        self.assertIn("- TO:", переименовано)
 
     def test_removed_demands_reason(self):
         удалено = self.text.split("## Удалено", 1)[1]
