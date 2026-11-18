@@ -127,7 +127,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
     Без этого downstream-скиллы упадут: `ucp-pattern-design` генерит `@RequiredArgsConstructor`-handler-ы (`java-style/boilerplate-is-generated`), `@Mapper`-интерфейсы (`usecase-pattern/explicit-mapper-between-layers`) и `Controller implements <Tag>Api` (`validation/controller-implements-generated-contract`) — все три annotation/codegen-цепочки должны работать с первой компиляции.
 
-13. **Создай (или обнови) корневой `CLAUDE.md`.** Каждый UCP-сервис обязан нести в корне репозитория `CLAUDE.md` — always-loaded память для AI-агента. Нет файла — создай; есть — обнови соответствующий блок, не дублируя то, что и так выводится из кода. Минимальный обязательный контент:
+13. **Создай (или обнови) корневой `AGENTS.md`.** Каждый UCP-сервис обязан нести в корне репозитория `AGENTS.md` — always-loaded память для AI-агента. Нет файла — создай; есть — обнови соответствующий блок, не дублируя то, что и так выводится из кода. Минимальный обязательный контент:
 
     ```markdown
     ### Спецификация
@@ -143,21 +143,21 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
     ### Кодогенерация и ревью — через скиллы
 
-    Любая работа над UCP-артефактом обязана идти через `/ucp-*` скилл, не писаться от руки:
+    Любая работа над UCP-артефактом обязана идти через `ucp-*` скилл, не писаться от руки:
 
     | Тип работы | Скилл |
     |---|---|
-    | Спека по бизнес-описанию | `/ucp-spec-design` |
-    | As-is спека из кода | `/ucp-spec-tier-0` |
-    | Ревью спеки | `/ucp-spec-review` |
-    | UseCase + Handler + Controller + маппер | `/ucp-pattern-design` |
-    | OpenAPI + DTO из карточки команды | `/ucp-api-design` |
-    | Aggregate + VO + Domain Event + Repository (Уровень 3) | `/ucp-ddd-tactical-design` |
-    | Bootstrap (профили, jOOQ, Liquibase) | `/ucp-bootstrap-design` |
-    | Тесты по разделу «Критерии приёмки» | `/ucp-test-design` |
+    | Спека по бизнес-описанию | `ucp-spec-design` |
+    | As-is спека из кода | `ucp-spec-tier-0` |
+    | Ревью спеки | `ucp-spec-review` |
+    | UseCase + Handler + Controller + маппер | `ucp-pattern-design` |
+    | OpenAPI + DTO из карточки команды | `ucp-api-design` |
+    | Aggregate + VO + Domain Event + Repository (Уровень 3) | `ucp-ddd-tactical-design` |
+    | Bootstrap (профили, jOOQ, Liquibase) | `ucp-bootstrap-design` |
+    | Тесты по разделу «Критерии приёмки» | `ucp-test-design` |
     ```
 
-    Держи `CLAUDE.md` коротким (always-loaded): только то, что неочевидно из кода/структуры.
+    Держи `AGENTS.md` коротким (always-loaded): только то, что неочевидно из кода/структуры.
 
 ## Гейты проекта
 
@@ -191,7 +191,7 @@ allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) 
 
 ## Вывод
 
-Произведи конкретные файлы (Java + YAML + корневой `CLAUDE.md`) и короткое описание PR, перечисляющее:
+Произведи конкретные файлы (Java + YAML + корневой `AGENTS.md`) и короткое описание PR, перечисляющее:
 - Какие правила `BS-*` адресуются каждым файлом.
 - Трейс исходного сбоя (если это была починка), чтобы будущие читатели могли его найти.
 - Сниппет `bootRun`-лога, показывающий, что сервис стартует чисто на профиле `local` (строка `Tomcat started on port 8080`).

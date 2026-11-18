@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 #
-# install.sh — подключение скиллов и style-guide-снапшотов в проект.
+# install.sh — подключение UCP-скиллов для выбранного coding-агента.
 #
 # Использование:
-#   ./install.sh [PROJECT_DIR]
+#   ./install.sh [--target claude|kimi|codex|...] [PROJECT_DIR]
 #
-# Если PROJECT_DIR не указан, используется текущая директория.
-# Скрипт создаёт симлинки на .claude/skills/*, .claude/docs/**/*.md и на
-# always-loaded ядро языка (.claude/rules/ucp-<lang>-core.md) из этого репо
-# в указанный проект. Симлинки означают, что обновления в этом репо
-# автоматически прилетят в проект — без ручного re-копирования.
-# Дополнительно — регистрирует GitLab MCP, если есть токен.
+# Если PROJECT_DIR не указан, используется текущая директория. Канонические
+# .claude/skills/* и .claude/docs/**/*.md подключаются симлинками в native paths
+# из tools/agent-targets.json. Обновления репо поэтому не требуют re-копирования.
+# Дополнительно Claude-адаптер регистрирует GitLab MCP, если есть токен.
 #
-# Профиль скиллов (опционально) — чтобы не тащить все ~45 ucp-* скиллов в проект,
-# которому нужна часть (меньше скилл-описаний в always-loaded контексте каждой
-# сессии):
+# Профиль скиллов (опционально) ограничивает набор ucp-* скиллов и уменьшает
+# контекст каталога в каждой сессии:
 #   UCP_PROFILE=auto  ./install.sh ~/proj   # по стеку проекта (по умолчанию): concern включается по
 #                                            # маркеру в зависимостях/раскладке; review — всегда, design — по UCP_DESIGN
 #   UCP_PROFILE=rest  ./install.sh ~/proj   # REST/UCP-сервис: spec+pattern+api+auth+jooq+pg+validation+test+java-style
@@ -76,12 +73,24 @@ manage_block() {
 }
 
 CHECK_MODE=false
+DRY_RUN=false
 WIZARD=false
+UCP_TARGET="${UCP_TARGET:-claude}"
 POSITIONAL=()
 while [ $# -gt 0 ]; do
   case "$1" in
     --check)
       CHECK_MODE=true
+      shift
+      ;;
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --target)
+      shift
+      if [ $# -eq 0 ]; then echo "ERROR: --target требует значение" >&2; exit 1; fi
+      UCP_TARGET="$1"
       shift
       ;;
     -w|--wizard)
@@ -90,21 +99,21 @@ while [ $# -gt 0 ]; do
       ;;
     -h|--help)
       cat <<USAGE
-Использование: install.sh [--wizard] [--check] [PROJECT_DIR]
+Использование: install.sh [--wizard] [--dry-run] [--check] [--target AGENT] [PROJECT_DIR]
 
-Без флагов: устанавливает скиллы / docs / rules / agents / hooks в PROJECT_DIR
-(симлинками), мерж settings.json, managed-блоки в CLAUDE.md и .gitignore.
-rules — always-loaded ядро языка (.claude/rules/ucp-<lang>-core.md): грузится
-в каждую сессию проекта без вызова скилла.
-По умолчанию PROJECT_DIR = текущая директория.
+Без флагов устанавливает скиллы для Claude Code в PROJECT_DIR (по умолчанию — текущая
+директория). Профили языка/трека работают одинаково для всех coding-агентов.
 
-  --wizard, -w  Интерактивный режим: спрашивает специализацию (track), язык и
-                профиль, ставит только подходящие скиллы. Не нужно помнить env-переменные.
-  --check       Диагностический режим. Ничего не меняет, только проверяет
-                состояние установки в PROJECT_DIR. Exit 0 если всё OK,
-                exit 1 если найдены проблемы.
+  --target AGENT  claude (по умолчанию), kimi, codex, cursor, copilot, gemini,
+                  opencode, qwen, zed, antigravity, codebuddy, joycode, hermes,
+                  openclaw, adal, grok, mistral-vibe или generic.
+  --wizard, -w    Интерактивно выбрать агента, специализацию, язык и профиль.
+  --dry-run       Показать целевые пути, скиллы и пропущенные capabilities без записи.
+  --check         Ничего не менять; проверить установку выбранного агента.
 
 Переменные окружения (или используйте --wizard):
+  UCP_TARGET    Целевой агент; альтернатива --target.
+  UCP_HOME      Домашний каталог для home-based целей (по умолчанию HOME).
   UCP_TRACK     backend (по умолчанию) | frontend | e2e — специализация (ось,
                 ортогональна языку). Режет по frontmatter-метке track: (backend|
                 frontend|e2e|any). Список через запятую. См. authoring-contract §10.
@@ -130,7 +139,8 @@ USAGE
   esac
 done
 
-# --- интерактивный мастер: спрашивает track/lang/profile, выставляет env+цель ---
+SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 run_wizard() {
   echo "==> UCP install wizard — интерактивная установка"
   echo
@@ -141,43 +151,55 @@ run_wizard() {
   _dir="${_dir:-$_def_dir}"
 
   echo
-  echo "1) Специализация (track). Сейчас скиллы есть только для backend:"
+  echo "1) Coding-агент:"
+  local _ids=() _labels=() _id _label _support
+  while IFS=$'\t' read -r _id _label _support; do
+    _ids+=("$_id")
+    _labels+=("$_label ($_support)")
+  done < <(python3 "$SKILLS_DIR/tools/agent_targets.py" list)
+  select _label in "${_labels[@]}"; do
+    [ -n "$_label" ] || continue
+    UCP_TARGET="${_ids[$((REPLY - 1))]}"
+    break
+  done
+
+  echo
+  echo "2) Специализация (track):"
   select UCP_TRACK in backend frontend e2e; do [ -n "$UCP_TRACK" ] && break; done
 
   UCP_LANG=java
   if [ "$UCP_TRACK" = backend ]; then
     echo
-    echo "2) Язык backend:"
+    echo "3) Язык backend:"
     select UCP_LANG in java python node go; do [ -n "$UCP_LANG" ] && break; done
   else
     echo "  ℹ для '$UCP_TRACK' ставятся скиллы своего трека плюс кросс-трековые (spec/arch/meta/install)."
   fi
 
   echo
-  echo "3) Профиль: auto=по стеку проекта · full=всё · rest=REST/UCP-сервис · data=data-heavy:"
+  echo "4) Профиль: auto=по стеку проекта · full=всё · rest=REST/UCP-сервис · data=data-heavy:"
   select UCP_PROFILE in auto full rest data; do [ -n "$UCP_PROFILE" ] && break; done
   UCP_DESIGN=all
   if [ "$UCP_PROFILE" = auto ]; then
     echo
-    echo "4) Design-генераторы: all=для всех включённых concern'ов · chain=только цепочка ucp-new-service (review ставится всегда):"
+    echo "5) Design-генераторы: all=для всех включённых concern'ов · chain=только цепочка ucp-new-service (review ставится всегда):"
     select UCP_DESIGN in all chain; do [ -n "$UCP_DESIGN" ] && break; done
   fi
 
   echo
   echo "Эквивалент команды:"
-  echo "  UCP_TRACK=$UCP_TRACK UCP_LANG=$UCP_LANG UCP_PROFILE=$UCP_PROFILE UCP_DESIGN=$UCP_DESIGN ./install.sh \"$_dir\""
+  echo "  UCP_TARGET=$UCP_TARGET UCP_TRACK=$UCP_TRACK UCP_LANG=$UCP_LANG UCP_PROFILE=$UCP_PROFILE UCP_DESIGN=$UCP_DESIGN ./install.sh \"$_dir\""
   printf "Установить? [Y/n]: "
   read -r _ok
   case "${_ok:-Y}" in [Nn]*) echo "Отменено."; exit 0 ;; esac
 
   POSITIONAL=("$_dir")
-  export UCP_TRACK UCP_LANG UCP_PROFILE UCP_DESIGN
+  export UCP_TARGET UCP_TRACK UCP_LANG UCP_PROFILE UCP_DESIGN
 }
 
 if [ "$WIZARD" = true ]; then run_wizard; fi
 
 PROJECT_DIR="${POSITIONAL[0]:-.}"
-SKILLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # --- язык: UCP_LANG — ось, ортогональная профилю. Режет скиллы по frontmatter
 # `lang:` (any|java|python|node|go; без метки = java) и доки по подпапке <concern>/<lang>/.
@@ -249,12 +271,19 @@ if [ ! -d "$PROJECT_DIR" ]; then
   exit 1
 fi
 
-PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd)"
+PROJECT_DIR="$(cd "$PROJECT_DIR" && pwd -P)"
 
 if [ "$PROJECT_DIR" = "$SKILLS_DIR" ]; then
   echo "ERROR: PROJECT_DIR совпадает с папкой репо. Передайте путь до своего проекта." >&2
   exit 1
 fi
+
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "ERROR: python3 необходим для выбора target-адаптера" >&2
+  exit 1
+fi
+TARGET_HOME="${UCP_HOME:-$HOME}"
+eval "$(python3 "$SKILLS_DIR/tools/agent_targets.py" target "$UCP_TARGET" --project "$PROJECT_DIR" --home "$TARGET_HOME")"
 
 # --- срез по стеку (UCP_PROFILE=auto). Concern включается по маркеру в проекте:
 # зависимости в build-файлах, классы в исходниках, раскладка каталогов. Review-скилл
@@ -389,6 +418,43 @@ print_slice() {
   fi
 }
 
+if [ "$DRY_RUN" = true ]; then
+  echo "==> Dry run: $TARGET_LABEL ($TARGET_SUPPORT)"
+  echo "  Проект: $PROJECT_DIR"
+  echo "  Skills: $TARGET_SKILLS_DIR"
+  echo "  Docs: $PROJECT_DIR/.claude/docs"
+  [ -n "$TARGET_AGENTS_DIR" ] && echo "  Agents ($TARGET_AGENT_FORMAT): $TARGET_AGENTS_DIR"
+  [ -n "$TARGET_RULES_DIR" ] && echo "  Rules: $TARGET_RULES_DIR"
+  [ -n "$TARGET_INSTRUCTION_FILE" ] && echo "  Instructions: $TARGET_INSTRUCTION_FILE"
+  [ -n "$TARGET_MANIFEST" ] && echo "  Manifest: $TARGET_MANIFEST"
+  print_slice
+  echo "  Выбранные скиллы:"
+  _seen_skills=" "
+  read -ra _glob_patterns <<< "$SKILL_GLOBS"
+  for glob in "${_glob_patterns[@]}"; do
+    for skill in "$SKILLS_DIR"/.claude/skills/$glob/; do
+      [ -d "$skill" ] || continue
+      name="$(basename "$skill")"
+      case "$_seen_skills" in *" $name "*) continue ;; esac
+      _slang="$(skill_lang "$skill")"
+      if [ "$_slang" != any ] && [ "$_slang" != "$UCP_LANG" ]; then continue; fi
+      _strack="$(skill_track "$skill")"
+      if [ "$_strack" != any ]; then
+        case ",$UCP_TRACK," in *",$_strack,"*) ;; *) continue ;; esac
+      fi
+      _seen_skills="$_seen_skills$name "
+      echo "    $name → $TARGET_SKILLS_DIR/$name"
+    done
+  done
+  [ "$TARGET_HOOKS" = true ] || echo "  Пропущено: hooks не настраиваются для $TARGET_LABEL"
+  [ "$TARGET_MCP" = true ] || echo "  Пропущено: MCP не настраивается для $TARGET_LABEL"
+  [ -n "$TARGET_RULES_DIR" ] || echo "  Пропущено: always-loaded rules не настраиваются для $TARGET_LABEL"
+  [ -n "$TARGET_AGENTS_DIR" ] || echo "  Пропущено: custom agents не настраиваются для $TARGET_LABEL"
+  [ -n "$TARGET_INSTRUCTION_FILE" ] || echo "  Пропущено: instruction file не настраивается для $TARGET_LABEL"
+  echo "✓ Dry run завершён без изменений."
+  exit 0
+fi
+
 # --- --check: диагностика без модификаций ---
 if [ "$CHECK_MODE" = true ]; then
   echo "==> Проверка установки UCP-скиллов в $PROJECT_DIR"
@@ -428,26 +494,43 @@ if [ "$CHECK_MODE" = true ]; then
     fi
   }
 
-  check_dir "$PROJECT_DIR/.claude/skills" "Skills (ucp-*)"
-  check_dir "$PROJECT_DIR/.claude/docs"   "Docs (style-guides)" r
-  check_dir "$PROJECT_DIR/.claude/agents" "Agents"
-  check_dir "$PROJECT_DIR/.claude/hooks"  "Hooks"
+  echo "  Target: $TARGET_LABEL ($TARGET_ID)"
+  check_dir "$TARGET_SKILLS_DIR" "Skills (ucp-*)"
+  check_dir "$PROJECT_DIR/.claude/docs" "Docs (style-guides)" r
+  if [ "$TARGET_AGENT_FORMAT" = markdown ]; then
+    check_dir "$TARGET_AGENTS_DIR" "Agents"
+  elif [ "$TARGET_AGENT_FORMAT" = codex-toml ]; then
+    for agent in "$SKILLS_DIR"/.claude/agents/*.md; do
+      [ -e "$agent" ] || continue
+      generated="$TARGET_AGENTS_DIR/$(basename "${agent%.md}").toml"
+      if [ -s "$generated" ] && grep -qF "Managed by usecase-pattern-skills" "$generated"; then
+        echo "  ✓ Codex agent: $(basename "$generated")"
+      else
+        echo "  ✗ Codex agent отсутствует: $generated"
+        PROBLEMS=$((PROBLEMS + 1))
+      fi
+    done
+  fi
+  [ "$TARGET_HOOKS" = true ] && check_dir "$PROJECT_DIR/.claude/hooks" "Hooks"
 
-  # .claude/rules — always-loaded ядро языка; проверяем, только если в репо есть
-  # <lang>-core.md для выбранного языка (иначе пустая rules/ — не проблема).
   expected_cores=0
   while IFS= read -r core; do
     case "/${core#"$SKILLS_DIR"/.claude/docs/}" in */"$UCP_LANG"/*) expected_cores=$((expected_cores + 1)) ;; esac
   done < <(find "$SKILLS_DIR/.claude/docs" -name '*-core.md' 2>/dev/null)
-  if [ "$expected_cores" -gt 0 ]; then
-    check_dir "$PROJECT_DIR/.claude/rules" "Rules (always-loaded ядро)"
+  if [ "$expected_cores" -gt 0 ] && [ -n "$TARGET_RULES_DIR" ]; then
+    check_dir "$TARGET_RULES_DIR" "Rules (always-loaded ядро)"
   fi
 
-  # CLAUDE.md managed block
-  if [ -f "$PROJECT_DIR/CLAUDE.md" ] && grep -qF "<!-- BEGIN ucp-skills" "$PROJECT_DIR/CLAUDE.md"; then
-    echo "  ✓ CLAUDE.md: managed-блок ucp-skills присутствует"
-  else
-    echo "  ✗ CLAUDE.md: managed-блок ucp-skills отсутствует"
+  if [ -n "$TARGET_INSTRUCTION_FILE" ]; then
+    if [ -f "$TARGET_INSTRUCTION_FILE" ] && grep -qF "<!-- BEGIN ucp-skills" "$TARGET_INSTRUCTION_FILE"; then
+      echo "  ✓ $TARGET_INSTRUCTION_FILE: managed-блок ucp-skills присутствует"
+    else
+      echo "  ✗ $TARGET_INSTRUCTION_FILE: managed-блок ucp-skills отсутствует"
+      PROBLEMS=$((PROBLEMS + 1))
+    fi
+  fi
+  if [ -n "$TARGET_MANIFEST" ] && [ ! -s "$TARGET_MANIFEST" ]; then
+    echo "  ✗ Manifest отсутствует: $TARGET_MANIFEST"
     PROBLEMS=$((PROBLEMS + 1))
   fi
 
@@ -459,8 +542,10 @@ if [ "$CHECK_MODE" = true ]; then
     PROBLEMS=$((PROBLEMS + 1))
   fi
 
-  # .claude/settings.json hooks
-  if [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
+  # Claude settings.json hooks; у остальных целей hooks не считаются установленными.
+  if [ "$TARGET_HOOKS" != true ]; then
+    echo "  — Hooks: не поддерживаются адаптером $TARGET_LABEL"
+  elif [ -f "$PROJECT_DIR/.claude/settings.json" ]; then
     if command -v python3 >/dev/null 2>&1; then
       hooks_status="$(PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
 import json, os, sys
@@ -474,17 +559,17 @@ except Exception as e:
     sys.exit(0)
 
 expected = [
-    ("UserPromptSubmit", ".claude/hooks/ucp-trigger-detect.sh"),
-    ("UserPromptSubmit", ".claude/hooks/impl-task-detect.sh"),
-    ("SessionStart",     ".claude/hooks/ucp-session-check.sh"),
-    ("PostToolUse",      ".claude/hooks/ucp-post-skill-review.sh"),
+    ("UserPromptSubmit", "ucp-trigger-detect.sh"),
+    ("UserPromptSubmit", "impl-task-detect.sh"),
+    ("SessionStart",     "ucp-session-check.sh"),
+    ("PostToolUse",      "ucp-post-skill-review.sh"),
 ]
 hooks = data.get("hooks", {})
 missing = []
 for event, cmd in expected:
     groups = hooks.get(event, [])
     found = any(
-        any(h.get("command") == cmd for h in group.get("hooks", []))
+        any(h.get("command", "").endswith(cmd) for h in group.get("hooks", []))
         for group in groups
     )
     if not found:
@@ -527,14 +612,77 @@ PY
   fi
 fi
 
-mkdir -p "$PROJECT_DIR/.claude/skills" "$PROJECT_DIR/.claude/docs" "$PROJECT_DIR/.claude/rules" "$PROJECT_DIR/.claude/agents" "$PROJECT_DIR/.claude/hooks"
+TARGET_STATE="$PROJECT_DIR/.claude/ucp-install-target"
+PREVIOUS_TARGET=""
+if [ -f "$TARGET_STATE" ]; then PREVIOUS_TARGET="$(cat "$TARGET_STATE")"; fi
+if [ -n "$PREVIOUS_TARGET" ] && [ "$PREVIOUS_TARGET" != "$TARGET_ID" ]; then
+  echo "==> Чищу managed-файлы предыдущего target: $PREVIOUS_TARGET"
+  (
+    eval "$(python3 "$SKILLS_DIR/tools/agent_targets.py" target "$PREVIOUS_TARGET" --project "$PROJECT_DIR" --home "$TARGET_HOME")"
+    for old in "$TARGET_SKILLS_DIR"/ucp-*; do
+      [ -L "$old" ] || continue
+      case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/*) rm "$old" ;; esac
+    done
+    for dir in "$TARGET_AGENTS_DIR" "$TARGET_RULES_DIR"; do
+      [ -n "$dir" ] || continue
+      for old in "$dir"/ucp-*; do
+        [ -L "$old" ] || continue
+        case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/*) rm "$old" ;; esac
+      done
+    done
+    if [ "$TARGET_AGENT_FORMAT" = codex-toml ]; then
+      for old in "$TARGET_AGENTS_DIR"/ucp-*.toml; do
+        [ -f "$old" ] || continue
+        grep -qF "Managed by usecase-pattern-skills" "$old" && rm "$old"
+      done
+    fi
+    if [ "$TARGET_HOOKS" = true ]; then
+      for old in "$PROJECT_DIR"/.claude/hooks/*.sh; do
+        [ -L "$old" ] || continue
+        case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/hooks/*) rm "$old" ;; esac
+      done
+    fi
+  )
+  if [ "$PREVIOUS_TARGET" = claude ]; then
+    PROJECT_DIR="$PROJECT_DIR" python3 - <<'PY'
+import json, os
+from pathlib import Path
+
+path = Path(os.environ["PROJECT_DIR"]) / ".claude" / "settings.json"
+if path.exists():
+    data = json.loads(path.read_text())
+    for event, groups in list(data.get("hooks", {}).items()):
+        kept = []
+        for group in groups:
+            hooks = [h for h in group.get("hooks", []) if not any(
+                name in h.get("command", "") for name in (
+                    "ucp-trigger-detect.sh", "impl-task-detect.sh",
+                    "ucp-session-check.sh", "ucp-post-skill-review.sh",
+                )
+            )]
+            if hooks:
+                kept.append({**group, "hooks": hooks})
+        if kept:
+            data["hooks"][event] = kept
+        else:
+            del data["hooks"][event]
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+PY
+  fi
+fi
+
+mkdir -p "$TARGET_SKILLS_DIR" "$PROJECT_DIR/.claude/docs"
+[ -n "$TARGET_AGENTS_DIR" ] && mkdir -p "$TARGET_AGENTS_DIR"
+[ -n "$TARGET_RULES_DIR" ] && mkdir -p "$TARGET_RULES_DIR"
+[ "$TARGET_HOOKS" = true ] && mkdir -p "$PROJECT_DIR/.claude/hooks"
+[ -n "$TARGET_MANIFEST" ] && mkdir -p "$(dirname "$TARGET_MANIFEST")"
 
 # Skills — симлинк ucp-* скиллов по выбранному профилю (по умолчанию — все).
 # Сначала чистим существующие ucp-* симлинки, указывающие в этот репо, — иначе
 # при смене профиля (full -> rest) останутся stale-симлинки на лишние скиллы.
 echo "==> Подключаю скиллы из $SKILLS_DIR/.claude/skills/ (трек: $UCP_TRACK, язык: $UCP_LANG, профиль: $SKILL_PROFILE_LABEL)"
 print_slice
-for old in "$PROJECT_DIR"/.claude/skills/ucp-*; do
+for old in "$TARGET_SKILLS_DIR"/ucp-*; do
   [ -L "$old" ] || continue
   case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/skills/*) rm "$old" ;; esac
 done
@@ -555,7 +703,7 @@ for glob in "${_glob_patterns[@]}"; do
     if [ "$_strack" != "any" ]; then
       case ",$UCP_TRACK," in *",$_strack,"*) ;; *) continue ;; esac
     fi
-    ln -sfn "$skill" "$PROJECT_DIR/.claude/skills/$name"
+    ln -sfn "$skill" "$TARGET_SKILLS_DIR/$name"
     SKILL_COUNT=$((SKILL_COUNT + 1))
     echo "    ✓ $name"
   done
@@ -564,39 +712,51 @@ if [ "$SKILL_COUNT" -eq 0 ]; then
   echo "ERROR: ни один скилл не подошёл под '$SKILL_GLOBS'" >&2
   exit 1
 fi
-
-# Agents — кастомные субагенты Claude Code (например ucp-implementer:
-# Sonnet-исполнитель, который пишет код по плану от Opus).
-echo
-echo "==> Подключаю агентов из $SKILLS_DIR/.claude/agents/"
-AGENT_COUNT=0
-for agent in "$SKILLS_DIR"/.claude/agents/*.md; do
-  [ -e "$agent" ] || continue
-  name="$(basename "$agent")"
-  ln -sfn "$agent" "$PROJECT_DIR/.claude/agents/$name"
-  AGENT_COUNT=$((AGENT_COUNT + 1))
-  echo "    ✓ $name"
-done
-if [ "$AGENT_COUNT" -eq 0 ]; then
-  echo "    (агентов в репо пока нет)"
+if [ -n "$TARGET_MANIFEST" ]; then
+  cat > "$TARGET_MANIFEST" <<'JSON'
+{
+  "name": "ucp",
+  "description": "Use Case Pattern Agent Skills",
+  "skills": "skills/"
+}
+JSON
 fi
 
-# Hooks — детерминированные обработчики событий, которые Claude Code запускает
-# на стороне harness (не модель). Закрывают зазоры, где модель может проигнори-
-# ровать инструкцию из CLAUDE.md: триггер-детект цепочки UCP, проверка установки
-# на старте сессии, обязательное ревью DDL/миграций.
 echo
-echo "==> Подключаю хуки из $SKILLS_DIR/.claude/hooks/"
+AGENT_COUNT=0
+if [ -n "$TARGET_AGENTS_DIR" ]; then
+  echo "==> Подключаю агентов ($TARGET_AGENT_FORMAT) в $TARGET_AGENTS_DIR"
+  for agent in "$SKILLS_DIR"/.claude/agents/*.md; do
+    [ -e "$agent" ] || continue
+    name="$(basename "$agent")"
+    if [ "$TARGET_AGENT_FORMAT" = codex-toml ]; then
+      generated="$TARGET_AGENTS_DIR/${name%.md}.toml"
+      python3 "$SKILLS_DIR/tools/agent_targets.py" emit-codex-agent "$agent" "$generated"
+      echo "    ✓ $(basename "$generated")"
+    else
+      ln -sfn "$agent" "$TARGET_AGENTS_DIR/$name"
+      echo "    ✓ $name"
+    fi
+    AGENT_COUNT=$((AGENT_COUNT + 1))
+  done
+else
+  echo "==> Custom agents: не поддерживаются адаптером $TARGET_LABEL"
+fi
+
+# Hooks устанавливает только Claude-адаптер; остальные не получают ложного parity.
+echo
 HOOK_COUNT=0
-for hook in "$SKILLS_DIR"/.claude/hooks/*.sh; do
-  [ -e "$hook" ] || continue
-  name="$(basename "$hook")"
-  ln -sfn "$hook" "$PROJECT_DIR/.claude/hooks/$name"
-  HOOK_COUNT=$((HOOK_COUNT + 1))
-  echo "    ✓ $name"
-done
-if [ "$HOOK_COUNT" -eq 0 ]; then
-  echo "    (хуков в репо пока нет)"
+if [ "$TARGET_HOOKS" = true ]; then
+  echo "==> Подключаю хуки из $SKILLS_DIR/.claude/hooks/"
+  for hook in "$SKILLS_DIR"/.claude/hooks/*.sh; do
+    [ -e "$hook" ] || continue
+    name="$(basename "$hook")"
+    ln -sfn "$hook" "$PROJECT_DIR/.claude/hooks/$name"
+    HOOK_COUNT=$((HOOK_COUNT + 1))
+    echo "    ✓ $name"
+  done
+else
+  echo "==> Hooks: не поддерживаются адаптером $TARGET_LABEL"
 fi
 
 # Регистрация хуков в .claude/settings.json — managed через Python: читаем
@@ -619,13 +779,26 @@ settings = project / ".claude" / "settings.json"
 data = json.loads(settings.read_text()) if settings.exists() else {}
 data.setdefault("hooks", {})
 
+# Путь к хуку — от корня проекта, а не относительный. Относительный
+# разрешается от рабочей директории сессии, а она уезжает, как только в работе
+# трогают вложенный проект (фронтенд, модуль): хук начинает падать с «No such
+# file or directory», и подсказки молча перестают работать.
+ROOT = "$CLAUDE_PROJECT_DIR"
+
 managed = [
-    ("UserPromptSubmit", ".claude/hooks/ucp-trigger-detect.sh", None),
-    ("UserPromptSubmit", ".claude/hooks/impl-task-detect.sh", None),
-    ("SessionStart",     ".claude/hooks/ucp-session-check.sh", None),
-    ("PostToolUse",      ".claude/hooks/ucp-post-skill-review.sh", "Skill"),
+    ("UserPromptSubmit", f'"{ROOT}"/.claude/hooks/ucp-trigger-detect.sh', None),
+    ("UserPromptSubmit", f'"{ROOT}"/.claude/hooks/impl-task-detect.sh', None),
+    ("SessionStart",     f'"{ROOT}"/.claude/hooks/ucp-session-check.sh', None),
+    ("PostToolUse",      f'"{ROOT}"/.claude/hooks/ucp-post-skill-review.sh', "Skill"),
 ]
-managed_paths = {p for _, p, _ in managed}
+# Старую запись с относительным путём тоже считаем своей — иначе при обновлении
+# рядом с новой останется сломанная.
+managed_paths = {p for _, p, _ in managed} | {
+    ".claude/hooks/ucp-trigger-detect.sh",
+    ".claude/hooks/impl-task-detect.sh",
+    ".claude/hooks/ucp-session-check.sh",
+    ".claude/hooks/ucp-post-skill-review.sh",
+}
 
 # Идемпотентность: вычищаем старые managed-entries по командному пути,
 # потом добавляем актуальные. Пользовательские хуки не трогаем.
@@ -708,61 +881,43 @@ done < <(find "$SKILLS_DIR/.claude/docs" -name '*.md' | sort)
 # Прунинг папок, опустевших после смены языка/профиля (напр. backend/error-handling/python/).
 find "$PROJECT_DIR/.claude/docs" -mindepth 1 -type d -empty -delete 2>/dev/null || true
 
-# Rules — always-loaded ядро языка. Claude Code грузит `.claude/rules/*.md` при
-# старте каждой сессии с приоритетом CLAUDE.md, поэтому базовые решения
-# методологии (раскладка, чистота core, команды/запросы, фабрики, исключения,
-# время) попадают в контекст без вызова скилла. Источник — файл
-# `.claude/docs/<track>/<lang>/<lang>-core.md` этого репо; в проект идёт симлинк
-# `.claude/rules/ucp-<lang>-core.md`. Без frontmatter `paths:` — грузится всегда.
+# Always-loaded rules есть не у всех harness; путь задаёт target-адаптер.
 echo
-echo "==> Подключаю always-loaded ядро в $PROJECT_DIR/.claude/rules/"
-for old in "$PROJECT_DIR"/.claude/rules/ucp-*; do
-  [ -L "$old" ] || continue
-  case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/docs/*) rm "$old" ;; esac
-done
 RULE_COUNT=0
-while IFS= read -r core; do
-  rel="${core#"$SKILLS_DIR"/.claude/docs/}"
-  case "/$rel" in
-    */java/*)   [ "$UCP_LANG" = java ]   || continue ;;
-    */python/*) [ "$UCP_LANG" = python ] || continue ;;
-    */node/*)   [ "$UCP_LANG" = node ]   || continue ;;
-    */go/*)     [ "$UCP_LANG" = go ]     || continue ;;
-  esac
-  name="ucp-$(basename "$core")"
-  ln -sfn "$core" "$PROJECT_DIR/.claude/rules/$name"
-  RULE_COUNT=$((RULE_COUNT + 1))
-  echo "    ✓ $name → $rel"
-done < <(find "$SKILLS_DIR/.claude/docs" -name '*-core.md' | sort)
-if [ "$RULE_COUNT" -eq 0 ]; then
-  echo "    (ядра для языка $UCP_LANG в репо пока нет)"
+if [ -n "$TARGET_RULES_DIR" ]; then
+  echo "==> Подключаю always-loaded ядро в $TARGET_RULES_DIR"
+  for old in "$TARGET_RULES_DIR"/ucp-*; do
+    [ -L "$old" ] || continue
+    case "$(readlink "$old")" in "$SKILLS_DIR"/.claude/docs/*) rm "$old" ;; esac
+  done
+  while IFS= read -r core; do
+    rel="${core#"$SKILLS_DIR"/.claude/docs/}"
+    case "/$rel" in
+      */java/*)   [ "$UCP_LANG" = java ]   || continue ;;
+      */python/*) [ "$UCP_LANG" = python ] || continue ;;
+      */node/*)   [ "$UCP_LANG" = node ]   || continue ;;
+      */go/*)     [ "$UCP_LANG" = go ]     || continue ;;
+    esac
+    name="ucp-$(basename "$core")"
+    ln -sfn "$core" "$TARGET_RULES_DIR/$name"
+    RULE_COUNT=$((RULE_COUNT + 1))
+    echo "    ✓ $name → $rel"
+  done < <(find "$SKILLS_DIR/.claude/docs" -name '*-core.md' | sort)
+else
+  echo "==> Always-loaded rules: не поддерживаются адаптером $TARGET_LABEL"
 fi
 
-# CLAUDE.md — точка входа для Claude в проекте-потребителе. install.sh
-# управляет блоком между маркерами BEGIN ucp-skills / END ucp-skills:
-# создаёт файл, дописывает блок, либо in-place заменяет существующий блок.
-# Контент вне маркеров сохраняется — это место пользователя.
-echo
-echo "==> Управляю блоком ucp-skills в $PROJECT_DIR/CLAUDE.md"
-
-CLAUDE_MD="$PROJECT_DIR/CLAUDE.md"
-CLAUDE_TEMPLATE="$SKILLS_DIR/templates/claude-block.md"
+# Instruction file задаётся адаптером; содержимое вне marker-блока сохраняется.
 BEGIN_MARKER="<!-- BEGIN ucp-skills (managed by claude-code-java/install.sh) -->"
 END_MARKER="<!-- END ucp-skills -->"
-
-if [ ! -f "$CLAUDE_TEMPLATE" ]; then
-  echo "ERROR: шаблон $CLAUDE_TEMPLATE не найден" >&2
-  exit 1
-fi
-
-CLAUDE_BLOCK_CONTENT="$(cat "$CLAUDE_TEMPLATE")"
 SLICE_SECTION="### Установленный срез
 
-Срез посчитан \`install.sh\` ($(date +%Y-%m-%d)): профиль \`$SKILL_PROFILE_LABEL\`, \`UCP_DESIGN=$UCP_DESIGN\`,
+Агент: \`$TARGET_LABEL\` (\`$TARGET_ID\`, $TARGET_SUPPORT). Срез посчитан \`install.sh\`
+($(date +%Y-%m-%d)): профиль \`$SKILL_PROFILE_LABEL\`, \`UCP_DESIGN=$UCP_DESIGN\`,
 язык \`$UCP_LANG\`, трек \`$UCP_TRACK\`. Спеки всех доменов стоят в \`.claude/docs/\` независимо
 от среза — выключен только упакованный скилл, не правила: для concern'а без скилла
 читай его \`spec.md\` напрямую. Поменять срез: \`UCP_CONCERNS_ON\` / \`UCP_CONCERNS_OFF\`
-и повторный \`install.sh\`."
+и повторный \`install.sh --target $TARGET_ID\`."
 if [ -n "$SLICE_ROWS" ]; then
   SLICE_SECTION="$SLICE_SECTION
 
@@ -774,12 +929,25 @@ case " $SLICE_ON " in *" arch "*)
 
 Архитектурный репозиторий: \`architecture/\` с \`services/_registry.yaml\` — платформенный
 уровень; скиллы \`ucp-arch-*\` работают только из его корня, спеки сервисов туда
-зеркалируются через \`/ucp-arch-sync\`. «Новый сервис» из \`architecture/\` — это
-\`/ucp-arch-design\`, из директории сервиса — \`/ucp-new-service\`." ;;
+зеркалируются скиллом \`ucp-arch-sync\`. «Новый сервис» из \`architecture/\` — это
+\`ucp-arch-design\`, из директории сервиса — \`ucp-new-service\`." ;;
 esac
-CLAUDE_BLOCK_CONTENT="${CLAUDE_BLOCK_CONTENT/$END_MARKER/$SLICE_SECTION
+echo
+if [ -n "$TARGET_INSTRUCTION_FILE" ]; then
+  echo "==> Управляю блоком ucp-skills в $TARGET_INSTRUCTION_FILE"
+  INSTRUCTION_TEMPLATE="$SKILLS_DIR/templates/$TARGET_TEMPLATE"
+  if [ ! -f "$INSTRUCTION_TEMPLATE" ]; then
+    echo "ERROR: шаблон $INSTRUCTION_TEMPLATE не найден" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$TARGET_INSTRUCTION_FILE")"
+  INSTRUCTION_CONTENT="$(cat "$INSTRUCTION_TEMPLATE")"
+  INSTRUCTION_CONTENT="${INSTRUCTION_CONTENT/$END_MARKER/$SLICE_SECTION
 $END_MARKER}"
-manage_block "$CLAUDE_MD" "$BEGIN_MARKER" "$END_MARKER" "$CLAUDE_BLOCK_CONTENT"
+  manage_block "$TARGET_INSTRUCTION_FILE" "$BEGIN_MARKER" "$END_MARKER" "$INSTRUCTION_CONTENT"
+else
+  echo "==> Instruction file: не поддерживается адаптером $TARGET_LABEL"
+fi
 
 # .gitignore — managed-блок. install.sh раскладывает в $PROJECT_DIR/.claude/
 # симлинки на скиллы, агентов и style-guide-снапшоты. В git-репо проекта они
@@ -790,21 +958,36 @@ echo "==> Управляю блоком ucp-skills в $PROJECT_DIR/.gitignore"
 
 GITIGNORE_BEGIN_MARKER="# BEGIN ucp-skills (managed by claude-code-java/install.sh)"
 GITIGNORE_END_MARKER="# END ucp-skills"
-GITIGNORE_BLOCK="$(cat <<'EOF'
-# BEGIN ucp-skills (managed by claude-code-java/install.sh)
-# Папки .claude/docs/, .claude/agents/, .claude/hooks/ принадлежат install.sh
-# целиком — свои файлы туда не клади (.claude/skills/ и .claude/rules/ остаются
-# открытыми для своих скиллов и правил — install.sh трогает там только ucp-*;
-# .claude/settings.json пользовательский, install.sh только управляет в нём
-# блоком hooks через идемпотентный python-мерж).
-.claude/skills/ucp-*
-.claude/rules/ucp-*
+GITIGNORE_BLOCK="$GITIGNORE_BEGIN_MARKER
+# Исключаются только managed-файлы выбранного target; home-based files сюда не входят.
 .claude/docs/
-.claude/agents/
-.claude/hooks/
-# END ucp-skills
-EOF
-)"
+.claude/ucp-install-target"
+if [ "$TARGET_SCOPE" = project ]; then
+  rel="${TARGET_SKILLS_DIR#"$PROJECT_DIR"/}"
+  GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+$rel/ucp-*"
+  if [ -n "$TARGET_AGENTS_DIR" ]; then
+    rel="${TARGET_AGENTS_DIR#"$PROJECT_DIR"/}"
+    if [ "$TARGET_AGENT_FORMAT" = codex-toml ]; then
+      GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+$rel/ucp-*.toml"
+    else
+      GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+$rel/ucp-*"
+    fi
+  fi
+  if [ -n "$TARGET_RULES_DIR" ]; then
+    rel="${TARGET_RULES_DIR#"$PROJECT_DIR"/}"
+    GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+$rel/ucp-*"
+  fi
+fi
+if [ "$TARGET_HOOKS" = true ]; then
+  GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+.claude/hooks/"
+fi
+GITIGNORE_BLOCK="$GITIGNORE_BLOCK
+$GITIGNORE_END_MARKER"
 
 manage_block "$PROJECT_DIR/.gitignore" \
   "$GITIGNORE_BEGIN_MARKER" \
@@ -828,7 +1011,9 @@ elif [ -r "$GITLAB_TOKEN_FILE" ]; then
   GITLAB_TOKEN="$(cat "$GITLAB_TOKEN_FILE")"
 fi
 
-if [ -z "$CLAUDE_BIN" ]; then
+if [ "$TARGET_MCP" != true ]; then
+  echo "    — MCP не настраивается адаптером $TARGET_LABEL"
+elif [ -z "$CLAUDE_BIN" ]; then
   echo "    ⚠ claude CLI не найден — пропускаю регистрацию GitLab MCP"
 elif [ -z "$GITLAB_TOKEN" ]; then
   echo "    ⚠ GitLab token не найден. Положите его в файл (read для пользователя):"
@@ -857,31 +1042,19 @@ else
   fi
 fi
 
+printf '%s\n' "$TARGET_ID" > "$TARGET_STATE"
+
 echo
-echo "✓ Готово. $SKILL_COUNT скиллов, $AGENT_COUNT агентов, $HOOK_COUNT хуков, $DOC_COUNT style-guide-ов и $RULE_COUNT always-loaded ядер подключены к $PROJECT_DIR."
+echo "✓ Готово: $TARGET_LABEL. $SKILL_COUNT скиллов, $AGENT_COUNT агентов, $HOOK_COUNT хуков, $DOC_COUNT style-guide-ов и $RULE_COUNT always-loaded ядер."
 echo
 echo "Проверка:"
-echo "    ls -la $PROJECT_DIR/.claude/skills"
+echo "    $0 --target $TARGET_ID --check $PROJECT_DIR"
+echo "    ls -la $TARGET_SKILLS_DIR"
 echo "    ls -la $PROJECT_DIR/.claude/docs"
-echo "    ls -la $PROJECT_DIR/.claude/rules"
+if [ "$TARGET_ID" = claude ]; then
+  echo
+  echo "Опциональные плагины Claude Code: superpowers (планирование/TDD) и context7"
+  echo "(актуальная документация библиотек). Основные скиллы работают без них."
+fi
 echo
-echo "─────────────────────────────────────────────────────────────────────"
-echo "ОПЦИОНАЛЬНО: плагины Claude Code, которые улучшают ucp-spec-design"
-echo "─────────────────────────────────────────────────────────────────────"
-echo
-echo "  • superpowers — TodoWrite, планирование, TDD."
-echo "    claude plugin marketplace add obra/superpowers-marketplace"
-echo "    claude plugin install superpowers@superpowers-marketplace"
-echo
-echo "  • context7 (MCP) — актуальная документация библиотек"
-echo "    (Spring Boot, jOOQ и т.п.), чтобы не протухала в спеке."
-echo "    claude mcp add context7 -- npx -y @upstash/context7-mcp"
-echo
-echo "Почти все скиллы работают без внешних плагинов. ucp-spec-design без"
-echo "superpowers/context7 тоже работает — просто без TodoWrite-планирования"
-echo "и без проверки актуальности версий библиотек."
-echo
-echo "─────────────────────────────────────────────────────────────────────"
-echo "Дальше: запускайте скиллы из своего проекта — например /ucp-pattern-review"
-echo "из чата Claude Code в $PROJECT_DIR."
-echo "─────────────────────────────────────────────────────────────────────"
+echo "Пример вызова для $TARGET_LABEL: $TARGET_INVOCATION"

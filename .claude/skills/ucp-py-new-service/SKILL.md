@@ -31,49 +31,51 @@ allowed-tools: Read Glob Grep Bash(find*) Skill(ucp-spec-design) Skill(ucp-py-dd
 
 ## Цепочка скиллов
 
+Вызывай скиллы через механизм текущего агента. Если вложенный вызов недоступен, прочитай соответствующий `SKILL.md` и выполни его инструкции в текущей сессии.
+
 ### Шаг 1 — Спека
-`Skill("ucp-spec-design", "<уровень> + <бизнес-описание>")` — спека с глоссарием, use-cases, ролями, ошибками, NFR.
+Вызови `ucp-spec-design`, передай уровень и бизнес-описание — спека с глоссарием, use-cases, ролями, ошибками, NFR.
 Пропусти, если `docs/spec/<service>-spec.md` актуален.
 
 ### Шаг 2 — DDD-слой (только Уровень 3)
-`Skill("ucp-py-ddd-tactical-design")` — агрегаты, VO, события, порты. На Уровнях 1–2 пропусти, сообщи об этом.
+Вызови `ucp-py-ddd-tactical-design` — агрегаты, VO, события, порты. На Уровнях 1–2 пропусти, сообщи об этом.
 
 ### Шаг 3 — Контракты через codegen (contract/DB-first) — ДВА ЧЕКПОИНТА
-- **3a. Схема БД:** `Skill("ucp-py-codegen-design", "DBML из доменной модели спеки")` — сгенерируй `doc/schema.dbml`.
+- **3a. Схема БД:** вызови `ucp-py-codegen-design` с задачей «DBML из доменной модели спеки» — сгенерируй `doc/schema.dbml`.
 - **3b. [CHECKPOINT DBML]** — покажи DBML пользователю, внеси правки, дождись явного подтверждения. **Не продолжай без него.**
 - **3c.** Продолжи codegen: `dbml2sql --postgres` → Liquibase changelog → `sqlacodegen` (ORM-черновик).
-- **3d. API-контракт:** `Skill("ucp-py-codegen-design", "OpenAPI из §API спеки")` — сгенерируй `doc/openapi.yaml`.
+- **3d. API-контракт:** вызови `ucp-py-codegen-design` с задачей «OpenAPI из §API спеки» — сгенерируй `doc/openapi.yaml`.
 - **3e. [CHECKPOINT OpenAPI]** — покажи контракт, внеси правки, дождись подтверждения.
 - **3f.** Продолжи codegen: `datamodel-codegen` → Pydantic v2-схемы (StrEnum, snake+alias, `ApiBaseModel`).
 
 ### Шаг 4 — Persistence
-`Skill("ucp-py-sqlalchemy-design")` — репозиторий (реализует порт), маппер ORM↔domain, UoW поверх ORM-черновика из шага 3c.
+Вызови `ucp-py-sqlalchemy-design` — репозиторий (реализует порт), маппер ORM↔domain, UoW поверх ORM-черновика из шага 3c.
 
 ### Шаг 5 — Bootstrap
-`Skill("ucp-py-bootstrap-design")` — app factory `create_app`, `lifespan`, DI-контейнер, `pydantic-settings`-профили. Пропусти, если рабочий скелет уже есть.
+Вызови `ucp-py-bootstrap-design` — app factory `create_app`, `lifespan`, DI-контейнер, `pydantic-settings`-профили. Пропусти, если рабочий скелет уже есть.
 
 ### Шаг 6 — Обработка ошибок
-`Skill("ucp-py-error-handling-design")` — иерархия `AppError`, exception-handlers, problem+json (RFC 9457).
+Вызови `ucp-py-error-handling-design` — иерархия `AppError`, exception-handlers, problem+json (RFC 9457).
 
 ### Шаг 7 — Наблюдаемость
-`Skill("ucp-py-observability-design")` — structlog (correlation-id), Prometheus-метрики, OTel.
+Вызови `ucp-py-observability-design` — structlog (correlation-id), Prometheus-метрики, OTel.
 
 ### Шаг 8 — Авторизация
-`Skill("ucp-py-auth-design")` — JWT/JWKS, RBAC/ABAC. Пропусти, если в спеке доступ `permitAll`.
+Вызови `ucp-py-auth-design` — JWT/JWKS, RBAC/ABAC. Пропусти, если в спеке доступ `permitAll`.
 
 ### Шаг 9 — UseCase / Handler / Endpoints (по операции)
-- `Skill("ucp-py-pattern-design", "<операция из §Use Cases>")` — UseCase (frozen dataclass) + Handler + Dispatcher.
-- `Skill("ucp-py-api-design", "<эндпоинт операции>")` — роутер + DTO.
+- Вызови `ucp-py-pattern-design` с операцией из §Use Cases — UseCase (frozen dataclass) + Handler + Dispatcher.
+- Вызови `ucp-py-api-design` с эндпоинтом операции — роутер + DTO.
 Вызывай по одной операции; при нескольких — уточни порядок у пользователя.
 
 ### Шаг 10 — Внешние интеграции (если есть)
-`Skill("ucp-py-integration-design")` + `Skill("ucp-py-resilience-design")` — httpx-клиент per-system, retry/CB/timeout. Пропусти, если внешних систем нет.
+Вызови последовательно `ucp-py-integration-design` и `ucp-py-resilience-design` — httpx-клиент per-system, retry/CB/timeout. Пропусти, если внешних систем нет.
 
 ### Шаг 11 — Фоновые задачи (если есть периодика/очереди)
-`Skill("ucp-py-scheduler-design")` — БД-as-queue (SKIP LOCKED) и/или Celery-beat→HTTP-тик. Пропусти, если фоновой обработки нет.
+Вызови `ucp-py-scheduler-design` — БД-as-queue (SKIP LOCKED) и/или Celery-beat→HTTP-тик. Пропусти, если фоновой обработки нет.
 
 ### Шаг 12 — Тесты
-`Skill("ucp-py-test-design")` — pytest + testcontainers, AAA по критериям приёмки спеки.
+Вызови `ucp-py-test-design` — pytest + testcontainers, AAA по критериям приёмки спеки.
 
 ## После каждого шага
 

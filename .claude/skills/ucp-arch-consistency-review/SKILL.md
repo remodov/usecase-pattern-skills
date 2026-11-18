@@ -27,7 +27,7 @@ test -f services/_registry.yaml || { echo "не корень architecture/ — �
 git log -1 --format=%ar services/
 ```
 
-Если последний коммит в `services/` старше 7 дней — **warning** (не failure): корпус может быть устаревшим, рекомендуй `/ucp-arch-sync` перед ревью. Продолжай прогон.
+Если последний коммит в `services/` старше 7 дней — **warning** (не failure): корпус может быть устаревшим, рекомендуй `ucp-arch-sync` перед ревью. Продолжай прогон.
 
 ## Зависимости
 
@@ -45,7 +45,7 @@ git log -1 --format=%ar services/
 2. **Определи scope ревью.**
    - Пользователь указал конкретный сервис (например, `services/order/`) или конкретный BP — фокус на нём, прогон только тех правил, что применимы.
    - Иначе — полный прогон по всем 8 группам (25 правил).
-   - При запуске создай TodoWrite-задачи по чек-листу в конце файла, чтобы прогон был трассируемым.
+   - При запуске создай задачи по чек-листу через доступный task-list tool или отмечай пункты вручную, чтобы прогон был трассируемым.
 
 3. **Прогон по подгруппам.**
 
@@ -157,7 +157,7 @@ git log -1 --format=%ar services/
   ```bash
   test -f contracts/events/_index.md || echo "❌ CONTR-4: реестра событий нет"
   ```
-  Файла нет → **один** finding CONTR-4 на корпус (не N по числу топиков), fix — `/ucp-arch-sync`, он перестраивает реестр из контрактов. Дальнейшие проверки CONTR-4 пропусти.
+  Файла нет → **один** finding CONTR-4 на корпус (не N по числу топиков), fix — `ucp-arch-sync`, он перестраивает реестр из контрактов. Дальнейшие проверки CONTR-4 пропусти.
 
   Шаг 2 — шапка таблицы на месте и в правильном порядке (первые шесть колонок):
   ```bash
@@ -256,7 +256,7 @@ Scope: <полный прогон | services/<name> | docs/business-processes/BP
 
 - R-ARCH-CONTR-4: топик `payment.captured.v1` объявлен в AsyncAPI, но отсутствует в реестре событий
   - Файлы: services/payment/contracts/asyncapi.yaml, contracts/events/_index.md
-  - Fix: прогнать `/ucp-arch-sync` — он перестроит реестр из контрактов; неизвестные ячейки закроются `not-declared`.
+  - Fix: прогнать `ucp-arch-sync` — он перестроит реестр из контрактов; неизвестные ячейки закроются `not-declared`.
 
 - R-ARCH-DOC-1 (⚠️): в docs/06-integration-patterns.md sync-вызовы перечислены прозой, таблицы нет
   - Файл: docs/06-integration-patterns.md:12-40
@@ -266,13 +266,13 @@ Scope: <полный прогон | services/<name> | docs/business-processes/BP
 - Critical (❌): N
 - Warning (⚠️): M
 - Прошло (✅): K
-- Рекомендации: запустить `/ucp-arch-sync` для авто-fix REG-2 / SPEC-* нарушений; вручную через `/ucp-arch-design` для CTX-* и BP-*.
+- Рекомендации: запустить `ucp-arch-sync` для авто-fix REG-2 / SPEC-* нарушений; вручную через `ucp-arch-design` для CTX-* и BP-*.
 ```
 
 **Серьёзность:**
 - **Critical (❌):** REG-1, REG-2, CTX-1, CTX-3, DATA-1, DATA-2, DATA-3, BP-1, BP-2, BP-4, BP-5, CONTR-1, CONTR-2, CONTR-4 — структурные нарушения, ломают consistency корпуса.
 - **Warning (⚠️):** REG-3, CTX-2, UL-1, UL-2, BP-3, BP-6, CONTR-3, SPEC-1, SPEC-2, SPEC-3, DOC-1 — дрейф между источниками, требует приведения в порядок но не блокирует работу.
-- Исключение по CONTR-4: **отсутствие самого файла** `contracts/events/_index.md` в корпусе, который никогда его не вёл, — один ❌ с fix'ом «прогони `/ucp-arch-sync`», а не N findings по числу топиков.
+- Исключение по CONTR-4: **отсутствие самого файла** `contracts/events/_index.md` в корпусе, который никогда его не вёл, — один ❌ с fix'ом «прогони `ucp-arch-sync`», а не N findings по числу топиков.
 
 ## Что не входит
 
@@ -281,7 +281,7 @@ Scope: <полный прогон | services/<name> | docs/business-processes/BP
 - Review спеки конкретного агрегата на качество дизайна — `ucp-spec-review`.
 - Review OpenAPI-контракта на REST-стиль — `ucp-api-review`.
 
-## Чек-лист правил (для TodoWrite при запуске)
+## Чек-лист правил для трассировки прогона
 
 - [ ] R-ARCH-REG-1: owner/tier/subdomain в каждой записи манифеста
 - [ ] R-ARCH-REG-2: соответствие services/ ↔ _registry.yaml
