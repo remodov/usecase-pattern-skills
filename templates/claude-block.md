@@ -2,10 +2,10 @@
 ## Use Case Pattern skills
 
 Проект использует методологию Use Case Pattern: скиллы `ucp-*`, корпус требований
-в `.claude/docs/` и always-loaded ядро языка в `.claude/rules/` подключены через
-`install.sh` из репо claude-code-java (справка — его README). Всё между маркерами
-`BEGIN ucp-skills` / `END ucp-skills` перезаписывается установщиком — своё пишите
-снаружи маркеров.
+в `.claude/docs/` и always-loaded ядро языка в `.claude/rules/` подключены напрямую
+из репозитория или через `install.sh` (справка — README). Всё между маркерами
+`BEGIN ucp-skills` / `END ucp-skills` перезаписывается генератором или установщиком —
+своё пишите снаружи маркеров.
 
 ### Язык общения
 

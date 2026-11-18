@@ -1,0 +1,5 @@
+{
+  "name": "ucp",
+  "description": "Use Case Pattern Agent Skills",
+  "skills": ".claude/skills/"
+}

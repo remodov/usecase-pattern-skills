@@ -1,0 +1,5 @@
+# Managed by usecase-pattern-skills sync_platforms.py
+#:schema https://developers.openai.com/codex/config-schema.json
+
+[features]
+multi_agent = true

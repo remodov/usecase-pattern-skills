@@ -999,12 +999,18 @@ ucp-e2e-review e2e/                           # ревью набора
 
 ## Подключение к проекту
 
-Три способа, от простого к ручному. Все ставят только **нужный срез** (язык × специализация × профиль).
+### Прямо из clone — ECC-style native layout
 
 ```bash
 git clone https://github.com/remodov/usecase-pattern-skills.git ~/projects/claude-code-java
 cd ~/projects/claude-code-java
 ```
+
+В Git хранятся физические `.agents/`, `.kimi-code/`, `.codex/`, `.cursor/`, `.opencode/`, `.gemini/`, `.github/` и остальные native-каталоги. Запустите агента из корня clone: поддерживающий auto-discovery инструмент увидит скиллы без установки. Скиллы не дублируются — native-каталоги содержат symlinks и generated configs на общий канонический набор.
+
+### Выборочная установка в другой проект
+
+Все способы ниже ставят только **нужный срез** (язык × специализация × профиль).
 
 #### A. Из поддерживаемого агента — диалогом
 
@@ -1340,8 +1346,9 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 | `python3 .claude/docs/_meta/spec_sync.py` | перегенерирует сводные таблицы в `_index.md` и `rule-code-registry.md` |
 | `python3 .claude/docs/_meta/check-shared-neutral.py` | ловит framework-специфичные токены в язык-нейтральном тексте |
 | `python3 tools/agent_targets.py validate` | проверяет реестр coding-агентов, native paths и capabilities |
+| `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 119 тестов: тулинг, шаблоны, числа в README, target adapters и реальные fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 127 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,

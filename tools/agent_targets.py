@@ -126,7 +126,7 @@ def toml_multiline(value):
     return '"""\n' + value.replace("\\", "\\\\").replace('"""', '\\"\\"\\"') + '"""'
 
 
-def emit_codex_agent(source, destination):
+def render_codex_agent(source):
     metadata, body = split_frontmatter(source)
     name = metadata.get("name") or Path(source).stem
     description = metadata.get("description")
@@ -134,13 +134,16 @@ def emit_codex_agent(source, destination):
         raise ValueError(f"{source}: некорректное имя агента {name!r}")
     if not description:
         raise ValueError(f"{source}: у Codex-агента обязательно поле description")
-    content = (
+    return (
         f"{CODEX_MARKER}\n"
         f"name = {toml_string(name)}\n"
         f"description = {toml_string(description)}\n"
         f"developer_instructions = {toml_multiline(body)}\n"
     )
-    Path(destination).write_text(content, encoding="utf-8")
+
+
+def emit_codex_agent(source, destination):
+    Path(destination).write_text(render_codex_agent(source), encoding="utf-8")
 
 
 def main():
