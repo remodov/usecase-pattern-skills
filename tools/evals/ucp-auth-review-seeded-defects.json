@@ -1,0 +1,21 @@
+{
+  "skill": "ucp-auth-review",
+  "title": "Review находит ручной JWT filter и незащищённый endpoint агрегата",
+  "initial_files": {
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java": "package com.example.notes.config;\n\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework.web.filter.OncePerRequestFilter;\n\n@Configuration\npublic class SecurityConfig {\n    @Bean\n    OncePerRequestFilter jwtFilter() {\n        return new OncePerRequestFilter() {\n        };\n    }\n}\n",
+    "adapter-in-rest/src/main/java/com/example/notes/controller/NoteController.java": "package com.example.notes.controller;\n\nimport java.util.UUID;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.PathVariable;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\npublic class NoteController {\n    @GetMapping(\"/notes/{id}\")\n    public String getNote(@PathVariable UUID id) {\n        return id.toString();\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java",
+    "adapter-in-rest/src/main/java/com/example/notes/controller/NoteController.java"
+  ],
+  "prompt": "/skill:ucp-auth-review Проверь только SecurityConfig.java и NoteController.java в этом fixture. Ничего не изменяй, сборку не запускай. Найди нарушения auth-patterns/* с requirement IDs, severity и file:line.",
+  "output_patterns": [
+    "auth-patterns/token-validated-by-library",
+    "auth-patterns/every-endpoint-has-role-check",
+    "auth-patterns/ownership-checked-in-domain",
+    "(?i)(критич|critical)",
+    "SecurityConfig\\.java:\\d+",
+    "NoteController\\.java:\\d+"
+  ]
+}

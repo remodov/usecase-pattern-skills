@@ -1,0 +1,19 @@
+{
+  "skill": "ucp-auth-review",
+  "title": "Канонический JWT Resource Server не получает критических находок",
+  "initial_files": {
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java": "package com.example.notes.config;\n\nimport org.springframework.context.annotation.Bean;\nimport org.springframework.context.annotation.Configuration;\nimport org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;\nimport org.springframework.security.config.annotation.web.builders.HttpSecurity;\nimport org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;\nimport org.springframework.security.config.http.SessionCreationPolicy;\nimport org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;\nimport org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;\nimport org.springframework.security.web.SecurityFilterChain;\n\n@Configuration\n@EnableMethodSecurity\npublic class SecurityConfig {\n    @Bean\n    SecurityFilterChain filterChain(HttpSecurity http) throws Exception {\n        http\n            .csrf(AbstractHttpConfigurer::disable)\n            .authorizeHttpRequests(auth -> auth\n                .requestMatchers(\"/actuator/health\", \"/actuator/prometheus\").hasRole(\"system\")\n                .anyRequest().hasAnyRole(\"customer\", \"seller\", \"admin\", \"system\"))\n            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))\n            .oauth2ResourceServer(oauth -> oauth.jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())));\n        return http.build();\n    }\n\n    private JwtAuthenticationConverter jwtAuthenticationConverter() {\n        var authorities = new JwtGrantedAuthoritiesConverter();\n        authorities.setAuthorityPrefix(\"ROLE_\");\n        authorities.setAuthoritiesClaimName(\"realm_access.roles\");\n        var converter = new JwtAuthenticationConverter();\n        converter.setJwtGrantedAuthoritiesConverter(authorities);\n        return converter;\n    }\n}\n",
+    "bootstrap/src/main/resources/application.yml": "spring:\n  security:\n    oauth2:\n      resourceserver:\n        jwt:\n          jwk-set-uri: ${JWK_SET_URI}\n"
+  },
+  "unchanged_files": [
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java",
+    "bootstrap/src/main/resources/application.yml"
+  ],
+  "prompt": "/skill:ucp-auth-review Проверь только bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java и bootstrap/src/main/resources/application.yml. Это Domain Service за Gateway; Gateway уже проверяет issuer, audience и rate limit. Публичных business-endpoint в заданном scope нет. Ничего не изменяй, сборку не запускай. Назови применённые auth-patterns requirement IDs и вынеси вердикт. В резюме явно укажи число критических находок.",
+  "output_patterns": [
+    "auth-patterns/token-validated-by-library",
+    "auth-patterns/roles-from-token-claims",
+    "(?i)(критично\\s*[—:-]?\\s*0|критичных\\s*[—:-]?\\s*0)",
+    "(?i)(соответств|approved|вердикт)"
+  ]
+}
