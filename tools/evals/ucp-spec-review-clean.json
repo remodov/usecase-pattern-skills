@@ -1,0 +1,18 @@
+{
+  "skill": "ucp-spec-review",
+  "title": "Fast review согласованной Level 2 спеки не даёт критических находок",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Use Case спецификация: notes\n\n## О сервисе\n\nКонтекст notes позволяет клиенту создавать личные заметки.\n\n## 4. Роли и доступ\n\nРоль customer создаёт собственные заметки.\n\n| Роль | Назначение |\n| --- | --- |\n| customer | Создаёт личные заметки |\n\n## 6. Use Cases\n\n### UC-1 Customer создаёт заметку\n\n- **Актор**: customer\n- **Домен-юниты**: Note\n- **Основной поток**: Customer передаёт непустой text и получает id.\n",
+    "docs/spec/aggregates/note.md": "---\ncontext: notes\naggregate: Note\nlevel: 2\n---\n# Note\n\n## О юните\n\nNote содержит текст личной заметки клиента.\n\n## 5. Команды\n\nCreateNote создаёт личную заметку и возвращает её идентификатор.\n\n### CreateNote\n\n- **Переход**: Отсутствует → Создана.\n- **Вход**: text.\n- **Результат**: id созданной заметки.\n- **Предусловия**: text непустой.\n- **Логика**: Создаёт заметку для текущего customer.\n- **Эмитит**: нет.\n- **Ошибки**: NOTE_TEXT_EMPTY.\n"
+  },
+  "unchanged_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md"
+  ],
+  "prompt": "/skill:ucp-spec-review fast Проверь docs/spec/notes-spec.md и docs/spec/aggregates/note.md. Это сокращённый fixture: применяй только кандидаты на Критично из fast-режима, не вынос findings за отсутствие разделов вне fast. Ничего не изменяй, сборку не запускай. Укажи уровень, раскладку, число критических находок и вердикт.",
+  "output_patterns": [
+    "(?i)Уровень[^\\n]*2",
+    "(?i)Критично\\s*(?:[—:-]|:)?\\s*0",
+    "(?i)(готова к кодогенерации|Вердикт[^\\n]*готова)"
+  ]
+}

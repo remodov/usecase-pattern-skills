@@ -1,0 +1,20 @@
+{
+  "skill": "ucp-spec-review",
+  "title": "Fast review находит неизвестного актора и денежную команду без идемпотентности",
+  "initial_files": {
+    "docs/spec/orders-spec.md": "---\ncontext: orders\nbounded-context: Orders\nlevel: 2\n---\n# Use Case спецификация: orders\n\n## 4. Роли и доступ\n\nВ контексте разрешена только роль customer.\n\n| Роль | Назначение |\n| --- | --- |\n| customer | Оформляет собственные заказы |\n\n## 6. Use Cases\n\n### UC-1 Finance возвращает деньги\n\n- **Актор**: finance\n- **Домен-юниты**: Order\n- **Основной поток**: Finance возвращает стоимость заказа через RefundOrder.\n",
+    "docs/spec/aggregates/order.md": "---\ncontext: orders\naggregate: Order\nlevel: 2\n---\n# Order\n\n## 5. Команды\n\nRefundOrder — денежная команда возврата стоимости заказа.\n\n### RefundOrder\n\n- **Переход**: Оплачен → Возвращён.\n- **Вход**: orderId, amount.\n- **Результат**: пустой результат.\n- **Предусловия**: Заказ оплачен.\n- **Логика**: Возвращает amount денег за заказ.\n- **Эмитит**: нет.\n- **Ошибки**: ORDER_NOT_PAID.\n"
+  },
+  "unchanged_files": [
+    "docs/spec/orders-spec.md",
+    "docs/spec/aggregates/order.md"
+  ],
+  "prompt": "/skill:ucp-spec-review fast Проверь docs/spec/orders-spec.md и docs/spec/aggregates/order.md. RefundOrder является денежной командой. Применяй fast-режим, ничего не изменяй и не запускай сборку. Найди критические нарушения с SR-кодами, файлом и разделом.",
+  "output_patterns": [
+    "SR-AR-1",
+    "SR-CM-4",
+    "(?i)Критично",
+    "orders-spec\\.md",
+    "order\\.md"
+  ]
+}
