@@ -1,0 +1,43 @@
+{
+  "skill": "ucp-bootstrap-design",
+  "title": "Bootstrap создаёт три профиля без дублирования production-дефолтов",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n"
+  },
+  "unchanged_files": [
+    "build.gradle"
+  ],
+  "prompt": "/skill:ucp-bootstrap-design Создай только конфигурацию профилей Spring Boot в bootstrap/src/main/resources: application.yml с production-дефолтами, application-local.yml и application-integration-test.yml. В базе задай spring.application.name=notes, server.port=8080 и Kafka bootstrap-servers через ENV. В local укажи PostgreSQL jdbc:postgresql://localhost:5432/notes и отключи auto-startup Kafka listeners. В integration-test отключи auto-startup Kafka listeners и задай cron-расписание notes.jobs.cron, которое никогда не срабатывает. Profile-файлы должны содержать только overrides, не дублируй application.name, server.port или bootstrap-servers. Не создавай другие профили, Java, README, AGENTS.md и тесты. Это статический fixture без repositories: не запускай сборку и не меняй build.gradle.",
+  "required_files": [
+    "bootstrap/src/main/resources/application.yml",
+    "bootstrap/src/main/resources/application-local.yml",
+    "bootstrap/src/main/resources/application-integration-test.yml"
+  ],
+  "forbidden_globs": [
+    "**/application-dev.yml",
+    "**/application-prod.yml",
+    "**/*Test.java"
+  ],
+  "file_patterns": {
+    "bootstrap/src/main/resources/application.yml": [
+      "application:\\s*\\n\\s+name:\\s*notes",
+      "server:\\s*\\n\\s+port:\\s*8080",
+      "bootstrap-servers:\\s*\\$\\{KAFKA_BOOTSTRAP_SERVERS(?::[^}]*)?\\}"
+    ],
+    "bootstrap/src/main/resources/application-local.yml": [
+      "jdbc:postgresql://localhost:5432/notes",
+      "kafka:\\s*\\n\\s+listener:\\s*\\n\\s+auto-startup:\\s*false"
+    ],
+    "bootstrap/src/main/resources/application-integration-test.yml": [
+      "kafka:\\s*\\n\\s+listener:\\s*\\n\\s+auto-startup:\\s*false",
+      "notes:\\s*\\n(?:\\s+.*\\n)*?\\s+jobs:\\s*\\n\\s+cron:\\s*[\"']?[^\\n\"']+"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "bootstrap/src/main/resources/application-*.yml": [
+      "application:\\s*\\n\\s+name:",
+      "server:\\s*\\n\\s+port:",
+      "bootstrap-servers:"
+    ]
+  }
+}

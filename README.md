@@ -1375,7 +1375,7 @@ python3 tools/skill_harness.py \
 | `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
 | `python3 tools/skill_harness.py --scenario <scenario> --agent <agent>` | поведенческий baseline/кандидат одного скилла в изолированном проекте |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 146 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning, harness и fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 147 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning, harness и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,

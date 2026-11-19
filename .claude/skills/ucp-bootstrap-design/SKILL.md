@@ -1,7 +1,7 @@
 ---
 name: ucp-bootstrap-design
 description: Спроектировать или починить bootstrap Spring Boot UCP-сервиса — профили local/integration-test/production, бины clock/UUID, SecurityConfig per profile, Liquibase, jOOQ codegen, гейтинг Kafka-листенеров, Jackson event-payload.
-when_to_use: Новый сервис без bootstrap, либо bootRun падает: UnsatisfiedDependencyException, fetch JWK-set, пустые outbox-payload, JdbcTemplate/JPA вместо jOOQ.
+when_to_use: "Новый сервис без bootstrap, либо bootRun падает: UnsatisfiedDependencyException, fetch JWK-set, пустые outbox-payload, JdbcTemplate/JPA вместо jOOQ."
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(docker compose*) Bash(curl*)
 ---
 

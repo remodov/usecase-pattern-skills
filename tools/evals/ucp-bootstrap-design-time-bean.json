@@ -1,0 +1,39 @@
+{
+  "skill": "ucp-bootstrap-design",
+  "title": "Bootstrap регистрирует production DateTimeService с подменой в тестах",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n",
+    "bootstrap/build.gradle": "plugins { id 'java' }\n",
+    "core/src/main/java/com/example/notes/core/service/DateTimeService.java": "package com.example.notes.core.service;\n\nimport java.time.Instant;\n\npublic interface DateTimeService {\n    Instant now();\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "bootstrap/build.gradle",
+    "core/src/main/java/com/example/notes/core/service/DateTimeService.java"
+  ],
+  "prompt": "/skill:ucp-bootstrap-design В core/service есть интерфейс DateTimeService.now(): Instant, но нет production-бина. Создай только bootstrap/src/main/java/com/example/notes/bootstrap/config/ServiceBeansConfig.java: системный Clock и DateTimeService должны быть @Bean и @ConditionalOnMissingBean, текущее Instant должно усекаться до ChronoUnit.MICROS. Не создавай другие классы, тесты, YAML, README или AGENTS.md. Это статический fixture без repositories: не запускай сборку и не меняй существующие файлы.",
+  "required_globs": [
+    "bootstrap/src/main/java/**/config/ServiceBeansConfig.java"
+  ],
+  "forbidden_globs": [
+    "**/*Test.java",
+    "**/application*.yml"
+  ],
+  "file_patterns": {
+    "bootstrap/src/main/java/**/config/ServiceBeansConfig.java": [
+      "@Configuration",
+      "class\\s+ServiceBeansConfig",
+      "@Bean",
+      "@ConditionalOnMissingBean",
+      "Clock\\s+\\w+\\s*\\(",
+      "Clock\\.systemUTC\\s*\\(",
+      "DateTimeService\\s+dateTimeService\\s*\\(\\s*Clock\\s+clock\\s*\\)",
+      "Instant\\.now\\s*\\(\\s*clock\\s*\\)\\s*\\.truncatedTo\\s*\\(\\s*ChronoUnit\\.MICROS\\s*\\)"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "bootstrap/src/main/java/**/config/ServiceBeansConfig.java": [
+      "Instant\\.now\\s*\\(\\s*\\)"
+    ]
+  }
+}
