@@ -1215,6 +1215,20 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 и без проверки актуальности версий библиотек. Остальные 11 скиллов их
 не требуют вообще.
 
+## Поведенческая оптимизация по одному скиллу
+
+`tools/skill_harness.py` прогоняет один сценарий в изолированном временном проекте и проверяет файлы, globs и вывод. Изменение скилла разрешается только по результату baseline и повторного сравнения; канонический корпус не настраивается под единственный красивый ответ.
+
+```bash
+python3 tools/skill_harness.py \
+  --scenario tools/evals/ucp-new-service-missing-input.json --agent kimi
+
+python3 tools/skill_harness.py \
+  --scenario tools/evals/ucp-new-service-first-step.json --agent kimi --timeout 600
+```
+
+Сценарий задаёт `initial_files`, `required_files`/`forbidden_files`, `required_globs`/`forbidden_globs` и `output_patterns`. `--dry-run` проверяет сценарий без вызова модели, `--keep` сохраняет временный проект для разбора. Поддерживаются CLI-адаптеры Kimi, OpenCode, Codex и Claude; доступность API и лимиты проверяются отдельно от качества скилла.
+
 ## Структура
 
 ```
@@ -1359,8 +1373,9 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 | `python3 .claude/docs/_meta/check-shared-neutral.py` | ловит framework-специфичные токены в язык-нейтральном тексте |
 | `python3 tools/agent_targets.py validate` | проверяет реестр coding-агентов, native paths и capabilities |
 | `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
+| `python3 tools/skill_harness.py --scenario <scenario> --agent <agent>` | поведенческий baseline/кандидат одного скилла в изолированном проекте |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 137 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning и fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 143 теста: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning, harness и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,
