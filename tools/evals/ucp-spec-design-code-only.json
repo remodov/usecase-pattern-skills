@@ -1,0 +1,18 @@
+{
+  "skill": "ucp-spec-design",
+  "title": "Code-only вход не превращается в выдуманную бизнес-спеку",
+  "initial_files": {
+    "src/main/java/com/example/notes/Note.java": "package com.example.notes;\n\npublic record Note(String text) {}\n"
+  },
+  "unchanged_files": [
+    "src/main/java/com/example/notes/Note.java"
+  ],
+  "prompt": "/skill:ucp-spec-design В репозитории есть только исходный код, бизнес-бриф отсутствует. Нужна спецификация сервиса. Не создавай и не изменяй файлы, не запускай сборку.",
+  "forbidden_globs": [
+    "docs/spec/**/*.md"
+  ],
+  "output_patterns": [
+    "ucp-spec-tier-0",
+    "(?i)(бизнес-(?:бриф|описан)|бизнес-бриф)"
+  ]
+}
