@@ -111,6 +111,20 @@ class SkillHarnessTest(unittest.TestCase):
             source.write_text("class CreateNoteCommand {}", encoding="utf-8")
             self.assertEqual(len(skill_harness.evaluate(scenario, project, "")), 2)
 
+    def test_unchanged_files_detect_review_edits(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            scenario = {
+                "initial_files": {"src/Review.java": "class Review {}\n"},
+                "unchanged_files": ["src/Review.java"],
+            }
+            source = project / "src/Review.java"
+            source.parent.mkdir(parents=True)
+            source.write_text("class Review {}\n", encoding="utf-8")
+            self.assertEqual(skill_harness.evaluate(scenario, project, ""), [])
+            source.write_text("class Review { /* changed */ }\n", encoding="utf-8")
+            self.assertEqual(skill_harness.evaluate(scenario, project, ""), ["Файл был изменён: src/Review.java"])
+
 
 if __name__ == "__main__":
     unittest.main()

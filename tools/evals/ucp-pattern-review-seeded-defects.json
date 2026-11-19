@@ -1,0 +1,24 @@
+{
+  "skill": "ucp-pattern-review",
+  "title": "Review находит вызов dispatcher из Handler и обход dispatcher в Controller",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'ru.vikulinva:usecase-pattern-starter:0.1.0'\n}\n",
+    "src/main/java/com/example/notes/CreateNoteCommand.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport ru.vikulinva.usecase.cqrs.UseCaseCommand;\n\npublic record CreateNoteCommand(String text) implements UseCaseCommand<UUID> {}\n",
+    "src/main/java/com/example/notes/OtherCommand.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport ru.vikulinva.usecase.cqrs.UseCaseCommand;\n\npublic record OtherCommand() implements UseCaseCommand<UUID> {}\n",
+    "src/main/java/com/example/notes/CreateNoteCommandHandler.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport lombok.RequiredArgsConstructor;\nimport org.springframework.stereotype.Component;\nimport org.springframework.transaction.annotation.Transactional;\nimport ru.vikulinva.usecase.UseCaseDispatcher;\nimport ru.vikulinva.usecase.UseCaseHandler;\n\n@Component\n@RequiredArgsConstructor\npublic class CreateNoteCommandHandler implements UseCaseHandler<CreateNoteCommand, UUID> {\n  private final UseCaseDispatcher dispatcher;\n\n  @Override\n  public Class<CreateNoteCommand> useCaseType() {\n    return CreateNoteCommand.class;\n  }\n\n  @Override\n  @Transactional\n  public UUID handle(CreateNoteCommand command) {\n    return dispatcher.dispatch(new OtherCommand());\n  }\n}\n",
+    "src/main/java/com/example/notes/NoteController.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport lombok.RequiredArgsConstructor;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.RequestBody;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\n@RequiredArgsConstructor\npublic class NoteController {\n  private final CreateNoteCommandHandler handler;\n\n  @PostMapping(\"/notes\")\n  public UUID create(@RequestBody String text) {\n    return handler.handle(new CreateNoteCommand(text));\n  }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "src/main/java/com/example/notes/CreateNoteCommand.java",
+    "src/main/java/com/example/notes/OtherCommand.java",
+    "src/main/java/com/example/notes/CreateNoteCommandHandler.java",
+    "src/main/java/com/example/notes/NoteController.java"
+  ],
+  "prompt": "/skill:ucp-pattern-review Проверь все Java-файлы в src/main/java/com/example/notes/. Ничего не изменяй. Обязательно локализуй нарушения по requirement IDs и file:line.",
+  "output_patterns": [
+    "usecase-pattern/handlers-do-not-call-handlers",
+    "usecase-pattern/entry-calls-dispatcher",
+    "(?i)(критич|critical)"
+  ]
+}

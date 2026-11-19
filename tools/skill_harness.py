@@ -26,7 +26,7 @@ def load_scenario(path):
     for field in ("skill", "title", "prompt"):
         if not isinstance(data.get(field), str) or not data[field].strip():
             raise ValueError(f"Сценарий требует {field}")
-    for field in ("required_files", "forbidden_files", "required_globs", "forbidden_globs"):
+    for field in ("required_files", "forbidden_files", "required_globs", "forbidden_globs", "unchanged_files"):
         for value in data.get(field, []):
             safe_relative(value)
     for field in ("output_patterns",):
@@ -76,6 +76,12 @@ def evaluate(scenario, project, output):
     for relative in scenario.get("forbidden_files", []):
         if (project / relative).exists():
             failures.append(f"Запрещённый файл появился: {relative}")
+    for relative in scenario.get("unchanged_files", []):
+        expected = scenario.get("initial_files", {}).get(relative)
+        if expected is None:
+            failures.append(f"unchanged_file без initial content: {relative}")
+        elif not (project / relative).is_file() or (project / relative).read_text(encoding="utf-8") != expected:
+            failures.append(f"Файл был изменён: {relative}")
     for pattern in scenario.get("required_globs", []):
         if not list(project.glob(pattern)):
             failures.append(f"Нет совпадений glob: {pattern}")

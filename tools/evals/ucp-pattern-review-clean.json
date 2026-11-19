@@ -1,0 +1,21 @@
+{
+  "skill": "ucp-pattern-review",
+  "title": "Корректная пара Command/Handler не получает ложных критических находок",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'ru.vikulinva:usecase-pattern-starter:0.1.0'\n  implementation 'org.springframework:spring-context:7.0.0'\n}\n",
+    "src/main/java/com/example/notes/CreateNoteCommand.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport ru.vikulinva.usecase.cqrs.UseCaseCommand;\n\npublic record CreateNoteCommand(String text) implements UseCaseCommand<UUID> {}\n",
+    "src/main/java/com/example/notes/CreateNoteCommandHandler.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport lombok.RequiredArgsConstructor;\nimport org.springframework.stereotype.Component;\nimport org.springframework.transaction.annotation.Transactional;\nimport ru.vikulinva.usecase.UseCaseHandler;\n\n@Component\n@RequiredArgsConstructor\npublic class CreateNoteCommandHandler implements UseCaseHandler<CreateNoteCommand, UUID> {\n  private final NoteRepository noteRepository;\n\n  @Override\n  public Class<CreateNoteCommand> useCaseType() {\n    return CreateNoteCommand.class;\n  }\n\n  @Override\n  @Transactional\n  public UUID handle(CreateNoteCommand command) {\n    return noteRepository.save(command.text());\n  }\n}\n",
+    "src/main/java/com/example/notes/NoteRepository.java": "package com.example.notes;\n\nimport java.util.UUID;\n\npublic interface NoteRepository {\n  UUID save(String text);\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "src/main/java/com/example/notes/CreateNoteCommand.java",
+    "src/main/java/com/example/notes/CreateNoteCommandHandler.java",
+    "src/main/java/com/example/notes/NoteRepository.java"
+  ],
+  "prompt": "/skill:ucp-pattern-review Проверь три Java-файла в src/main/java/com/example/notes/. Ничего не изменяй. Назови прочитанные requirement IDs и вынеси вердикт.",
+  "output_patterns": [
+    "usecase-pattern/[a-z]",
+    "(?i)(одобр|approved|вердикт)"
+  ]
+}
