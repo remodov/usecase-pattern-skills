@@ -1,0 +1,20 @@
+{
+  "skill": "ucp-ddd-tactical-review",
+  "title": "Review находит мутабельный VO и зависимость домена от команды",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'ru.vikulinva:ddd-building-blocks:0.1.0'\n}\n",
+    "core/src/main/java/core/domain/valueobject/NoteId.java": "package core.domain.valueobject;\n\nimport java.util.UUID;\nimport ru.vikulinva.ddd.ValueObject;\n\npublic class NoteId implements ValueObject {\n  private UUID value;\n\n  public void setValue(UUID value) {\n    this.value = value;\n  }\n}\n",
+    "core/src/main/java/core/domain/aggregate/Note.java": "package core.domain.aggregate;\n\nimport core.usecase.command.note.CreateNoteCommand;\nimport ru.vikulinva.ddd.AggregateRoot;\n\npublic class Note extends AggregateRoot<NoteId> {\n  private final NoteId id;\n  private String text;\n\n  public void changeText(CreateNoteCommand command) {\n    this.text = command.text();\n  }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "core/src/main/java/core/domain/valueobject/NoteId.java",
+    "core/src/main/java/core/domain/aggregate/Note.java"
+  ],
+  "prompt": "/skill:ucp-ddd-tactical-review Проверь оба Java-файла в core/src/main/java/core/domain/. Ничего не изменяй. Найди нарушения с requirement IDs и file:line.",
+  "output_patterns": [
+    "ddd-tactical/value-object-is-immutable",
+    "ddd-tactical/domain-does-not-know-operations",
+    "(?i)(критич|critical)"
+  ]
+}

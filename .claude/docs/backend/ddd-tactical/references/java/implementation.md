@@ -269,37 +269,25 @@ Entity, Value Object — не DTO и не репозитории.
 
 ## 7. Factory
 
-### `ddd-tactical/factory-only-when-needed` — Единственная точка создания агрегата — `<X>Factory`
+### `ddd-tactical/factory-only-when-needed` — Единственная точка создания агрегата — именованный конструктор и `<X>Factory`
 
-У каждого корня агрегата и сущности есть фабрика в `core/domain/factory/` — `@UtilityClass` со статическим `create(...)`: проверяет инварианты создания, собирает объект через `<X>.builder()`, регистрирует начальные события и возвращает валидный агрегат. Как в эталоне: 25 фабрик на 19 агрегатов и 12 сущностей.
+У каждого корня агрегата и сущности есть фабрика в `core/domain/factory/` — `@UtilityClass` со статическим `create(...)`. Фабрика делегирует именованному конструктору корня, который проверяет инварианты создания, регистрирует начальные события и возвращает валидный агрегат. Публичного builder или конструктора без проверок нет.
 
 ```java
 @UtilityClass
 public class OrderFactory {
 
-    public Order create(UUID orderId, CustomerId customerId, List<OrderLine> lines, UUID createdBy) {
-        if (lines.isEmpty()) {
-            throw new OrderException.LinesRequired(orderId);
-        }
-        OffsetDateTime now = DateTimeUtil.currentDateTime();
-        Order order = Order.builder()
-            .id(orderId)
-            .customerId(customerId)
-            .status(OrderStatus.DRAFT)
-            .lines(new ArrayList<>(lines))
-            .createdBy(createdBy)
-            .createdAt(now)
-            .updatedAt(now)
-            .build();
-        order.markCreated();
-        return order;
+    public Order create(OrderId orderId, CustomerId customerId, List<OrderLine> lines) {
+        return Order.create(orderId, customerId, lines);
     }
 }
 ```
 
-### `ddd-tactical/factory-only-when-needed` — `@Builder` агрегата — проводка, не API
+### `ddd-tactical/factory-only-when-needed` — Закрытый конструктор, именованные `create` и `restore`
 
-Публичного конструктора у агрегата нет: `@Builder` генерирует package-private all-args конструктор и `builder()`, которым пользуются ровно два места — фабрика при создании и `<X>DomainRecordMapper.toDomain(...)` при восстановлении из БД. ArchUnit `AggregateBuildersUsedOnlyByFactoriesTest` держит оба условия:
+Корень сам контролирует внутреннее создание: закрытый конструктор проверяет обязательные поля и инварианты и вызывается только именованными методами. `create(...)` дополнительно регистрирует начальные события; `restore(...)` выполняет те же проверки, но события не регистрирует и вызывается только persistence-маппером. Метод регистрации события остаётся закрытым: внешний вызов `markCreated()` позволяет повторно создать ложный факт создания. Это работает при канонической раскладке фабрики и маппера в других пакетах, в отличие от ограничения builder через `AccessLevel.PACKAGE_PRIVATE`.
+
+ArchUnit `AggregateCreationIsControlledTest` проверяет отсутствие публичных конструкторов и вызовы `restore(...)` вне persistence-маппера:
 
 ```java
 @ArchTest
@@ -308,13 +296,11 @@ static final ArchRule aggregatesHaveNoPublicConstructors = classes()
         .should(notHavePublicConstructors());
 
 @ArchTest
-static final ArchRule aggregateBuildersUsedOnlyByFactoriesAndMappers = noClasses()
-        .that().resideOutsideOfPackages("<root>.core.domain.factory..", "<root>.adapter.out.postgres..")
-        .should().callMethodWhere(target(name("builder"))
+static final ArchRule restoreIsUsedOnlyByPersistenceMappers = noClasses()
+        .that().resideOutsideOfPackages("<root>.adapter.out.postgres..")
+        .should().callMethodWhere(target(name("restore"))
                 .and(target(owner(assignableTo(Entity.class)))));
 ```
-
-`notHavePublicConstructors()` — своё `ArchCondition`: у класса нет конструктора с модификатором `PUBLIC`. `Entity` из `ddd-building-blocks` покрывает и `AggregateRoot`.
 
 ### `ddd-tactical/factory-only-when-needed` — Антипаттерн: сборка агрегата «на месте»
 

@@ -99,7 +99,7 @@
 | [ddd-tactical/event-named-in-past-tense](.claude/docs/backend/ddd-tactical/spec.md) — Имя события — свершившийся факт | ревью | нет |
 | [ddd-tactical/events-published-after-save](.claude/docs/backend/ddd-tactical/spec.md) — События публикуются после сохранения и очищаются | ревью | нет |
 | [ddd-tactical/events-registered-by-root](.claude/docs/backend/ddd-tactical/spec.md) — События регистрирует корень | java: archunit:EventsRegisteredByRootTest · python: ревью · go: ревью · node: ревью | частичное |
-| [ddd-tactical/factory-only-when-needed](.claude/docs/backend/ddd-tactical/spec.md) — Агрегат создаётся через единственную точку, которая проверяет инварианты | java: archunit:AggregateBuildersUsedOnlyByFactoriesTest · python: ревью · go: ревью · node: ревью | частичное |
+| [ddd-tactical/factory-only-when-needed](.claude/docs/backend/ddd-tactical/spec.md) — Агрегат создаётся через единственную точку, которая проверяет инварианты | java: archunit:AggregateCreationIsControlledTest · python: ревью · go: ревью · node: ревью | частичное |
 | [ddd-tactical/identity-is-immutable](.claude/docs/backend/ddd-tactical/spec.md) — Идентификатор стабилен и неизменяем | java: archunit:EntityIdIsFinalTest · python: ревью · go: ревью · node: ревью | частичное |
 | [ddd-tactical/model-is-not-anemic](.claude/docs/backend/ddd-tactical/spec.md) — Модель богата поведением | ревью | нет |
 | [ddd-tactical/no-after-commit-for-critical-effects](.claude/docs/backend/ddd-tactical/spec.md) — Критичные эффекты не доставляются после фиксации напрямую | ревью | нет |
@@ -262,7 +262,7 @@
 | [hexagonal/single-scan-root](.claude/docs/backend/hexagonal/spec.md) — Архитектурные тесты сканируют один корневой пакет | ревью | нет |
 | [java-style/abbreviation-casing](.claude/docs/backend/java/java-style/spec.md) — Аббревиатуры оформляются единообразно | checkstyle:AbbreviationAsWordInName | частичное |
 | [java-style/boilerplate-is-generated](.claude/docs/backend/java/java-style/spec.md) — Шаблонный код генерируется, а не пишется | ревью | нет |
-| [java-style/builder-used-sparingly](.claude/docs/backend/java/java-style/spec.md) — Построитель — для объектов переноса, на агрегате — только проводка фабрики | java: archunit:AggregateBuildersUsedOnlyByFactoriesTest | частичное |
+| [java-style/builder-used-sparingly](.claude/docs/backend/java/java-style/spec.md) — Построитель — для объектов переноса, на агрегате — только проводка фабрики | java: archunit:AggregateCreationIsControlledTest | частичное |
 | [java-style/deviation-requires-justification](.claude/docs/backend/java/java-style/spec.md) — Отступление от правила объясняется читаемостью | ревью | нет |
 | [java-style/exhaustive-switch-on-sealed](.claude/docs/backend/java/java-style/spec.md) — Закрытые иерархии разбираются исчерпывающим переключением | java: errorprone:MissingCasesInEnumSwitch | частичное |
 | [java-style/expressions-stay-simple](.claude/docs/backend/java/java-style/spec.md) — Выражения остаются простыми и явными | checkstyle:BooleanExpressionComplexity, checkstyle:ArrayTypeStyle, checkstyle:ModifierOrder, checkstyle:RedundantModifier | полное |

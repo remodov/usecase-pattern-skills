@@ -1,0 +1,23 @@
+{
+  "skill": "ucp-ddd-tactical-review",
+  "title": "Валидный агрегат, VO, фабрика и начальное событие проходят review",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'ru.vikulinva:ddd-building-blocks:0.1.0'\n}\n",
+    "core/src/main/java/core/domain/valueobject/NoteId.java": "package core.domain.valueobject;\n\nimport java.util.Objects;\nimport java.util.UUID;\nimport ru.vikulinva.ddd.ValueObject;\n\npublic record NoteId(UUID value) implements ValueObject {\n  public NoteId {\n    Objects.requireNonNull(value, \"value must not be null\");\n  }\n}\n",
+    "core/src/main/java/core/domain/aggregate/Note.java": "package core.domain.aggregate;\n\nimport core.domain.event.NoteCreated;\nimport core.domain.valueobject.NoteId;\nimport java.util.Objects;\nimport lombok.Getter;\nimport ru.vikulinva.ddd.AggregateRoot;\n\n@Getter\npublic class Note extends AggregateRoot<NoteId> {\n  private final NoteId id;\n  private final String text;\n\n  private Note(NoteId id, String text) {\n    this.id = Objects.requireNonNull(id, \"id must not be null\");\n    if (text == null || text.isBlank()) {\n      throw new IllegalArgumentException(\"text must not be blank\");\n    }\n    this.text = text;\n  }\n\n  public static Note create(NoteId id, String text) {\n    Note note = new Note(id, text);\n    note.markCreated();\n    return note;\n  }\n\n  public static Note restore(NoteId id, String text) {\n    return new Note(id, text);\n  }\n\n  private void markCreated() {\n    registerEvent(new NoteCreated(id, text));\n  }\n}\n",
+    "core/src/main/java/core/domain/factory/NoteFactory.java": "package core.domain.factory;\n\nimport core.domain.aggregate.Note;\nimport core.domain.valueobject.NoteId;\nimport lombok.experimental.UtilityClass;\n\n@UtilityClass\npublic class NoteFactory {\n  public Note create(NoteId id, String text) {\n    return Note.create(id, text);\n  }\n}\n",
+    "core/src/main/java/core/domain/event/NoteCreated.java": "package core.domain.event;\n\nimport core.domain.aggregate.Note;\nimport core.domain.valueobject.NoteId;\nimport lombok.Getter;\nimport ru.vikulinva.ddd.DomainEvent;\n\n@Getter\npublic final class NoteCreated extends DomainEvent {\n  private final String text;\n\n  public NoteCreated(NoteId noteId, String text) {\n    super(Note.class.getSimpleName(), noteId.value().toString());\n    this.text = text;\n  }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "core/src/main/java/core/domain/valueobject/NoteId.java",
+    "core/src/main/java/core/domain/aggregate/Note.java",
+    "core/src/main/java/core/domain/factory/NoteFactory.java",
+    "core/src/main/java/core/domain/event/NoteCreated.java"
+  ],
+  "prompt": "/skill:ucp-ddd-tactical-review Проверь четыре Java-файла в core/src/main/java/core/domain/. Ничего не изменяй. Назови requirement IDs и явно укажи число критических находок.",
+  "output_patterns": [
+    "ddd-tactical/[a-z]",
+    "(?i)(?:критично|критичных)[^0-9\\n]*\\b0\\b"
+  ]
+}

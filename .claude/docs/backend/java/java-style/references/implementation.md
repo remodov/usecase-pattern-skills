@@ -386,7 +386,7 @@ testAnnotationProcessor("org.projectlombok:lombok:1.18.34")
 
 `@Builder` уместен на объектах переноса с многими полями и опциональными значениями: фильтры портов, команды с параметрами по умолчанию, исходящие запросы во внешний API, настройки. Не вешаем его на каждый POJO «на всякий случай» — это раздувает API класса.
 
-На entity / aggregate root `@Builder` стоит (в эталоне — на всех 19 агрегатах и 12 сущностях), но это не API, а проводка: публичного конструктора у агрегата нет (Lombok генерирует package-private all-args), а `builder()` зовут ровно два места — `<X>Factory.create(...)` при создании и `<X>DomainRecordMapper.toDomain(...)` при восстановлении из БД. Любой другой вызов — обход проверок создания, его ловит `AggregateBuildersUsedOnlyByFactoriesTest` (правило — в `ddd-tactical/references/java/implementation.md`, §7).
+На entity / aggregate root нет открытого канала сборки в обход инвариантов: публичного конструктора нет, а закрытый конструктор вызывается именованными `create(...)` и `restore(...)`. `create` проверяет инварианты и регистрирует начальные события, `restore` предназначен только `<X>DomainRecordMapper.toDomain(...)`. Builder, доступный вне этих точек, удаляется: package-private доступ не сочетается с каноническими фабрикой и маппером в других пакетах. Вызовы `restore` вне маппера ловит `AggregateCreationIsControlledTest` (правило — в `ddd-tactical/references/java/implementation.md`, §7).
 
 ---
 

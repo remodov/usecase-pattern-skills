@@ -178,7 +178,7 @@
 | `archunit:MappersStayInPersistenceTest` | мапперы делегируют, а не наследуют | `jooq/mappers-delegate` |
 | `archunit:NestedFieldsAreValidatedTest` | вложенные структуры проверяются рекурсивно | `validation/nested-validated-recursively` |
 | `archunit:NoAdHocDslContextTest` | контекст доступа — единственный бин | `jooq/dsl-context-is-singleton-bean` |
-| `archunit:AggregateBuildersUsedOnlyByFactoriesTest` | у агрегата нет публичного конструктора; `builder()` зовут только фабрика и persistence-маппер | `java-style/builder-used-sparingly`, `ddd-tactical/factory-only-when-needed` |
+| `archunit:AggregateCreationIsControlledTest` | у агрегата нет публичного конструктора; закрытое создание идёт через именованный `create`, `restore` зовёт только persistence-маппер | `java-style/builder-used-sparingly`, `ddd-tactical/factory-only-when-needed` |
 | `archunit:NoCacheableOnCommandsTest` | на пути записи кеша нет | `caching/no-cache-on-write-path` |
 | `archunit:NoChainedTransactionManagerTest` | распределённых транзакций не бывает | `distributed-patterns/no-two-phase-commit` |
 | `archunit:NoCyclicDependenciesTest` | мапперы не образуют циклов | `usecase-pattern/no-cyclic-mappers` |
