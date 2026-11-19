@@ -1,0 +1,18 @@
+{
+  "skill": "ucp-test-review",
+  "title": "Review находит flaky wait, EmbeddedKafka и неправильный HTTP-слой",
+  "initial_files": {
+    "src/test/java/com/example/notes/CreateNoteIntegrationTest.java": "package com.example.notes;\n\nimport org.junit.jupiter.api.Test;\nimport org.springframework.beans.factory.annotation.Autowired;\nimport org.springframework.boot.test.context.SpringBootTest;\nimport org.springframework.kafka.test.context.EmbeddedKafka;\nimport org.springframework.test.web.servlet.MockMvc;\n\nimport static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;\nimport static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;\n\n@SpringBootTest\n@EmbeddedKafka\nclass CreateNoteIntegrationTest {\n    @Autowired\n    private MockMvc mockMvc;\n\n    @Test\n    void createNote() throws Exception {\n        Thread.sleep(500);\n        mockMvc.perform(get(\"/notes/1\"))\n            .andExpect(status().isOk());\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "src/test/java/com/example/notes/CreateNoteIntegrationTest.java"
+  ],
+  "prompt": "/skill:ucp-test-review Проверь только src/test/java/com/example/notes/CreateNoteIntegrationTest.java. Ничего не изменяй, сборку не запускай. Найди нарушения test-strategy/* с requirement IDs, severity и file:line.",
+  "output_patterns": [
+    "test-strategy/(?:integration-test-shape|tests-are-synchronous-and-deterministic)",
+    "test-strategy/no-broker-or-cache-in-integration-tests",
+    "test-strategy/test-uses-http-client",
+    "(?i)(критич|critical)",
+    "CreateNoteIntegrationTest\\.java:\\d+"
+  ]
+}

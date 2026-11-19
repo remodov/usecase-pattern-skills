@@ -1,0 +1,16 @@
+{
+  "skill": "ucp-test-review",
+  "title": "Детерминированный unit-тест агрегата не получает критических находок",
+  "initial_files": {
+    "core/src/test/java/com/example/notes/core/domain/NoteTest.java": "package com.example.notes.core.domain;\n\nimport org.junit.jupiter.api.DisplayName;\nimport org.junit.jupiter.api.Test;\n\nimport static org.assertj.core.api.Assertions.assertThat;\nimport static org.assertj.core.api.Assertions.assertThatThrownBy;\n\nclass NoteTest {\n    @Test\n    void create_whenTextIsPresent_returnsNote() {\n        Note note = Note.create(\"text\");\n\n        assertThat(note.text()).isEqualTo(\"text\");\n    }\n\n    @Test\n    @DisplayName(\"BR-001: Пустой text отклоняется\")\n    void create_whenTextIsEmpty_throwsException() {\n        assertThatThrownBy(() -> Note.create(\"\"))\n            .isInstanceOf(IllegalArgumentException.class)\n            .hasMessage(\"NOTE_TEXT_EMPTY\");\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "core/src/test/java/com/example/notes/core/domain/NoteTest.java"
+  ],
+  "prompt": "/skill:ucp-test-review Проверь только core/src/test/java/com/example/notes/core/domain/NoteTest.java. Production Note.create уже проверен: он возвращает Note для непустого text и бросает IllegalArgumentException для пустого. Спеки с другими UC/BR в fixture нет. Ничего не изменяй, сборку не запускай. Назови применённые test-strategy requirement IDs, вердикт и явно число критических находок.",
+  "output_patterns": [
+    "test-strategy/test-layers-separated",
+    "(?i)(критично\\s*[—:-]?\\s*0|критичных\\s*[—:-]?\\s*0)",
+    "(?i)(соответств|approved|вердикт)"
+  ]
+}
