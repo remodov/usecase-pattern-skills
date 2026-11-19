@@ -32,10 +32,11 @@ def load_scenario(path):
     for field in ("output_patterns",):
         for value in data.get(field, []):
             re.compile(value)
-    for glob, patterns in data.get("file_patterns", {}).items():
-        safe_relative(glob)
-        for value in patterns:
-            re.compile(value)
+    for field in ("file_patterns", "file_forbidden_patterns"):
+        for glob, patterns in data.get(field, {}).items():
+            safe_relative(glob)
+            for value in patterns:
+                re.compile(value)
     for path_value in data.get("initial_files", {}):
         safe_relative(path_value)
     return data
@@ -100,6 +101,14 @@ def evaluate(scenario, project, output):
             for pattern in patterns:
                 if not re.search(pattern, content, re.MULTILINE):
                     failures.append(f"{path.relative_to(project)}: нет content pattern {pattern}")
+    for glob, patterns in scenario.get("file_forbidden_patterns", {}).items():
+        for path in project.glob(glob):
+            if not path.is_file():
+                continue
+            content = path.read_text(encoding="utf-8")
+            for pattern in patterns:
+                if re.search(pattern, content, re.MULTILINE):
+                    failures.append(f"{path.relative_to(project)}: запрещённый content pattern {pattern}")
     for pattern in scenario.get("output_patterns", []):
         if not re.search(pattern, output, re.MULTILINE):
             failures.append(f"В ответе нет pattern: {pattern}")

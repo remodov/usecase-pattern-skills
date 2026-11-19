@@ -125,6 +125,15 @@ class SkillHarnessTest(unittest.TestCase):
             source.write_text("class Review { /* changed */ }\n", encoding="utf-8")
             self.assertEqual(skill_harness.evaluate(scenario, project, ""), ["Файл был изменён: src/Review.java"])
 
+    def test_file_forbidden_patterns_detect_prohibited_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            source = project / "core/domain/aggregate/Note.java"
+            source.parent.mkdir(parents=True)
+            source.write_text("import org.springframework.stereotype.Component;\n", encoding="utf-8")
+            scenario = {"file_forbidden_patterns": {"core/domain/**/*.java": ["org\\.springframework"]}}
+            self.assertEqual(len(skill_harness.evaluate(scenario, project, "")), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

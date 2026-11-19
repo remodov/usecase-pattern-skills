@@ -1,0 +1,19 @@
+{
+  "skill": "ucp-ddd-tactical-design",
+  "title": "Без ddd-building-blocks не создаются локальные DDD-копии",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n"
+  },
+  "unchanged_files": [
+    "build.gradle"
+  ],
+  "prompt": "/skill:ucp-ddd-tactical-design Уровень 3. Спроектируй агрегат Note. Если ddd-building-blocks отсутствует, остановись и предложи зависимость; не создавай исходники или локальные Entity/AggregateRoot/ValueObject.",
+  "forbidden_globs": [
+    "src/**/*",
+    "core/**/*"
+  ],
+  "output_patterns": [
+    "ddd-building-blocks",
+    "(?i)(добав|зависим)"
+  ]
+}

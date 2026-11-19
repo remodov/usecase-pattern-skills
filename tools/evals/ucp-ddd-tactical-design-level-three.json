@@ -1,0 +1,53 @@
+{
+  "skill": "ucp-ddd-tactical-design",
+  "title": "Уровень 3 создаёт агрегат и связанные доменные типы без инфраструктуры",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'ru.vikulinva:ddd-building-blocks:0.1.0'\n  compileOnly 'org.projectlombok:lombok:1.18.42'\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle"
+  ],
+  "prompt": "/skill:ucp-ddd-tactical-design Уровень 3, bounded context notes. Создай полные файлы только для пяти типов: NoteId (VO), Note (aggregate), NoteCreated (domain event), NoteFactory и NoteRepository. Note защищает непустой text и владельца; создание регистрирует NoteCreated. Без внутренних сущностей, Domain Service, Specification, Controller, UseCase и тестов. Используй канонические core/domain и core/port/out/repository пакеты. Это статический fixture без repositories: не запускай сборку и не меняй build.gradle.",
+  "required_globs": [
+    "**/NoteId.java",
+    "**/Note.java",
+    "**/NoteCreated.java",
+    "**/NoteFactory.java",
+    "**/NoteRepository.java"
+  ],
+  "forbidden_globs": [
+    "**/*Controller.java",
+    "**/*Test.java"
+  ],
+  "file_patterns": {
+    "**/NoteId.java": [
+      "record\\s+NoteId",
+      "ValueObject"
+    ],
+    "**/Note.java": [
+      "class\\s+Note",
+      "AggregateRoot<NoteId>"
+    ],
+    "**/NoteCreated.java": [
+      "class\\s+NoteCreated",
+      "DomainEvent"
+    ],
+    "**/NoteFactory.java": [
+      "class\\s+NoteFactory",
+      "(?:static\\s+)?Note\\s+create\\s*\\("
+    ],
+    "**/NoteRepository.java": [
+      "interface\\s+NoteRepository",
+      "AggregateRepository<Note, NoteId>"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "**/*.java": [
+      "org\\.springframework",
+      "import\\s+[^;]*\\.usecase\\."
+    ]
+  },
+  "output_patterns": [
+    "ddd-tactical/"
+  ]
+}

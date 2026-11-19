@@ -1227,7 +1227,7 @@ python3 tools/skill_harness.py \
   --scenario tools/evals/ucp-new-service-first-step.json --agent kimi --timeout 600
 ```
 
-Сценарий задаёт `initial_files`, `required_files`/`forbidden_files`, `required_globs`/`forbidden_globs`, `file_patterns` и `output_patterns`; `file_patterns` проверяет regex в содержимом каждого созданного файла, а `unchanged_files` доказывает отсутствие правок в review-fixtures. `--dry-run` проверяет сценарий без вызова модели, `--keep` сохраняет временный проект для разбора. Поддерживаются CLI-адаптеры Kimi, OpenCode, Codex и Claude; доступность API и лимиты проверяются отдельно от качества скилла.
+Сценарий задаёт `initial_files`, `required_files`/`forbidden_files`, `required_globs`/`forbidden_globs`, `file_patterns`, `file_forbidden_patterns` и `output_patterns`; `file_patterns` ищет обязательные regex, а `file_forbidden_patterns` — запрещённые в содержимом файлов. `unchanged_files` доказывает отсутствие правок в review-fixtures. `--dry-run` проверяет сценарий без вызова модели, `--keep` сохраняет временный проект для разбора. Поддерживаются CLI-адаптеры Kimi, OpenCode, Codex и Claude; доступность API и лимиты проверяются отдельно от качества скилла.
 
 ## Структура
 
@@ -1375,7 +1375,7 @@ python3 tools/skill_harness.py \
 | `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
 | `python3 tools/skill_harness.py --scenario <scenario> --agent <agent>` | поведенческий baseline/кандидат одного скилла в изолированном проекте |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 145 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning, harness и fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 146 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning, harness и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,
