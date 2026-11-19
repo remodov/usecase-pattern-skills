@@ -1,0 +1,33 @@
+{
+  "skill": "ucp-api-design",
+  "title": "Создание заметки оформляется OpenAPI-first с контрактом ошибки",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n"
+  },
+  "unchanged_files": [
+    "build.gradle"
+  ],
+  "prompt": "/skill:ucp-api-design Сервис notes. Создай полный OpenAPI-файл для операции CreateNote: POST на коллекцию заметок. Вход CreateNoteRequest содержит только text. Ответ 201 содержит id созданной заметки. Пустой text возвращает 400 ProblemDetails с бизнес-кодом NOTE_TEXT_EMPTY. Соблюдай rest-api/*, добавь требуемые schemas и enum ErrorCode. Не создавай Java-файлы или другие YAML.",
+  "required_files": [
+    "src/main/resources/openapi/notes.openapi.yaml"
+  ],
+  "forbidden_globs": [
+    "src/main/java/**/*",
+    "**/*Controller.java"
+  ],
+  "file_patterns": {
+    "src/main/resources/openapi/notes.openapi.yaml": [
+      "openapi:\\s*3",
+      "/notes:",
+      "operationId:\\s*createNote",
+      "CreateNoteRequest",
+      "ErrorCode",
+      "NOTE_TEXT_EMPTY",
+      "application/problem\\+json"
+    ]
+  },
+  "output_patterns": [
+    "rest-api/",
+    "(?i)(openapi.generator|bootstrap)"
+  ]
+}
