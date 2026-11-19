@@ -1,0 +1,16 @@
+{
+  "skill": "ucp-api-review",
+  "title": "Review находит метод/статус, метаданные и нестандартный error body",
+  "initial_files": {
+    "src/main/resources/openapi/orders.openapi.yaml": "openapi: 3.0.3\ninfo:\n  title: Orders API\n  version: 1.0.0\npaths:\n  /api/v1/order:\n    post:\n      requestBody:\n        required: true\n        content:\n          application/json:\n            schema:\n              type: object\n              properties:\n                text:\n                  type: string\n      responses:\n        '200':\n          description: Заказ создан\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  id:\n                    type: string\n        '400':\n          description: Ошибка запроса\n          content:\n            application/json:\n              schema:\n                type: object\n                properties:\n                  message:\n                    type: string\n"
+  },
+  "unchanged_files": [
+    "src/main/resources/openapi/orders.openapi.yaml"
+  ],
+  "prompt": "/skill:ucp-api-review Проверь src/main/resources/openapi/orders.openapi.yaml. Ничего не изменяй. Найди нарушения rest-api/* с requirement IDs и file:line.",
+  "output_patterns": [
+    "rest-api/collections-plural-singletons-singular",
+    "rest-api/operation-id-and-tags",
+    "rest-api/error-body-follows-standard"
+  ]
+}
