@@ -1,0 +1,44 @@
+{
+  "skill": "ucp-auth-design",
+  "title": "Два endpoint используют централизованную ABAC-проверку владельца",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n",
+    "core/src/main/java/com/example/notes/core/domain/Note.java": "package com.example.notes.core.domain;\n\nimport java.util.UUID;\n\npublic record Note(UUID customerId) {}\n",
+    "core/src/main/java/com/example/notes/core/port/out/repository/NoteRepository.java": "package com.example.notes.core.port.out.repository;\n\nimport com.example.notes.core.domain.Note;\nimport java.util.Optional;\nimport java.util.UUID;\n\npublic interface NoteRepository {\n    Optional<Note> findById(UUID id);\n}\n",
+    "adapter-in-rest/src/main/java/com/example/notes/controller/NoteController.java": "package com.example.notes.controller;\n\nimport java.util.UUID;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.PathVariable;\nimport org.springframework.web.bind.annotation.PutMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\npublic class NoteController {\n    @GetMapping(\"/notes/{id}\")\n    public String getNote(@PathVariable UUID id) {\n        return id.toString();\n    }\n\n    @PutMapping(\"/notes/{id}\")\n    public String updateNote(@PathVariable UUID id) {\n        return id.toString();\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "core/src/main/java/com/example/notes/core/domain/Note.java",
+    "core/src/main/java/com/example/notes/core/port/out/repository/NoteRepository.java"
+  ],
+  "prompt": "/skill:ucp-auth-design Domain Service notes, единственная роль customer. Добавь авторизацию на оба существующих endpoint NoteController: @PreAuthorize(\"hasRole('customer') and @access.canAccessNote(#id, authentication)\"). Создай только adapter-in-rest/src/main/java/com/example/notes/security/AccessPolicy.java как @Component(\"access\") с boolean canAccessNote(UUID id, Authentication authentication): загрузи Note через NoteRepository, отсутствующий Note запрещай, сравни Note.customerId с subject JWT. Не добавляй admin-bypass, audit, другие классы, тесты и конфигурацию. Из существующих файлов меняй только NoteController. Это статический fixture: не запускай сборку.",
+  "required_files": [
+    "adapter-in-rest/src/main/java/com/example/notes/controller/NoteController.java",
+    "adapter-in-rest/src/main/java/com/example/notes/security/AccessPolicy.java"
+  ],
+  "forbidden_globs": [
+    "**/*Test.java",
+    "**/SecurityConfig.java"
+  ],
+  "file_patterns": {
+    "adapter-in-rest/src/main/java/com/example/notes/controller/NoteController.java": [
+      "(?:@PreAuthorize\\(\"hasRole\\('customer'\\) and @access\\.canAccessNote\\(#id,\\s*authentication\\)\"\\)\\s*\\n\\s*@GetMapping\\(\"/notes/\\{id\\}\"\\)|@GetMapping\\(\"/notes/\\{id\\}\"\\)\\s*\\n\\s*@PreAuthorize\\(\"hasRole\\('customer'\\) and @access\\.canAccessNote\\(#id,\\s*authentication\\)\"\\))",
+      "(?:@PreAuthorize\\(\"hasRole\\('customer'\\) and @access\\.canAccessNote\\(#id,\\s*authentication\\)\"\\)\\s*\\n\\s*@PutMapping\\(\"/notes/\\{id\\}\"\\)|@PutMapping\\(\"/notes/\\{id\\}\"\\)\\s*\\n\\s*@PreAuthorize\\(\"hasRole\\('customer'\\) and @access\\.canAccessNote\\(#id,\\s*authentication\\)\"\\))"
+    ],
+    "adapter-in-rest/src/main/java/com/example/notes/security/AccessPolicy.java": [
+      "@Component\\(\\s*\"access\"\\s*\\)",
+      "boolean\\s+canAccessNote\\s*\\(\\s*UUID\\s+id\\s*,\\s*Authentication\\s+authentication\\s*\\)",
+      "NoteRepository",
+      "findById\\s*\\(\\s*id\\s*\\)",
+      "getSubject\\s*\\(",
+      "customerId\\s*\\("
+    ]
+  },
+  "file_forbidden_patterns": {
+    "adapter-in-rest/src/main/java/**/*.java": [
+      "ROLE_admin|hasRole\\('admin'\\)",
+      "(?://|/\\*)\\s*AUTH-"
+    ]
+  }
+}

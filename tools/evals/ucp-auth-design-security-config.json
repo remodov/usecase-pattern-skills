@@ -1,0 +1,41 @@
+{
+  "skill": "ucp-auth-design",
+  "title": "Domain Service получает stateless JWT security и роли из claims",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n",
+    "bootstrap/build.gradle": "plugins { id 'java' }\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "bootstrap/build.gradle"
+  ],
+  "prompt": "/skill:ucp-auth-design Domain Service notes. Создай только bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java. Нужны stateless Spring Security Resource Server, JWT через oauth2ResourceServer, @EnableMethodSecurity, permitAll только для /actuator/health и /actuator/prometheus, остальные запросы authenticated. Роли извлекай библиотечным JwtAuthenticationConverter из realm_access.roles с префиксом ROLE_. Не меняй зависимости и не создавай фильтры, тесты, YAML, другие классы, README или AGENTS.md. Это статический fixture: не запускай сборку.",
+  "required_files": [
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java"
+  ],
+  "forbidden_globs": [
+    "**/*Test.java",
+    "**/application*.yml"
+  ],
+  "file_patterns": {
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java": [
+      "@Configuration",
+      "@EnableMethodSecurity",
+      "SecurityFilterChain\\s+\\w+\\s*\\(",
+      "SessionCreationPolicy\\.STATELESS",
+      "requestMatchers\\(\\s*\"/actuator/health\"\\s*,\\s*\"/actuator/prometheus\"\\s*\\)\\.permitAll\\(\\)",
+      "anyRequest\\(\\)\\.authenticated\\(\\)",
+      "oauth2ResourceServer",
+      "JwtAuthenticationConverter",
+      "JwtGrantedAuthoritiesConverter",
+      "setAuthorityPrefix\\(\\s*\"ROLE_\"\\s*\\)",
+      "setAuthoritiesClaimName\\(\\s*\"realm_access.roles\"\\s*\\)"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "bootstrap/src/main/java/com/example/notes/config/SecurityConfig.java": [
+      "OncePerRequestFilter",
+      "(?://|/\\*)\\s*AUTH-"
+    ]
+  }
+}
