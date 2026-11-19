@@ -211,6 +211,12 @@
 
 Скилл язык- и track-нейтральный (`lang: any`, `track: any`) и доступен всем native-каталогам. Crapper, Dryer и Mutator используются при наличии; их отсутствие называется явно, без выдумывания CRAP/similarity/mutation scores. Лицензия сохранена в `.claude/skills/ub-mode/LICENSE`.
 
+### `ucp-learn`
+
+Project-scoped обучение на устойчивых нюансах, а не фоновая запись всех задач. Первое подтверждение закономерности остаётся `collecting`; второе разное подтверждение переводит кандидата в `pending`. Только тогда агент показывает урок и evidence и спрашивает: «Применить этот нюанс к текущему проекту?»
+
+Применение выполняется через `tools/ucp_learning.py apply --yes` и добавляет правило в `.ucp/learning/playbook.md`. Канонические скиллы не меняются, опыт не переносится между проектами или из корпоративного репозитория в публичный. Сырой `candidates.json` исключён из Git, playbook — это только подтверждённые пользователем правила проекта.
+
 ### `ucp-api-review`
 
 Ревью REST API контракта или кода на соответствие требованиям `rest-api/*` (`.claude/docs/backend/rest-api/spec.md`).
@@ -1354,7 +1360,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 | `python3 tools/agent_targets.py validate` | проверяет реестр coding-агентов, native paths и capabilities |
 | `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 130 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode и fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 137 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode, project learning и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,
