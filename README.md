@@ -205,6 +205,12 @@
 
 ## Скиллы
 
+### `ub-mode`
+
+Инженерная дисциплина при написании и изменении кода по [unclebob/ub-mode](https://github.com/unclebob/ub-mode) (Robert C. Martin, MIT): сначала сделать работающим, затем правильным. TDD, проектирование от первых принципов, границы и типы, идемпотентность, устранение причин, малые проверяемые шаги, тестирование поведения, рефакторинг.
+
+Скилл язык- и track-нейтральный (`lang: any`, `track: any`) и доступен всем native-каталогам. Crapper, Dryer и Mutator используются при наличии; их отсутствие называется явно, без выдумывания CRAP/similarity/mutation scores. Лицензия сохранена в `.claude/skills/ub-mode/LICENSE`.
+
 ### `ucp-api-review`
 
 Ревью REST API контракта или кода на соответствие требованиям `rest-api/*` (`.claude/docs/backend/rest-api/spec.md`).
@@ -1348,7 +1354,7 @@ claude mcp add --transport http context7 https://mcp.context7.com/mcp
 | `python3 tools/agent_targets.py validate` | проверяет реестр coding-агентов, native paths и capabilities |
 | `python3 tools/sync_platforms.py --check` | гейт ECC-style symlinks, instruction files, native configs и Codex TOML |
 | `python3 tools/fe_audit.py <клон frontend-templates>` | сверяет скиллы фронта с эталонным репозиторием: живые ссылки на требования, покрытие областей |
-| `python3 -m unittest discover -s tools/tests` | 127 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points и fixture-установки |
+| `python3 -m unittest discover -s tools/tests` | 130 тестов: тулинг, шаблоны, числа в README, target adapters, native entry points, ub-mode и fixture-установки |
 
 Все три проверки прогоняются в CI (`.gitlab-ci.yml`). Правило про гейты
 рекурсивно: собственная проверка, не описанная в `_meta/project-gates.md`,
