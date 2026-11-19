@@ -1,0 +1,37 @@
+{
+  "skill": "ucp-test-design",
+  "title": "Unit-тест агрегата выбирается без Spring и покрывает BR-001",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n",
+    "core/src/main/java/com/example/notes/core/domain/Note.java": "package com.example.notes.core.domain;\n\npublic class Note {\n    private final String text;\n\n    private Note(String text) {\n        if (text == null || text.isBlank()) {\n            throw new IllegalArgumentException(\"NOTE_TEXT_EMPTY\");\n        }\n        this.text = text;\n    }\n\n    public static Note create(String text) {\n        return new Note(text);\n    }\n\n    public String text() {\n        return text;\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "core/src/main/java/com/example/notes/core/domain/Note.java"
+  ],
+  "prompt": "/skill:ucp-test-design Создай только core/src/test/java/com/example/notes/core/domain/NoteTest.java для чистой бизнес-логики Note. Нужны unit-тесты без Spring: happy path create с непустым text и BR-001 — пустой text отклоняется с IllegalArgumentException. Используй JUnit 5, AssertJ и @DisplayName с BR-001 для негативного сценария. Не создавай base-классы, другие тесты и production-файлы. Это статический fixture: не запускай сборку.",
+  "required_files": [
+    "core/src/test/java/com/example/notes/core/domain/NoteTest.java"
+  ],
+  "forbidden_globs": [
+    "**/*IntegrationTest.java",
+    "**/*BaseIntegrationTest.java"
+  ],
+  "file_patterns": {
+    "core/src/test/java/com/example/notes/core/domain/NoteTest.java": [
+      "@Test",
+      "Note\\.create\\s*\\(",
+      "assertThat\\s*\\(",
+      "@DisplayName\\(\\s*\"BR-001[^\"]*\"\\s*\\)",
+      "assertThatThrownBy\\s*\\(",
+      "IllegalArgumentException\\.class"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "core/src/test/java/com/example/notes/core/domain/NoteTest.java": [
+      "org\\.springframework|@SpringBootTest|@WebMvcTest|MockMvc",
+      "Thread\\.sleep|Awaitility|EmbeddedKafka|Redis",
+      "(?://|/\\*)\\s*TS-"
+    ]
+  }
+}

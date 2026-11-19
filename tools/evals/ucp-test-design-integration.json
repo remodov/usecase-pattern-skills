@@ -1,0 +1,44 @@
+{
+  "skill": "ucp-test-design",
+  "title": "Integration-тест использует HTTP client и бизнес-код ошибки",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n",
+    "src/test/java/com/example/notes/NotesBaseIntegrationTest.java": "package com.example.notes;\n\nimport org.springframework.boot.test.context.SpringBootTest;\nimport org.springframework.test.context.ActiveProfiles;\n\n@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)\n@ActiveProfiles(\"integration-test\")\npublic abstract class NotesBaseIntegrationTest {\n}\n",
+    "src/test/java/com/example/notes/TestHttpHeaders.java": "package com.example.notes;\n\nimport org.springframework.http.HttpHeaders;\n\npublic final class TestHttpHeaders {\n    public static HttpHeaders withSuccessToken() {\n        return new HttpHeaders();\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "build.gradle",
+    "src/test/java/com/example/notes/NotesBaseIntegrationTest.java",
+    "src/test/java/com/example/notes/TestHttpHeaders.java"
+  ],
+  "prompt": "/skill:ucp-test-design BaseIntegrationTest и TestHttpHeaders уже существуют. Создай только src/test/java/com/example/notes/CreateNoteIntegrationTest.java, наследник NotesBaseIntegrationTest. Интеграционный сценарий BR-001: POST /notes с пустым text через реальный HTTP должен вернуть 400 и ProblemDetails code NOTE_TEXT_EMPTY. Используй TestRestTemplate.exchange, HttpEntity и TestHttpHeaders.withSuccessToken(), JUnit 5, AssertJ и @DisplayName с BR-001. Не создавай инфраструктуру, WireMock, production-код и другие тесты. Это статический fixture: не запускай сборку.",
+  "required_files": [
+    "src/test/java/com/example/notes/CreateNoteIntegrationTest.java"
+  ],
+  "forbidden_globs": [
+    "**/*TestObjectGenerator.java"
+  ],
+  "file_patterns": {
+    "src/test/java/com/example/notes/CreateNoteIntegrationTest.java": [
+      "extends\\s+NotesBaseIntegrationTest",
+      "@DisplayName\\(\\s*\"BR-001[^\"]*\"\\s*\\)",
+      "TestRestTemplate",
+      "\\.exchange\\s*\\(",
+      "\"/notes\"",
+      "HttpMethod\\.POST",
+      "HttpEntity",
+      "TestHttpHeaders\\.withSuccessToken\\s*\\(",
+      "BAD_REQUEST|isEqualTo\\(\\s*400\\s*\\)",
+      "NOTE_TEXT_EMPTY"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "src/test/java/com/example/notes/CreateNoteIntegrationTest.java": [
+      "MockMvc|@WebMvcTest",
+      "EmbeddedKafka|Redis|RedisContainer|KafkaContainer",
+      "Thread\\.sleep|Awaitility",
+      "@MockBean|@MockitoBean",
+      "(?://|/\\*)\\s*TS-"
+    ]
+  }
+}
