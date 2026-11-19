@@ -99,6 +99,18 @@ class SkillHarnessTest(unittest.TestCase):
                     result = skill_harness.run_scenario(scenario, "kimi", ROOT, timeout=1)
             self.assertEqual(result, 1)
 
+    def test_file_patterns_validate_generated_content(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp)
+            scenario = {"file_patterns": {"src/**/*.java": ["record", "UseCaseCommand"]}}
+            self.assertEqual(len(skill_harness.evaluate(scenario, project, "")), 1)
+            source = project / "src/main/java/example/CreateNoteCommand.java"
+            source.parent.mkdir(parents=True)
+            source.write_text("record CreateNoteCommand() implements UseCaseCommand {}", encoding="utf-8")
+            self.assertEqual(skill_harness.evaluate(scenario, project, ""), [])
+            source.write_text("class CreateNoteCommand {}", encoding="utf-8")
+            self.assertEqual(len(skill_harness.evaluate(scenario, project, "")), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

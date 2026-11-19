@@ -1,0 +1,15 @@
+{
+  "skill": "ucp-pattern-design",
+  "title": "Без usecase-pattern не создаются локальные копии",
+  "initial_files": {
+    "build.gradle": "plugins { id 'java' }\n\ndependencies {\n  implementation 'org.springframework:spring-context:7.0.0'\n}\n"
+  },
+  "prompt": "/skill:ucp-pattern-design Уровень 2. Спроектируй CreateNoteCommand и Handler. Если библиотека usecase-pattern отсутствует, остановись и предложи зависимость; не создавай локальные копии UseCase/UseCaseHandler/UseCaseDispatcher и не создавай исходники.",
+  "forbidden_globs": [
+    "src/**/*"
+  ],
+  "output_patterns": [
+    "usecase-pattern-starter",
+    "(?i)(добав|зависим)"
+  ]
+}
