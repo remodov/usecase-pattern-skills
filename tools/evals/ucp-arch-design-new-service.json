@@ -1,0 +1,66 @@
+{
+  "skill": "ucp-arch-design",
+  "title": "Новый сервис добавляется во все платформенные реестры",
+  "initial_files": {
+    "services/_registry.yaml": "services:\n  - name: order\n    tier: 3\n    owner: order-team\n    subdomain: Core\n    git: git@github.com:org/order.git\n    paths:\n      spec: docs/spec/\n      contracts: openapi/\n",
+    "services/order/README.md": "# Order Service\n\n| | |\n|---|---|\n| **Tier** | 3 (DDD + Hexagonal) |\n| **Субдомен** | **Core** |\n| **Владелец** | order-team |\n| **Статус** | 🟢 работает |\n\n## Назначение\n\nУправляет заказами.\n\n## Домен-агрегаты\n\n| Агрегат | Назначение |\n|---|---|\n| Order | Заказ клиента |\n\n## Use Cases\n\nСоздание заказа.\n\n## Связи\n\n| Сосед | Тип | Канал |\n|---|---|---|\n| payment | customer-supplier | sync REST |\n\n## Технологии\n\nSpring Boot, DDD, Kafka outbox.\n\n## Участие в бизнес-процессах\n\nНет.\n",
+    "docs/00-overview.md": "# Overview\n\n| Сервис | Назначение |\n|---|---|\n| order | Заказы |\n",
+    "docs/01-context-map.md": "# Context Map\n\n| Источник | Партнёр | Тип | Канал |\n|---|---|---|---|\n| order | payment | customer-supplier | sync REST |\n",
+    "docs/03-data-ownership.md": "# Data Ownership\n\n| Сущность | Owner-сервис |\n|---|---|\n| Order | order |\n",
+    "contracts/events/_index.md": "# Event Index\n\n| Топик/канал | Publisher (сервис) | Consumers | Брокер | Тип сообщения | Контракт (ссылка на asyncapi) |\n|---|---|---|---|---|---|\n| order.events.v1 | order | not-declared | Kafka | OrderChanged.v1 | not-declared |\n",
+    "docs/adr/0001-tier-per-service.md": "# Tier per service\n\nTier 1/2/3 выбирается по сложности домена.\n",
+    "docs/adr/0002-no-direct-data-edits.md": "# Owner edits only\n\nТолько owner изменяет свои данные.\n"
+  },
+  "unchanged_files": [
+    "services/order/README.md",
+    "docs/adr/0001-tier-per-service.md",
+    "docs/adr/0002-no-direct-data-edits.md"
+  ],
+  "prompt": "/skill:ucp-arch-design Все ответы уже даны, вопросы не нужны; понимание подтверждаю. Добавь сервис notification: Tier 2, Generic (типовая инфраструктура уведомлений), owner-team=notification-team. Владеет только сущностью Notification, конфликтов с Order нет. Связь: order → notification, open-host-service, async events. Notification слушает существующий order.events.v1 (publisher order, добавь notification в Consumers) и публикует новый notification.events.v1, Kafka, NotificationSent.v1, consumers=not-declared, contract=not-declared. Участия в BP и новых BP нет. Назначение: доставляет уведомления о событиях заказа. Обнови карточку, registry (запись в конец), overview, context map, data ownership и event index. Не создавай per-service docs/spec, код, OpenAPI, репозиторий и коммит. Сборку не запускай.",
+  "required_files": [
+    "services/notification/README.md",
+    "services/_registry.yaml",
+    "docs/00-overview.md",
+    "docs/01-context-map.md",
+    "docs/03-data-ownership.md",
+    "contracts/events/_index.md"
+  ],
+  "forbidden_globs": [
+    "services/notification/docs/**",
+    "**/*.java",
+    "services/notification/contracts/**"
+  ],
+  "file_patterns": {
+    "services/notification/README.md": [
+      "# Notification Service",
+      "Tier.*2",
+      "Generic",
+      "notification-team",
+      "Notification",
+      "order",
+      "open-host-service|OHS",
+      "async"
+    ],
+    "services/_registry.yaml": [
+      "- name: order[\\s\\S]*- name: notification",
+      "owner:\\s*notification-team",
+      "tier:\\s*2",
+      "subdomain:\\s*Generic"
+    ],
+    "docs/00-overview.md": [
+      "notification"
+    ],
+    "docs/01-context-map.md": [
+      "order[^\\n]*notification|notification[^\\n]*order",
+      "open-host-service|OHS",
+      "async"
+    ],
+    "docs/03-data-ownership.md": [
+      "\\| Notification \\| notification \\|"
+    ],
+    "contracts/events/_index.md": [
+      "order\\.events\\.v1[^\\n]*notification",
+      "\\| notification\\.events\\.v1 \\| notification \\| not-declared \\| Kafka \\| NotificationSent\\.v1 \\| not-declared \\|"
+    ]
+  }
+}
