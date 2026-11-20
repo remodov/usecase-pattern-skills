@@ -1,0 +1,22 @@
+{
+  "skill": "ucp-spec-change-review",
+  "title": "Fast review находит отсутствие причины, неверный класс и горизонтальные задачи",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Notes\n\n## 2. Интеграции\n\n| Контракт | Потребитель | Связь |\n| --- | --- | --- |\n| NoteResponse | Billing | customer-supplier |\n",
+    "docs/spec/aggregates/note.md": "---\ncontext: notes\naggregate: Note\nlevel: 2\n---\n# Note\n\n## 1. Доменная модель\n\nNote содержит id и text.\n",
+    "docs/spec/changes/2026-11-20-rename-note-text.md": "---\ncontext: notes\nchange: rename-note-text\nstatus: proposed\nlevel: 2\n---\n# Rename text\n\n## 1. Зачем\n\nПереименовать поле text в content.\n\n## 2. Что меняется\n\n| Файл | Раздел | Было | Станет |\n| --- | --- | --- | --- |\n| docs/spec/aggregates/note.md | Доменная модель | text | content |\n\n## 3. Влияние\n\nКласс: compatible. Возможно, затронет другие сервисы.\n\n## 4. Миграция\n\nЗаменить text на content одним выпуском.\n\n## 5. Задачи\n\n- [ ] Изменить все DTO.\n- [ ] Изменить все контроллеры.\n- [ ] Написать все тесты.\n\n## 6. Критерии приёмки\n\nПоле называется content.\n\n## 7. Слияние\n\nОжидает реализации.\n"
+  },
+  "unchanged_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md",
+    "docs/spec/changes/2026-11-20-rename-note-text.md"
+  ],
+  "prompt": "/skill:ucp-spec-change-review fast Проверь docs/spec/changes/2026-11-20-rename-note-text.md вместе со спекой. Ничего не изменяй, сборку не запускай. Найди критические нарушения fast-режима с SC-кодами, файлом и разделом.",
+  "output_patterns": [
+    "SC-WHY-1",
+    "SC-IMP-2",
+    "SC-TASK-1",
+    "(?i)Критично",
+    "2026-11-20-rename-note-text\\.md"
+  ]
+}

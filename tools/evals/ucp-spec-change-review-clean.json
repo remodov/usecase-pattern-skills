@@ -1,0 +1,21 @@
+{
+  "skill": "ucp-spec-change-review",
+  "title": "Fast review согласованного compatible change не даёт критических находок",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Notes\n\n## 2. Интеграции\n\nВнешних потребителей и подписчиков событий нет.\n\n## 9. Критерии приёмки\n\nСоздание заметки с непустым текстом успешно.\n",
+    "docs/spec/aggregates/note.md": "---\ncontext: notes\naggregate: Note\nlevel: 2\n---\n# Note\n\n## 1. Доменная модель\n\nNote содержит id и text.\n\n## 5. Команды\n\n### CreateNote\n\n- **Вход**: text.\n- **Результат**: id.\n- **Предусловия**: text непустой.\n- **Логика**: Создаёт заметку.\n- **Эмитит**: нет.\n- **Ошибки**: NOTE_TEXT_EMPTY.\n\n## 7. Запросы\n\n### GetNote\n\n- **Параметры**: id.\n- **Возвращает**: Note.\n- **Логика**: Возвращает заметку владельцу.\n",
+    "docs/spec/changes/2026-11-20-note-expiration.md": "---\ncontext: notes\nchange: note-expiration\nstatus: proposed\nlevel: 2\n---\n# Note expiration\n\n## 1. Зачем\n\nСейчас владелец не может ограничить срок доступности заметки, поэтому устаревшие записи остаются доступны. Рассматривалось автоматическое удаление, но оно выходит за границу; выбран необязательный срок чтения.\n\n## 2. Что меняется\n\n| Файл | Раздел | Было | Станет |\n| --- | --- | --- | --- |\n| docs/spec/aggregates/note.md | Доменная модель | id и text | Добавлен необязательный expiresAt |\n| docs/spec/aggregates/note.md | Команды · CreateNote | Вход text | Добавлен необязательный expiresAt |\n| docs/spec/aggregates/note.md | Запросы · GetNote | Возвращает Note без проверки срока | Для истёкшей заметки возвращается NOTE_EXPIRED |\n| docs/spec/notes-spec.md | Критерии приёмки | Только создание | Добавлены сценарии действующей и истёкшей заметки |\n\n## 3. Влияние\n\nКласс: compatible. Внешние потребители и подписчики отсутствуют; прежние клиенты CreateNote не меняются.\n\n## 4. Миграция\n\nНе требуется: поле необязательное.\n\n## 5. Задачи\n\n- [ ] Срез срока действия целиком через `ucp-api-design`, `ucp-pattern-design` и `ucp-test-design`: необязательный expiresAt, чтение действующей заметки и проверка успеха/NOTE_EXPIRED.\n\n## 6. Критерии приёмки\n\n- **Дано** действующая заметка, **Когда** владелец читает её, **Тогда** заметка возвращается.\n- **Дано** истёкшая заметка, **Когда** владелец читает её, **Тогда** возвращается NOTE_EXPIRED.\n\n## 7. Слияние\n\nОжидает реализации.\n"
+  },
+  "unchanged_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md",
+    "docs/spec/changes/2026-11-20-note-expiration.md"
+  ],
+  "prompt": "/skill:ucp-spec-change-review fast Проверь docs/spec/changes/2026-11-20-note-expiration.md вместе со спекой. Применяй только fast-режим. Ничего не изменяй, сборку не запускай. Укажи класс, статус, число критических находок и вердикт.",
+  "output_patterns": [
+    "compatible",
+    "proposed",
+    "(?i)Критично\\s*(?:[—:-]|:)?\\s*0",
+    "(?i)готово к реализации"
+  ]
+}
