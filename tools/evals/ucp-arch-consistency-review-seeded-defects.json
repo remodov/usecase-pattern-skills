@@ -1,0 +1,28 @@
+{
+  "skill": "ucp-arch-consistency-review",
+  "title": "Review находит неполный registry, двух data owners и двух publishers",
+  "initial_files": {
+    "services/_registry.yaml": "services:\n  - name: order\n    tier: 3\n    subdomain: Core\n",
+    "services/order/README.md": "# Order Service\n\n## Домен-агрегаты\n\nАгрегаты не заявлены.\n\n## Use Cases\n\nUse Cases не заявлены.\n\n## Связи\n\nСвязей нет.\n\n## Участие в бизнес-процессах\n\nНе участвует.\n",
+    "docs/03-data-ownership.md": "# Data Ownership\n\n| Сущность | Owner-сервис |\n|---|---|\n| Order | order |\n| Order | payment |\n",
+    "contracts/events/_index.md": "# Event Index\n\n| Топик/канал | Publisher (сервис) | Consumers | Брокер | Тип сообщения | Контракт (ссылка на asyncapi) |\n|---|---|---|---|---|---|\n| order.events.v1 | order | not-declared | Kafka | OrderChanged.v1 | services/order/contracts/asyncapi.yaml |\n| order.events.v1 | payment | not-declared | Kafka | OrderChanged.v1 | not-declared |\n",
+    "services/order/contracts/asyncapi.yaml": "asyncapi: 2.6.0\ninfo:\n  title: Order Events\n  version: 1.0.0\nchannels:\n  order.events.v1:\n    publish:\n      message:\n        $ref: '#/components/messages/OrderChanged'\ncomponents:\n  messages:\n    OrderChanged:\n      name: OrderChanged.v1\n      payload:\n        type: object\n        properties:\n          eventId:\n            type: string\n          eventType:\n            type: string\n          version:\n            type: string\n"
+  },
+  "unchanged_files": [
+    "services/_registry.yaml",
+    "services/order/README.md",
+    "docs/03-data-ownership.md",
+    "contracts/events/_index.md",
+    "services/order/contracts/asyncapi.yaml"
+  ],
+  "prompt": "/skill:ucp-arch-consistency-review Проверь services/_registry.yaml, docs/03-data-ownership.md, contracts/events/_index.md и связанный AsyncAPI. Это сфокусированный fixture для REG-1, DATA-1 и CONTR-4. Ничего не изменяй, сборку не запускай. Найди критические нарушения с кодами правил, файлами и строками.",
+  "output_patterns": [
+    "REG-1|registry-entry-is-complete",
+    "DATA-1|single-owner-per-entity",
+    "CONTR-4|one-publisher-per-event",
+    "(?:Critical|Критично|❌)",
+    "services/_registry\\.yaml",
+    "docs/03-data-ownership\\.md",
+    "contracts/events/_index\\.md"
+  ]
+}

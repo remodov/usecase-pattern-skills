@@ -1,0 +1,28 @@
+{
+  "skill": "ucp-arch-consistency-review",
+  "title": "Согласованный минимальный architecture corpus не имеет critical issues",
+  "initial_files": {
+    "services/_registry.yaml": "services:\n  - name: order\n    tier: 3\n    owner: order-team\n    subdomain: Core\n    git: git@github.com:org/order.git\n    paths:\n      spec: services/order/spec/\n      contracts: services/order/contracts/\n",
+    "services/order/README.md": "# Order Service\n\n| | |\n|---|---|\n| **Tier** | 3 |\n| **Субдомен** | Core |\n| **Владелец** | order-team |\n\n## Домен-агрегаты\n\nАгрегаты не заявлены в этом сокращённом fixture.\n\n## Use Cases\n\nUse Cases не заявлены в этом сокращённом fixture.\n\n## Связи\n\nСвязей нет.\n\n## Участие в бизнес-процессах\n\nНе участвует.\n",
+    "docs/00-overview.md": "# Overview\n\n| Сервис | Назначение |\n|---|---|\n| order | Заказы |\n",
+    "docs/01-context-map.md": "# Context Map\n\n| Сервис | Связи |\n|---|---|\n| order | нет |\n",
+    "docs/02-ubiquitous-language.md": "# Ubiquitous Language\n\n| Термин | Определение |\n|---|---|\n| Order | Заказ клиента |\n",
+    "docs/03-data-ownership.md": "# Data Ownership\n\n| Сущность | Owner-сервис |\n|---|---|\n| Order | order |\n",
+    "docs/06-integration-patterns.md": "# Integration Patterns\n\n| From | To | Endpoint | Протокол | BP |\n|---|---|---|---|---|\n| not-declared | not-declared | not-declared | not-declared | not-declared |\n",
+    "contracts/events/_index.md": "# Event Index\n\n| Топик/канал | Publisher (сервис) | Consumers | Брокер | Тип сообщения | Контракт (ссылка на asyncapi) |\n|---|---|---|---|---|---|\n| order.events.v1 | order | not-declared | Kafka | OrderChanged.v1 | services/order/contracts/asyncapi.yaml |\n",
+    "services/order/contracts/asyncapi.yaml": "asyncapi: 2.6.0\ninfo:\n  title: Order Events\n  version: 1.0.0\nchannels:\n  order.events.v1:\n    publish:\n      message:\n        $ref: '#/components/messages/OrderChanged'\ncomponents:\n  messages:\n    OrderChanged:\n      name: OrderChanged.v1\n      payload:\n        type: object\n        properties:\n          eventId:\n            type: string\n          eventType:\n            type: string\n          version:\n            type: string\n"
+  },
+  "unchanged_files": [
+    "services/_registry.yaml",
+    "services/order/README.md",
+    "docs/03-data-ownership.md",
+    "contracts/events/_index.md",
+    "services/order/contracts/asyncapi.yaml"
+  ],
+  "prompt": "/skill:ucp-arch-consistency-review Полный прогон применимых правил для этого сокращённого architecture fixture. Ничего не изменяй, сборку не запускай. Отсутствие git history считай только warning о свежести, не critical. Не выдумывай findings для отсутствующих необязательных BP и OpenAPI. В резюме явно укажи число Critical.",
+  "output_patterns": [
+    "(?:Critical|Критично)[^\\n]*0",
+    "REG-1|registry-entry-is-complete",
+    "CONTR-4|one-publisher-per-event"
+  ]
+}
