@@ -1,0 +1,20 @@
+{
+  "skill": "ucp-arch-bp-design",
+  "title": "Вне architecture root создание BP отклоняется",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Notes\n"
+  },
+  "unchanged_files": [
+    "docs/spec/notes-spec.md"
+  ],
+  "prompt": "/skill:ucp-arch-bp-design Создай новый бизнес-процесс checkout. Если гейт архитектурного корня не проходит, ничего не создавай и не изменяй. Сборку не запускай.",
+  "forbidden_globs": [
+    "services/**",
+    "docs/business-processes/**"
+  ],
+  "output_patterns": [
+    "корня архитектурного репо",
+    "services/_registry\\.yaml",
+    "docs/business-processes/_index\\.md"
+  ]
+}

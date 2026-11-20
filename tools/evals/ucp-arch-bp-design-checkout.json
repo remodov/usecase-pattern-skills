@@ -1,0 +1,67 @@
+{
+  "skill": "ucp-arch-bp-design",
+  "title": "BP-02 создаётся с orchestration, money-idempotency и back-references",
+  "initial_files": {
+    "services/_registry.yaml": "services:\n  - name: order\n    tier: 3\n    owner: order-team\n    subdomain: Core\n  - name: payment\n    tier: 3\n    owner: payment-team\n    subdomain: Core\n  - name: notification\n    tier: 2\n    owner: notification-team\n    subdomain: Generic\n",
+    "services/order/README.md": "# Order Service\n\n## Use Cases\n\n- CreateOrder\n- MarkOrderPaid\n- CancelOrder\n\n## Участие в бизнес-процессах\n\n| BP | Роль |\n|---|---|\n| [BP-01: Purchase](../../docs/business-processes/BP-01-purchase.md) | participant |\n",
+    "services/payment/README.md": "# Payment Service\n\n## Use Cases\n\n- AuthorizePayment\n- RefundPayment\n\n## Участие в бизнес-процессах\n\n| BP | Роль |\n|---|---|\n| [BP-01: Purchase](../../docs/business-processes/BP-01-purchase.md) | participant |\n",
+    "services/notification/README.md": "# Notification Service\n\n## Use Cases\n\n- SendNotification\n\n## Участие в бизнес-процессах\n\n| BP | Роль |\n|---|---|\n",
+    "docs/01-context-map.md": "# Context Map\n\n| Источник | Партнёр | Тип | Канал |\n|---|---|---|---|\n| order | payment | customer-supplier | sync REST |\n| payment | notification | open-host-service | async events |\n",
+    "docs/business-processes/_index.md": "# Business Processes\n\n| BP | Название | Участники | Тип |\n|---|---|---|---|\n| [BP-01](BP-01-purchase.md) | Purchase | order, payment | orchestration |\n",
+    "docs/business-processes/BP-01-purchase.md": "# BP-01: Purchase\n\n**Триггер:** Buyer нажимает Купить\n**Saga-orchestrator:** order\n**Сервисы:** order, payment\n**Цель:** Заказ оплачен.\n\n### Sequence\n\n```mermaid\nsequenceDiagram\n    autonumber\n    Buyer->>Order: CreateOrder\n    Order->>Payment: AuthorizePayment\n```\n\n### Шаги\n\n| # | Сервис | Действие | На отказ |\n|---|---|---|---|\n| 1 | order | CreateOrder | Пользователь видит ошибку |\n\n### 🔴 Точки отказа и компенсации\n\n| Где упало | Что делаем |\n|---|---|\n| CreateOrder | Нет компенсации: заказ не создан |\n"
+  },
+  "unchanged_files": [
+    "services/_registry.yaml",
+    "docs/01-context-map.md",
+    "docs/business-processes/BP-01-purchase.md"
+  ],
+  "prompt": "/skill:ucp-arch-bp-design Все ответы даны, вопросы не нужны; понимание подтверждаю. Создай BP-02-checkout. Триггер: Buyer подтверждает checkout. Цель: заказ создан и оплачен, buyer получил уведомление. Участники только order, payment, notification. Orchestration с Saga-orchestrator=order: 4 шага и ветвление на отказ оплаты. Шаги и существующие UC: order.CreateOrder → payment.AuthorizePayment → order.MarkOrderPaid → notification.SendNotification. Для оплаты обязателен Idempotency-Key=orderId. При отказе AuthorizePayment выполнить order.CancelOrder; при отказе MarkOrderPaid выполнить payment.RefundPayment и order.CancelOrder. Компенсации семантические, идемпотентные и фиксируются в audit trail, никаких DELETE. При отказе SendNotification заказ остаётся оплаченным, пользователь видит статус без уведомления, отдельная компенсация не нужна. Используй sequenceDiagram и существующие UC, новых UC не требуется. Обнови _index.md и back-references всех участников. Не пиши код и контракты, не создавай сервисы и коммит.",
+  "required_files": [
+    "docs/business-processes/BP-02-checkout.md",
+    "docs/business-processes/_index.md",
+    "services/order/README.md",
+    "services/payment/README.md",
+    "services/notification/README.md"
+  ],
+  "forbidden_globs": [
+    "**/*.java",
+    "services/*/contracts/**"
+  ],
+  "file_patterns": {
+    "docs/business-processes/BP-02-checkout.md": [
+      "# BP-02:",
+      "Saga-orchestrator:\\*\\*?\\s*order|Saga-orchestrator.*order",
+      "sequenceDiagram",
+      "CreateOrder",
+      "AuthorizePayment",
+      "MarkOrderPaid",
+      "SendNotification",
+      "Idempotency-Key",
+      "orderId",
+      "CancelOrder",
+      "RefundPayment",
+      "audit"
+    ],
+    "docs/business-processes/_index.md": [
+      "BP-02",
+      "checkout|Checkout"
+    ],
+    "services/order/README.md": [
+      "BP-02",
+      "orchestrator"
+    ],
+    "services/payment/README.md": [
+      "BP-02",
+      "participant"
+    ],
+    "services/notification/README.md": [
+      "BP-02",
+      "participant"
+    ]
+  },
+  "file_forbidden_patterns": {
+    "docs/business-processes/BP-02-checkout.md": [
+      "DELETE(?!`?\\s+не\\s)`?|удалить запись|(?i:drop\\s+table)"
+    ]
+  }
+}
