@@ -1,0 +1,35 @@
+{
+  "skill": "ucp-spec-change",
+  "title": "Merge обновляет спеку и архивирует принятое изменение",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Notes\n\n## 9. Критерии приёмки\n\nДействующая заметка доступна владельцу.\n",
+    "docs/spec/aggregates/note.md": "---\ncontext: notes\naggregate: Note\nlevel: 2\n---\n# Note\n\n## 1. Доменная модель\n\nNote содержит id и text.\n\n## 7. Запросы\n\n### GetNote\n\n- **Вопрос**: Какой текст имеет заметка?\n- **Параметры**: id.\n- **Возвращает**: Note.\n- **Логика**: Возвращает заметку владельцу.\n",
+    "docs/spec/changes/2026-11-20-note-expiration.md": "---\ncontext: notes\nchange: note-expiration\nstatus: proposed\nlevel: 2\n---\n# Note expiration\n\n## 1. Зачем\n\nНужно ограничить срок доступности заметки.\n\n## 2. Что меняется\n\n| Файл | Раздел | Изменение |\n| --- | --- | --- |\n| docs/spec/aggregates/note.md | Доменная модель | Добавить необязательный expiresAt |\n| docs/spec/aggregates/note.md | Запросы · GetNote | После expiresAt возвращать NOTE_EXPIRED |\n| docs/spec/notes-spec.md | Критерии приёмки | Добавить Given/When/Then для истёкшей заметки |\n\n## 3. Влияние\n\nCompatible, внешних потребителей нет.\n\n## 4. Миграция\n\nМиграция не требуется.\n\n## 5. Задачи\n\n- [x] Реализовано и проверено.\n\n## 6. Критерии приёмки\n\n- **Given** заметка с истёкшим expiresAt, **When** владелец вызывает GetNote, **Then** возвращается NOTE_EXPIRED.\n\n## 7. Слияние\n\nОжидает слияния.\n"
+  },
+  "prompt": "/skill:ucp-spec-change merge Изменение реализовано точно по docs/spec/changes/2026-11-20-note-expiration.md и принято. Влей все строки в спеку, перенеси критерий, закрой change датой 2026-11-20 и перемести его в docs/spec/changes/archive/. Не меняй код и не создавай новых изменений. Сборку не запускай; если project spec_check в fixture недоступен, просто укажи это после слияния.",
+  "required_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md",
+    "docs/spec/changes/archive/2026-11-20-note-expiration.md"
+  ],
+  "forbidden_files": [
+    "docs/spec/changes/2026-11-20-note-expiration.md"
+  ],
+  "file_patterns": {
+    "docs/spec/notes-spec.md": [
+      "Given",
+      "When",
+      "Then",
+      "NOTE_EXPIRED"
+    ],
+    "docs/spec/aggregates/note.md": [
+      "expiresAt",
+      "NOTE_EXPIRED",
+      "GetNote"
+    ],
+    "docs/spec/changes/archive/2026-11-20-note-expiration.md": [
+      "status:\\s*merged",
+      "2026-11-20"
+    ]
+  }
+}

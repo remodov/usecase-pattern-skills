@@ -1,0 +1,41 @@
+{
+  "skill": "ucp-spec-change",
+  "title": "Propose создаёт отдельный compatible change без правки спеки",
+  "initial_files": {
+    "docs/spec/notes-spec.md": "---\ncontext: notes\nbounded-context: Notes\nlevel: 2\n---\n# Notes\n\n## 2. Интеграции\n\nВнешних потребителей и интеграций нет.\n\n## 6. Use Cases\n\n### UC-1 Customer создаёт заметку\n\nCustomer вызывает CreateNote и получает id.\n\n## 9. Критерии приёмки\n\nСоздание заметки с непустым текстом успешно.\n",
+    "docs/spec/aggregates/note.md": "---\ncontext: notes\naggregate: Note\nlevel: 2\n---\n# Note\n\n## 4. Бизнес-правила\n\nТекст заметки непустой.\n\n## 5. Команды\n\n### CreateNote\n\n- **Вход**: text.\n- **Результат**: id.\n- **Предусловия**: text непустой.\n- **Логика**: Создаёт заметку.\n- **Эмитит**: нет.\n- **Ошибки**: NOTE_TEXT_EMPTY.\n"
+  },
+  "unchanged_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md"
+  ],
+  "prompt": "/skill:ucp-spec-change propose Создай только docs/spec/changes/2026-11-20-note-expiration.md. Все обязательные решения уже приняты, дополнительные вопросы не нужны. Граница: добавить Note необязательный expiresAt и запрет чтения после истечения срока; удаление и другие команды не входят. Подход: хранить expiresAt в Note и проверять срок в GetNote, других подходов нет. Совместимость: compatible, поле необязательное, прежние клиенты работают без изменений; внешних потребителей нет. Проверка: contract и integration tests на успех и NOTE_EXPIRED. Владелец решения: product-owner; change живёт до merge. Задачи нарежь вертикально с конкретными ucp-* skills. Добавь Given/When/Then для действующей и истёкшей заметки. Спеку и код не меняй, сборку не запускай.",
+  "required_files": [
+    "docs/spec/changes/2026-11-20-note-expiration.md"
+  ],
+  "file_patterns": {
+    "docs/spec/changes/2026-11-20-note-expiration.md": [
+      "context:\\s*notes",
+      "change:\\s*note-expiration",
+      "status:\\s*proposed",
+      "level:\\s*2",
+      "## 1\\. Зачем",
+      "## 2\\. Что меняется",
+      "compatible",
+      "## 3\\. Влияние",
+      "## 4\\. Миграция",
+      "## 5\\. Задачи",
+      "ucp-(?:pattern|api|test)-design",
+      "## 6\\. Критерии приёмки",
+      "(?:Given|Дано)",
+      "(?:When|Когда)",
+      "(?:Then|Тогда)",
+      "NOTE_EXPIRED",
+      "## 7\\. Слияние",
+      "product-owner"
+    ]
+  },
+  "forbidden_globs": [
+    "**/*.java"
+  ]
+}
