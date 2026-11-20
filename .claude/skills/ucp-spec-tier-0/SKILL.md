@@ -2,7 +2,7 @@
 name: ucp-spec-tier-0
 lang: any
 track: any
-description: Сгенерировать as-is Use Case спецификацию существующего сервиса из кода (Java, миграции, OpenAPI, тесты) — без бизнес-брифа; формат как у ucp-spec-design, Уровень 0 (level: 0), отсутствующее — литерал not-declared.
+description: "Сгенерировать as-is Use Case спецификацию существующего сервиса из кода (Java, миграции, OpenAPI, тесты) — без бизнес-брифа; формат как у ucp-spec-design, Уровень 0 (level: 0), отсутствующее — литерал not-declared."
 when_to_use: Онбординг сервиса не по UCP; точка отсчёта для миграции на уровень 1/2/3. На входе только репо.
 allowed-tools: Read Glob Grep Write Edit Bash(./gradlew*) Bash(mvn*) Skill(superpowers:*)
 ---

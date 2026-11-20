@@ -1,0 +1,13 @@
+{
+  "skill": "ucp-spec-tier-0",
+  "title": "Пустой репозиторий не порождает выдуманную as-is спеку",
+  "initial_files": {},
+  "prompt": "/skill:ucp-spec-tier-0 Сгенерируй as-is спеку текущего репозитория. Ничего не создавай и не изменяй, сборку не запускай.",
+  "forbidden_globs": [
+    "docs/spec/**/*.md"
+  ],
+  "output_patterns": [
+    "\\.claude/docs/shared/spec-format/spec\\.md",
+    "(?i)(не могу|останов|отсутств)"
+  ]
+}

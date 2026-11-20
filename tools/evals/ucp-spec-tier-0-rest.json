@@ -1,0 +1,55 @@
+{
+  "skill": "ucp-spec-tier-0",
+  "title": "As-is спека восстанавливает REST-операции с evidence и Level 0",
+  "initial_files": {
+    "settings.gradle": "rootProject.name = 'notes'\n",
+    "src/main/java/com/example/notes/Note.java": "package com.example.notes;\n\nimport java.util.UUID;\n\npublic record Note(UUID id, String text) {}\n",
+    "src/main/java/com/example/notes/NoteService.java": "package com.example.notes;\n\nimport java.util.UUID;\n\npublic class NoteService {\n    public Note create(String text) {\n        if (text == null || text.isBlank()) {\n            throw new IllegalArgumentException(\"NOTE_TEXT_EMPTY\");\n        }\n        return new Note(UUID.randomUUID(), text);\n    }\n\n    public Note get(UUID id) {\n        return new Note(id, \"stored\");\n    }\n}\n",
+    "src/main/java/com/example/notes/NoteController.java": "package com.example.notes;\n\nimport java.util.UUID;\nimport org.springframework.web.bind.annotation.GetMapping;\nimport org.springframework.web.bind.annotation.PathVariable;\nimport org.springframework.web.bind.annotation.PostMapping;\nimport org.springframework.web.bind.annotation.RequestBody;\nimport org.springframework.web.bind.annotation.RequestMapping;\nimport org.springframework.web.bind.annotation.RestController;\n\n@RestController\n@RequestMapping(\"/notes\")\npublic class NoteController {\n    private final NoteService service;\n\n    public NoteController(NoteService service) {\n        this.service = service;\n    }\n\n    @PostMapping\n    public UUID createNote(@RequestBody String text) {\n        return service.create(text).id();\n    }\n\n    @GetMapping(\"/{id}\")\n    public Note getNote(@PathVariable UUID id) {\n        return service.get(id);\n    }\n}\n"
+  },
+  "unchanged_files": [
+    "settings.gradle",
+    "src/main/java/com/example/notes/Note.java",
+    "src/main/java/com/example/notes/NoteService.java",
+    "src/main/java/com/example/notes/NoteController.java"
+  ],
+  "prompt": "/skill:ucp-spec-tier-0 Сгенерируй as-is спеку сервиса по исходникам. Имя сервиса задано в settings.gradle. Нужны только docs/spec/notes-spec.md и docs/spec/aggregates/note.md. Восстанови обе REST-операции, command/query карточки, NOTE_TEXT_EMPTY, обязательные реестры и evidence file:line. Брокеров и событий в коде нет. Не выдумывай акторов, владельцев, SLA и отсутствующие бизнес-факты; неизвестные поля помечай not-declared. Исходники не меняй, сборку не запускай.",
+  "required_files": [
+    "docs/spec/notes-spec.md",
+    "docs/spec/aggregates/note.md"
+  ],
+  "forbidden_globs": [
+    "src/**/*.md",
+    "docs/spec/commands/**"
+  ],
+  "file_patterns": {
+    "docs/spec/notes-spec.md": [
+      "context:\\s*notes",
+      "bounded-context:\\s*(?i:notes)",
+      "level:\\s*0",
+      "\\(Уровень 0, as-is\\)",
+      "## 11\\. Техническая реализация",
+      "Каналы и топики",
+      "не применимо: брокеров нет",
+      "\\| Метод \\| Путь \\| operationId \\| Назначение \\| Evidence \\|",
+      "\\| POST \\| `?/notes`? \\|",
+      "\\| GET \\| `?/notes/\\{id\\}`? \\|",
+      "NoteController\\.java:\\d+",
+      "## Что не определено"
+    ],
+    "docs/spec/aggregates/note.md": [
+      "context:\\s*notes",
+      "aggregate:\\s*(?i:note)",
+      "level:\\s*0",
+      "## 5\\. Команды",
+      "(?i:createNote)",
+      "## 7\\. Запросы",
+      "(?i:getNote)",
+      "NOTE_TEXT_EMPTY",
+      "not-declared",
+      "## Частые ошибки",
+      "## Что не определено",
+      "## Куда дальше"
+    ]
+  }
+}

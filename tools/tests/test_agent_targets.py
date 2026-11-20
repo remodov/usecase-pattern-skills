@@ -66,11 +66,14 @@ class AgentTargetRegistryTest(unittest.TestCase):
                 if skill.parent.name != "ucp-meta-review":
                     self.assertNotIn("TodoWrite", body)
 
-    def test_bootstrap_frontmatter_has_yaml_safe_trigger(self):
-        skill = ROOT / ".claude" / "skills" / "ucp-bootstrap-design" / "SKILL.md"
-        line = next(line for line in skill.read_text(encoding="utf-8").splitlines() if line.startswith("when_to_use:"))
-        value = line.partition(":")[2].strip()
-        self.assertFalse(not value.startswith(('"', "'")) and re.search(r":(?:\s|$)", value))
+    def test_processed_skill_frontmatter_has_yaml_safe_scalars(self):
+        for name in ("ucp-bootstrap-design", "ucp-spec-tier-0"):
+            with self.subTest(skill=name):
+                skill = ROOT / ".claude" / "skills" / name / "SKILL.md"
+                frontmatter = skill.read_text(encoding="utf-8").split("---")[1]
+                for line in frontmatter.splitlines():
+                    value = line.partition(":")[2].strip()
+                    self.assertFalse(not value.startswith(('"', "'")) and re.search(r":(?:\s|$)", value))
 
     def test_codex_agent_emitter(self):
         with tempfile.TemporaryDirectory() as tmp:
